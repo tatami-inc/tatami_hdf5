@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.9.6"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>tatami_hdf5: tatami_hdf5/class/Hdf5DenseMatrix.hpp Source File</title>
+<title>tatami_hdf5: tatami_hdf5/Hdf5DenseMatrix.hpp Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -71,7 +71,7 @@ $(function() {
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_199b33aff6fd440ccb32a7c0defe24db.html">tatami_hdf5</a></li><li class="navelem"><a class="el" href="dir_2ac1ff629bb61bae86cf06b3b32f98e8.html">class</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_199b33aff6fd440ccb32a7c0defe24db.html">tatami_hdf5</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
@@ -90,9 +90,9 @@ $(function() {
 <div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span><span class="preprocessor">#include &lt;list&gt;</span></div>
 <div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span><span class="preprocessor">#include &lt;vector&gt;</span></div>
 <div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span> </div>
-<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span><span class="preprocessor">#include &quot;utils.hpp&quot;</span></div>
+<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span><span class="preprocessor">#include &quot;<a class="codeRef" href="https://tatami-inc.github.io/tatami/stats_2utils_8hpp.html">utils.hpp</a>&quot;</span></div>
 <div class="line"><a id="l00014" name="l00014"></a><span class="lineno">   14</span> </div>
-<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span><span class="keyword">namespace </span>tatami_hdf5 {</div>
+<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span><span class="keyword">namespace </span><a class="code hl_namespace" href="namespacetatami__hdf5.html">tatami_hdf5</a> {</div>
 <div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span> </div>
 <div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span><span class="keyword">template</span>&lt;<span class="keyword">typename</span> Value_, <span class="keyword">typename</span> Index_, <span class="keywordtype">bool</span> transpose_ = false&gt;</div>
 <div class="line"><a id="l00047" name="l00047"></a><span class="lineno"><a class="line" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html">   47</a></span><span class="keyword">class </span><a class="code hl_class" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html">Hdf5DenseMatrix</a> : <span class="keyword">public</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1VirtualDenseMatrix.html">tatami::VirtualDenseMatrix</a>&lt;Value_, Index_&gt; {</div>
@@ -188,13 +188,13 @@ $(function() {
 <div class="line"><a id="l00152" name="l00152"></a><span class="lineno">  152</span>        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
 <div class="line"><a id="l00153" name="l00153"></a><span class="lineno">  153</span>    }</div>
 <div class="line"><a id="l00154" name="l00154"></a><span class="lineno">  154</span> </div>
-<div class="line"><a id="l00155" name="l00155"></a><span class="lineno">  155</span>    <span class="keyword">using </span>Matrix&lt;Value_, Index_&gt;<a class="code hl_functionRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a3913e6cfd25586f37c0833a21c8f0ca6">::dense_row</a>;</div>
+<div class="line"><a id="l00155" name="l00155"></a><span class="lineno">  155</span>    <span class="keyword">using </span><a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a>&lt;Value_, Index_&gt;<a class="code hl_functionRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a3913e6cfd25586f37c0833a21c8f0ca6">::dense_row</a>;</div>
 <div class="line"><a id="l00156" name="l00156"></a><span class="lineno">  156</span> </div>
-<div class="line"><a id="l00157" name="l00157"></a><span class="lineno">  157</span>    <span class="keyword">using </span>Matrix&lt;Value_, Index_&gt;<a class="code hl_functionRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a94a543328188b8212c9267f9c5edc431">::dense_column</a>;</div>
+<div class="line"><a id="l00157" name="l00157"></a><span class="lineno">  157</span>    <span class="keyword">using </span><a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a>&lt;Value_, Index_&gt;<a class="code hl_functionRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a94a543328188b8212c9267f9c5edc431">::dense_column</a>;</div>
 <div class="line"><a id="l00158" name="l00158"></a><span class="lineno">  158</span> </div>
-<div class="line"><a id="l00159" name="l00159"></a><span class="lineno">  159</span>    <span class="keyword">using </span>Matrix&lt;Value_, Index_&gt;<a class="code hl_functionRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a7274f8de1b6918f45291e10c054252a1">::sparse_row</a>;</div>
+<div class="line"><a id="l00159" name="l00159"></a><span class="lineno">  159</span>    <span class="keyword">using </span><a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a>&lt;Value_, Index_&gt;<a class="code hl_functionRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a7274f8de1b6918f45291e10c054252a1">::sparse_row</a>;</div>
 <div class="line"><a id="l00160" name="l00160"></a><span class="lineno">  160</span> </div>
-<div class="line"><a id="l00161" name="l00161"></a><span class="lineno">  161</span>    <span class="keyword">using </span>Matrix&lt;Value_, Index_&gt;<a class="code hl_functionRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a8bfc42ee94b0068d1542c579718b52b4">::sparse_column</a>;</div>
+<div class="line"><a id="l00161" name="l00161"></a><span class="lineno">  161</span>    <span class="keyword">using </span><a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a>&lt;Value_, Index_&gt;<a class="code hl_functionRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a8bfc42ee94b0068d1542c579718b52b4">::sparse_column</a>;</div>
 <div class="line"><a id="l00162" name="l00162"></a><span class="lineno">  162</span> </div>
 <div class="line"><a id="l00163" name="l00163"></a><span class="lineno">  163</span><span class="keyword">private</span>:</div>
 <div class="line"><a id="l00164" name="l00164"></a><span class="lineno">  164</span>    <span class="keyword">template</span>&lt;<span class="keywordtype">bool</span> accrow_&gt;</div>
@@ -204,7 +204,7 @@ $(function() {
 <div class="line"><a id="l00168" name="l00168"></a><span class="lineno">  168</span>        std::vector&lt;std::pair&lt;Index_, Index_&gt; &gt; chunks_in_need; </div>
 <div class="line"><a id="l00169" name="l00169"></a><span class="lineno">  169</span>        <span class="keyword">typename</span> std::conditional&lt;accrow_ == transpose_, std::vector&lt;std::pair&lt;Index_, Index_&gt; &gt;, <span class="keywordtype">bool</span>&gt;::type cache_transpose_info;</div>
 <div class="line"><a id="l00170" name="l00170"></a><span class="lineno">  170</span> </div>
-<div class="line"><a id="l00171" name="l00171"></a><span class="lineno">  171</span>        OracleStream&lt;Index_&gt; prediction_stream;</div>
+<div class="line"><a id="l00171" name="l00171"></a><span class="lineno">  171</span>        <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html">tatami::OracleStream&lt;Index_&gt;</a> prediction_stream;</div>
 <div class="line"><a id="l00172" name="l00172"></a><span class="lineno">  172</span>        std::vector&lt;std::pair&lt;Index_, Index_&gt; &gt; predictions_made;</div>
 <div class="line"><a id="l00173" name="l00173"></a><span class="lineno">  173</span>        <span class="keywordtype">size_t</span> predictions_fulfilled = 0;</div>
 <div class="line"><a id="l00174" name="l00174"></a><span class="lineno">  174</span>    };</div>
@@ -546,17 +546,17 @@ $(function() {
 <div class="line"><a id="l00522" name="l00522"></a><span class="lineno">  522</span>    }</div>
 <div class="line"><a id="l00523" name="l00523"></a><span class="lineno">  523</span> </div>
 <div class="line"><a id="l00524" name="l00524"></a><span class="lineno">  524</span><span class="keyword">private</span>:</div>
-<div class="line"><a id="l00525" name="l00525"></a><span class="lineno">  525</span>    <span class="keyword">template</span>&lt;<span class="keywordtype">bool</span> accrow_, DimensionSelectionType selection_&gt;</div>
-<div class="line"><a id="l00526" name="l00526"></a><span class="lineno">  526</span>    <span class="keyword">struct </span>Hdf5Extractor : <span class="keyword">public</span> <a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ae9f8db5316521603085577d977a6955f">Extractor</a>&lt;selection_, false, Value_, Index_&gt; {</div>
+<div class="line"><a id="l00525" name="l00525"></a><span class="lineno">  525</span>    <span class="keyword">template</span>&lt;<span class="keywordtype">bool</span> accrow_, tatami::DimensionSelectionType selection_&gt;</div>
+<div class="line"><a id="l00526" name="l00526"></a><span class="lineno">  526</span>    <span class="keyword">struct </span>Hdf5Extractor : <span class="keyword">public</span> <a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ae9f8db5316521603085577d977a6955f">tatami::Extractor</a>&lt;selection_, false, Value_, Index_&gt; {</div>
 <div class="line"><a id="l00527" name="l00527"></a><span class="lineno">  527</span>        Hdf5Extractor(<span class="keyword">const</span> Hdf5DenseMatrix* p) : parent(p) {</div>
-<div class="line"><a id="l00528" name="l00528"></a><span class="lineno">  528</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == DimensionSelectionType::FULL) {</div>
+<div class="line"><a id="l00528" name="l00528"></a><span class="lineno">  528</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == tatami::DimensionSelectionType::FULL) {</div>
 <div class="line"><a id="l00529" name="l00529"></a><span class="lineno">  529</span>                this-&gt;full_length = (accrow_ ? parent-&gt;ncol() : parent-&gt;nrow());</div>
 <div class="line"><a id="l00530" name="l00530"></a><span class="lineno">  530</span>                base.fill(parent, this-&gt;full_length); </div>
 <div class="line"><a id="l00531" name="l00531"></a><span class="lineno">  531</span>            }</div>
 <div class="line"><a id="l00532" name="l00532"></a><span class="lineno">  532</span>        }</div>
 <div class="line"><a id="l00533" name="l00533"></a><span class="lineno">  533</span> </div>
 <div class="line"><a id="l00534" name="l00534"></a><span class="lineno">  534</span>        Hdf5Extractor(<span class="keyword">const</span> Hdf5DenseMatrix* p, Index_ start, Index_ length) : parent(p) {</div>
-<div class="line"><a id="l00535" name="l00535"></a><span class="lineno">  535</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == DimensionSelectionType::BLOCK) {</div>
+<div class="line"><a id="l00535" name="l00535"></a><span class="lineno">  535</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == tatami::DimensionSelectionType::BLOCK) {</div>
 <div class="line"><a id="l00536" name="l00536"></a><span class="lineno">  536</span>                this-&gt;block_start = start;</div>
 <div class="line"><a id="l00537" name="l00537"></a><span class="lineno">  537</span>                this-&gt;block_length = length;</div>
 <div class="line"><a id="l00538" name="l00538"></a><span class="lineno">  538</span>                base.fill(parent, this-&gt;block_length); </div>
@@ -564,7 +564,7 @@ $(function() {
 <div class="line"><a id="l00540" name="l00540"></a><span class="lineno">  540</span>        }</div>
 <div class="line"><a id="l00541" name="l00541"></a><span class="lineno">  541</span> </div>
 <div class="line"><a id="l00542" name="l00542"></a><span class="lineno">  542</span>        Hdf5Extractor(<span class="keyword">const</span> Hdf5DenseMatrix* p, std::vector&lt;Index_&gt; idx) : parent(p) {</div>
-<div class="line"><a id="l00543" name="l00543"></a><span class="lineno">  543</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == DimensionSelectionType::INDEX) {</div>
+<div class="line"><a id="l00543" name="l00543"></a><span class="lineno">  543</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == tatami::DimensionSelectionType::INDEX) {</div>
 <div class="line"><a id="l00544" name="l00544"></a><span class="lineno">  544</span>                this-&gt;index_length = idx.size();</div>
 <div class="line"><a id="l00545" name="l00545"></a><span class="lineno">  545</span>                indices = std::move(idx);</div>
 <div class="line"><a id="l00546" name="l00546"></a><span class="lineno">  546</span>                base.fill(parent, this-&gt;index_length); </div>
@@ -574,11 +574,11 @@ $(function() {
 <div class="line"><a id="l00550" name="l00550"></a><span class="lineno">  550</span>    <span class="keyword">protected</span>:</div>
 <div class="line"><a id="l00551" name="l00551"></a><span class="lineno">  551</span>        <span class="keyword">const</span> Hdf5DenseMatrix* parent;</div>
 <div class="line"><a id="l00552" name="l00552"></a><span class="lineno">  552</span>        Workspace&lt;accrow_&gt; base;</div>
-<div class="line"><a id="l00553" name="l00553"></a><span class="lineno">  553</span>        <span class="keyword">typename</span> std::conditional&lt;selection_ == DimensionSelectionType::INDEX, std::vector&lt;Index_&gt;, <span class="keywordtype">bool</span>&gt;::type indices;</div>
+<div class="line"><a id="l00553" name="l00553"></a><span class="lineno">  553</span>        <span class="keyword">typename</span> std::conditional&lt;selection_ == tatami::DimensionSelectionType::INDEX, std::vector&lt;Index_&gt;, <span class="keywordtype">bool</span>&gt;::type indices;</div>
 <div class="line"><a id="l00554" name="l00554"></a><span class="lineno">  554</span> </div>
 <div class="line"><a id="l00555" name="l00555"></a><span class="lineno">  555</span>    <span class="keyword">public</span>:</div>
 <div class="line"><a id="l00556" name="l00556"></a><span class="lineno">  556</span>        <span class="keyword">const</span> Index_* index_start()<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00557" name="l00557"></a><span class="lineno">  557</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == DimensionSelectionType::INDEX) {</div>
+<div class="line"><a id="l00557" name="l00557"></a><span class="lineno">  557</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == tatami::DimensionSelectionType::INDEX) {</div>
 <div class="line"><a id="l00558" name="l00558"></a><span class="lineno">  558</span>                <span class="keywordflow">return</span> indices.data();</div>
 <div class="line"><a id="l00559" name="l00559"></a><span class="lineno">  559</span>            } <span class="keywordflow">else</span> {</div>
 <div class="line"><a id="l00560" name="l00560"></a><span class="lineno">  560</span>                <span class="keywordflow">return</span> NULL;</div>
@@ -586,25 +586,25 @@ $(function() {
 <div class="line"><a id="l00562" name="l00562"></a><span class="lineno">  562</span>        }</div>
 <div class="line"><a id="l00563" name="l00563"></a><span class="lineno">  563</span> </div>
 <div class="line"><a id="l00564" name="l00564"></a><span class="lineno">  564</span>        <span class="keyword">const</span> Value_* fetch(Index_ i, Value_* buffer) {</div>
-<div class="line"><a id="l00565" name="l00565"></a><span class="lineno">  565</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == DimensionSelectionType::FULL) {</div>
+<div class="line"><a id="l00565" name="l00565"></a><span class="lineno">  565</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == tatami::DimensionSelectionType::FULL) {</div>
 <div class="line"><a id="l00566" name="l00566"></a><span class="lineno">  566</span>                <span class="keywordflow">return</span> parent-&gt;extract&lt;accrow_&gt;(i, buffer, 0, this-&gt;full_length, this-&gt;base);</div>
-<div class="line"><a id="l00567" name="l00567"></a><span class="lineno">  567</span>            } <span class="keywordflow">else</span> <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == DimensionSelectionType::BLOCK) {</div>
+<div class="line"><a id="l00567" name="l00567"></a><span class="lineno">  567</span>            } <span class="keywordflow">else</span> <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(selection_ == tatami::DimensionSelectionType::BLOCK) {</div>
 <div class="line"><a id="l00568" name="l00568"></a><span class="lineno">  568</span>                <span class="keywordflow">return</span> parent-&gt;extract&lt;accrow_&gt;(i, buffer, this-&gt;block_start, this-&gt;block_length, this-&gt;base);</div>
 <div class="line"><a id="l00569" name="l00569"></a><span class="lineno">  569</span>            } <span class="keywordflow">else</span> {</div>
 <div class="line"><a id="l00570" name="l00570"></a><span class="lineno">  570</span>                <span class="keywordflow">return</span> parent-&gt;extract&lt;accrow_&gt;(i, buffer, this-&gt;indices, this-&gt;index_length, this-&gt;base);</div>
 <div class="line"><a id="l00571" name="l00571"></a><span class="lineno">  571</span>            }</div>
 <div class="line"><a id="l00572" name="l00572"></a><span class="lineno">  572</span>        }</div>
 <div class="line"><a id="l00573" name="l00573"></a><span class="lineno">  573</span> </div>
-<div class="line"><a id="l00574" name="l00574"></a><span class="lineno">  574</span>        <span class="keywordtype">void</span> set_oracle(std::unique_ptr&lt;Oracle&lt;Index_&gt; &gt; o) {</div>
+<div class="line"><a id="l00574" name="l00574"></a><span class="lineno">  574</span>        <span class="keywordtype">void</span> set_oracle(std::unique_ptr&lt;<a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; o) {</div>
 <div class="line"><a id="l00575" name="l00575"></a><span class="lineno">  575</span>            base.futurist.reset(<span class="keyword">new</span> OracleCache&lt;accrow_&gt;);</div>
 <div class="line"><a id="l00576" name="l00576"></a><span class="lineno">  576</span>            base.futurist-&gt;prediction_stream.set(std::move(o));</div>
 <div class="line"><a id="l00577" name="l00577"></a><span class="lineno">  577</span>            base.historian.reset();</div>
 <div class="line"><a id="l00578" name="l00578"></a><span class="lineno">  578</span>        }</div>
 <div class="line"><a id="l00579" name="l00579"></a><span class="lineno">  579</span>    };</div>
 <div class="line"><a id="l00580" name="l00580"></a><span class="lineno">  580</span> </div>
-<div class="line"><a id="l00581" name="l00581"></a><span class="lineno">  581</span>    <span class="keyword">template</span>&lt;<span class="keywordtype">bool</span> accrow_, <a class="code hl_enumerationRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0a2ecaf58e2b69bb4a808e814aeb16a1">DimensionSelectionType</a> selection_, <span class="keyword">typename</span> ... Args_&gt;</div>
-<div class="line"><a id="l00582" name="l00582"></a><span class="lineno">  582</span>    std::unique_ptr&lt;Extractor&lt;selection_, false, Value_, Index_&gt; &gt; populate(<span class="keyword">const</span> Options&amp; opt, Args_... args)<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00583" name="l00583"></a><span class="lineno">  583</span>        std::unique_ptr&lt;Extractor&lt;selection_, false, Value_, Index_&gt; &gt; output;</div>
+<div class="line"><a id="l00581" name="l00581"></a><span class="lineno">  581</span>    <span class="keyword">template</span>&lt;<span class="keywordtype">bool</span> accrow_, <a class="code hl_enumerationRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0a2ecaf58e2b69bb4a808e814aeb16a1">tatami::DimensionSelectionType</a> selection_, <span class="keyword">typename</span> ... Args_&gt;</div>
+<div class="line"><a id="l00582" name="l00582"></a><span class="lineno">  582</span>    std::unique_ptr&lt;tatami::Extractor&lt;selection_, false, Value_, Index_&gt; &gt; populate(<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt, Args_... args)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00583" name="l00583"></a><span class="lineno">  583</span>        std::unique_ptr&lt;tatami::Extractor&lt;selection_, false, Value_, Index_&gt; &gt; output;</div>
 <div class="line"><a id="l00584" name="l00584"></a><span class="lineno">  584</span> </div>
 <div class="line"><a id="l00585" name="l00585"></a><span class="lineno">  585</span><span class="preprocessor">#ifndef TATAMI_HDF5_PARALLEL_LOCK</span></div>
 <div class="line"><a id="l00586" name="l00586"></a><span class="lineno">  586</span><span class="preprocessor">        #pragma omp critical</span></div>
@@ -625,34 +625,35 @@ $(function() {
 <div class="line"><a id="l00601" name="l00601"></a><span class="lineno">  601</span>    }</div>
 <div class="line"><a id="l00602" name="l00602"></a><span class="lineno">  602</span> </div>
 <div class="line"><a id="l00603" name="l00603"></a><span class="lineno">  603</span><span class="keyword">public</span>:</div>
-<div class="line"><a id="l00604" name="l00604"></a><span class="lineno">  604</span>    std::unique_ptr&lt;FullDenseExtractor&lt;Value_, Index_&gt; &gt; dense_row(<span class="keyword">const</span> Options&amp; opt)<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00605" name="l00605"></a><span class="lineno">  605</span>        <span class="keywordflow">return</span> populate&lt;true, DimensionSelectionType::FULL&gt;(opt);</div>
+<div class="line"><a id="l00604" name="l00604"></a><span class="lineno">  604</span>    std::unique_ptr&lt;tatami::FullDenseExtractor&lt;Value_, Index_&gt; &gt; dense_row(<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00605" name="l00605"></a><span class="lineno">  605</span>        <span class="keywordflow">return</span> populate&lt;true, tatami::DimensionSelectionType::FULL&gt;(opt);</div>
 <div class="line"><a id="l00606" name="l00606"></a><span class="lineno">  606</span>    }</div>
 <div class="line"><a id="l00607" name="l00607"></a><span class="lineno">  607</span> </div>
-<div class="line"><a id="l00608" name="l00608"></a><span class="lineno">  608</span>    std::unique_ptr&lt;BlockDenseExtractor&lt;Value_, Index_&gt; &gt; dense_row(Index_ block_start, Index_ block_length, <span class="keyword">const</span> Options&amp; opt)<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00609" name="l00609"></a><span class="lineno">  609</span>        <span class="keywordflow">return</span> populate&lt;true, DimensionSelectionType::BLOCK&gt;(opt, block_start, block_length);</div>
+<div class="line"><a id="l00608" name="l00608"></a><span class="lineno">  608</span>    std::unique_ptr&lt;tatami::BlockDenseExtractor&lt;Value_, Index_&gt; &gt; dense_row(Index_ block_start, Index_ block_length, <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00609" name="l00609"></a><span class="lineno">  609</span>        <span class="keywordflow">return</span> populate&lt;true, tatami::DimensionSelectionType::BLOCK&gt;(opt, block_start, block_length);</div>
 <div class="line"><a id="l00610" name="l00610"></a><span class="lineno">  610</span>    }</div>
 <div class="line"><a id="l00611" name="l00611"></a><span class="lineno">  611</span> </div>
-<div class="line"><a id="l00612" name="l00612"></a><span class="lineno">  612</span>    std::unique_ptr&lt;IndexDenseExtractor&lt;Value_, Index_&gt; &gt; dense_row(std::vector&lt;Index_&gt; indices, <span class="keyword">const</span> Options&amp; opt)<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00613" name="l00613"></a><span class="lineno">  613</span>        <span class="keywordflow">return</span> populate&lt;true, DimensionSelectionType::INDEX&gt;(opt, std::move(indices));</div>
+<div class="line"><a id="l00612" name="l00612"></a><span class="lineno">  612</span>    std::unique_ptr&lt;tatami::IndexDenseExtractor&lt;Value_, Index_&gt; &gt; dense_row(std::vector&lt;Index_&gt; indices, <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00613" name="l00613"></a><span class="lineno">  613</span>        <span class="keywordflow">return</span> populate&lt;true, tatami::DimensionSelectionType::INDEX&gt;(opt, std::move(indices));</div>
 <div class="line"><a id="l00614" name="l00614"></a><span class="lineno">  614</span>    }</div>
 <div class="line"><a id="l00615" name="l00615"></a><span class="lineno">  615</span> </div>
-<div class="line"><a id="l00616" name="l00616"></a><span class="lineno">  616</span>    std::unique_ptr&lt;FullDenseExtractor&lt;Value_, Index_&gt; &gt; dense_column(<span class="keyword">const</span> Options&amp; opt)<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00617" name="l00617"></a><span class="lineno">  617</span>        <span class="keywordflow">return</span> populate&lt;false, DimensionSelectionType::FULL&gt;(opt);</div>
+<div class="line"><a id="l00616" name="l00616"></a><span class="lineno">  616</span>    std::unique_ptr&lt;tatami::FullDenseExtractor&lt;Value_, Index_&gt; &gt; dense_column(<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00617" name="l00617"></a><span class="lineno">  617</span>        <span class="keywordflow">return</span> populate&lt;false, tatami::DimensionSelectionType::FULL&gt;(opt);</div>
 <div class="line"><a id="l00618" name="l00618"></a><span class="lineno">  618</span>    }</div>
 <div class="line"><a id="l00619" name="l00619"></a><span class="lineno">  619</span> </div>
-<div class="line"><a id="l00620" name="l00620"></a><span class="lineno">  620</span>    std::unique_ptr&lt;BlockDenseExtractor&lt;Value_, Index_&gt; &gt; dense_column(Index_ block_start, Index_ block_length, <span class="keyword">const</span> Options&amp; opt)<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00621" name="l00621"></a><span class="lineno">  621</span>        <span class="keywordflow">return</span> populate&lt;false, DimensionSelectionType::BLOCK&gt;(opt, block_start, block_length);</div>
+<div class="line"><a id="l00620" name="l00620"></a><span class="lineno">  620</span>    std::unique_ptr&lt;tatami::BlockDenseExtractor&lt;Value_, Index_&gt; &gt; dense_column(Index_ block_start, Index_ block_length, <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00621" name="l00621"></a><span class="lineno">  621</span>        <span class="keywordflow">return</span> populate&lt;false, tatami::DimensionSelectionType::BLOCK&gt;(opt, block_start, block_length);</div>
 <div class="line"><a id="l00622" name="l00622"></a><span class="lineno">  622</span>    }</div>
 <div class="line"><a id="l00623" name="l00623"></a><span class="lineno">  623</span> </div>
-<div class="line"><a id="l00624" name="l00624"></a><span class="lineno">  624</span>    std::unique_ptr&lt;IndexDenseExtractor&lt;Value_, Index_&gt; &gt; dense_column(std::vector&lt;Index_&gt; indices, <span class="keyword">const</span> Options&amp; opt)<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00625" name="l00625"></a><span class="lineno">  625</span>        <span class="keywordflow">return</span> populate&lt;false, DimensionSelectionType::INDEX&gt;(opt, std::move(indices));</div>
+<div class="line"><a id="l00624" name="l00624"></a><span class="lineno">  624</span>    std::unique_ptr&lt;tatami::IndexDenseExtractor&lt;Value_, Index_&gt; &gt; dense_column(std::vector&lt;Index_&gt; indices, <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00625" name="l00625"></a><span class="lineno">  625</span>        <span class="keywordflow">return</span> populate&lt;false, tatami::DimensionSelectionType::INDEX&gt;(opt, std::move(indices));</div>
 <div class="line"><a id="l00626" name="l00626"></a><span class="lineno">  626</span>    }</div>
 <div class="line"><a id="l00627" name="l00627"></a><span class="lineno">  627</span>};</div>
 <div class="line"><a id="l00628" name="l00628"></a><span class="lineno">  628</span> </div>
 <div class="line"><a id="l00629" name="l00629"></a><span class="lineno">  629</span>}</div>
 <div class="line"><a id="l00630" name="l00630"></a><span class="lineno">  630</span> </div>
 <div class="line"><a id="l00631" name="l00631"></a><span class="lineno">  631</span><span class="preprocessor">#endif</span></div>
+<div class="ttc" id="aclasstatami_1_1Matrix_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a></div></div>
 <div class="ttc" id="aclasstatami_1_1Matrix_html_a3913e6cfd25586f37c0833a21c8f0ca6"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a3913e6cfd25586f37c0833a21c8f0ca6">tatami::Matrix::dense_row</a></div><div class="ttdeci">std::unique_ptr&lt; FullDenseExtractor&lt; Value_, Index_ &gt; &gt; dense_row() const</div></div>
 <div class="ttc" id="aclasstatami_1_1Matrix_html_a7274f8de1b6918f45291e10c054252a1"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a7274f8de1b6918f45291e10c054252a1">tatami::Matrix::sparse_row</a></div><div class="ttdeci">std::unique_ptr&lt; FullSparseExtractor&lt; Value_, Index_ &gt; &gt; sparse_row() const</div></div>
 <div class="ttc" id="aclasstatami_1_1Matrix_html_a8bfc42ee94b0068d1542c579718b52b4"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a8bfc42ee94b0068d1542c579718b52b4">tatami::Matrix::sparse_column</a></div><div class="ttdeci">std::unique_ptr&lt; FullSparseExtractor&lt; Value_, Index_ &gt; &gt; sparse_column() const</div></div>
@@ -661,8 +662,13 @@ $(function() {
 <div class="ttc" id="aclasstatami__hdf5_1_1Hdf5DenseMatrix_html"><div class="ttname"><a href="classtatami__hdf5_1_1Hdf5DenseMatrix.html">tatami_hdf5::Hdf5DenseMatrix</a></div><div class="ttdoc">Dense matrix backed by a DataSet in a HDF5 file.</div><div class="ttdef"><b>Definition:</b> Hdf5DenseMatrix.hpp:47</div></div>
 <div class="ttc" id="aclasstatami__hdf5_1_1Hdf5DenseMatrix_html_a0645a6c3952aaf2b5d61841709a1d21c"><div class="ttname"><a href="classtatami__hdf5_1_1Hdf5DenseMatrix.html#a0645a6c3952aaf2b5d61841709a1d21c">tatami_hdf5::Hdf5DenseMatrix::Hdf5DenseMatrix</a></div><div class="ttdeci">Hdf5DenseMatrix(std::string file, std::string name, size_t cache_limit=100000000)</div><div class="ttdef"><b>Definition:</b> Hdf5DenseMatrix.hpp:64</div></div>
 <div class="ttc" id="aclasstatami__hdf5_1_1Hdf5DenseMatrix_html_a09c098a2d7d0b3e7686280b7c9545d37"><div class="ttname"><a href="classtatami__hdf5_1_1Hdf5DenseMatrix.html#a09c098a2d7d0b3e7686280b7c9545d37">tatami_hdf5::Hdf5DenseMatrix::prefer_rows</a></div><div class="ttdeci">bool prefer_rows() const</div><div class="ttdef"><b>Definition:</b> Hdf5DenseMatrix.hpp:143</div></div>
-<div class="ttc" id="anamespacetatami_html_a0a2ecaf58e2b69bb4a808e814aeb16a1"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0a2ecaf58e2b69bb4a808e814aeb16a1">DimensionSelectionType</a></div><div class="ttdeci">DimensionSelectionType</div></div>
-<div class="ttc" id="anamespacetatami_html_ae9f8db5316521603085577d977a6955f"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/namespacetatami.html#ae9f8db5316521603085577d977a6955f">Extractor</a></div><div class="ttdeci">typename std::conditional&lt; sparse_, SparseExtractor&lt; selection_, Value_, Index_ &gt;, DenseExtractor&lt; selection_, Value_, Index_ &gt; &gt;::type Extractor</div></div>
+<div class="ttc" id="anamespacetatami__hdf5_html"><div class="ttname"><a href="namespacetatami__hdf5.html">tatami_hdf5</a></div><div class="ttdoc">Representations for matrix data in HDF5 files.</div><div class="ttdef"><b>Definition:</b> Hdf5CompressedSparseMatrix.hpp:21</div></div>
+<div class="ttc" id="anamespacetatami_html_a0a2ecaf58e2b69bb4a808e814aeb16a1"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0a2ecaf58e2b69bb4a808e814aeb16a1">tatami::DimensionSelectionType</a></div><div class="ttdeci">DimensionSelectionType</div></div>
+<div class="ttc" id="anamespacetatami_html_ae9f8db5316521603085577d977a6955f"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/namespacetatami.html#ae9f8db5316521603085577d977a6955f">tatami::Extractor</a></div><div class="ttdeci">typename std::conditional&lt; sparse_, SparseExtractor&lt; selection_, Value_, Index_ &gt;, DenseExtractor&lt; selection_, Value_, Index_ &gt; &gt;::type Extractor</div></div>
+<div class="ttc" id="astats_2utils_8hpp_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/stats_2utils_8hpp.html">utils.hpp</a></div></div>
+<div class="ttc" id="astructtatami_1_1Options_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a></div></div>
+<div class="ttc" id="astructtatami_1_1OracleStream_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html">tatami::OracleStream</a></div></div>
+<div class="ttc" id="astructtatami_1_1Oracle_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html">tatami::Oracle</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>

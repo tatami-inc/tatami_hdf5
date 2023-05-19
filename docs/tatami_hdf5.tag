@@ -2,53 +2,63 @@
 <tagfile doxygen_version="1.9.6">
   <compound kind="file">
     <name>Hdf5CompressedSparseMatrix.hpp</name>
-    <path>tatami_hdf5/class/</path>
+    <path>tatami_hdf5/</path>
     <filename>Hdf5CompressedSparseMatrix_8hpp.html</filename>
     <class kind="class">tatami_hdf5::Hdf5CompressedSparseMatrix</class>
+    <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>Hdf5DenseMatrix.hpp</name>
-    <path>tatami_hdf5/class/</path>
+    <path>tatami_hdf5/</path>
     <filename>Hdf5DenseMatrix_8hpp.html</filename>
     <class kind="class">tatami_hdf5::Hdf5DenseMatrix</class>
+    <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>load_hdf5_matrix.hpp</name>
-    <path>tatami_hdf5/utils/</path>
+    <path>tatami_hdf5/</path>
     <filename>load__hdf5__matrix_8hpp.html</filename>
+    <namespace>tatami_hdf5</namespace>
     <member kind="function">
-      <type>tatami::CompressedSparseMatrix&lt; ROW, T, IDX, U, V, W &gt;</type>
+      <type>tatami::CompressedSparseMatrix&lt; row_, Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_ &gt;</type>
       <name>load_hdf5_compressed_sparse_matrix</name>
-      <anchorfile>load__hdf5__matrix_8hpp.html</anchorfile>
-      <anchor>a86048761a58f8043420ba870cc64465e</anchor>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>acf08ac352e8f0caa63483d0967ea88a3</anchor>
       <arglist>(size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr)</arglist>
     </member>
     <member kind="function">
-      <type>tatami::DenseMatrix&lt;!transpose, T, IDX, V &gt;</type>
+      <type>tatami::DenseMatrix&lt;!transpose_, Value_, Index_, ValueStorage_ &gt;</type>
       <name>load_hdf5_dense_matrix</name>
-      <anchorfile>load__hdf5__matrix_8hpp.html</anchorfile>
-      <anchor>a3bc9d3c09c149124154e4236689d15ab</anchor>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>a9c60ce93385d89902f042f3c43fae5bb</anchor>
       <arglist>(const std::string &amp;file, const std::string &amp;name)</arglist>
     </member>
   </compound>
   <compound kind="file">
+    <name>tatami_hdf5.hpp</name>
+    <path>tatami_hdf5/</path>
+    <filename>tatami__hdf5_8hpp.html</filename>
+    <namespace>tatami_hdf5</namespace>
+  </compound>
+  <compound kind="file">
     <name>write_sparse_matrix_to_hdf5.hpp</name>
-    <path>tatami_hdf5/utils/</path>
+    <path>tatami_hdf5/</path>
     <filename>write__sparse__matrix__to__hdf5_8hpp.html</filename>
     <class kind="struct">tatami_hdf5::WriteSparseMatrixToHdf5Parameters</class>
+    <namespace>tatami_hdf5</namespace>
     <member kind="function">
       <type>void</type>
       <name>write_sparse_matrix_to_hdf5</name>
-      <anchorfile>write__sparse__matrix__to__hdf5_8hpp.html</anchorfile>
-      <anchor>a41d9517559dcd8ef43c2f646458df658</anchor>
-      <arglist>(const Matrix&lt; T, IDX &gt; *mat, H5::Group &amp;location, const WriteSparseMatrixToHdf5Parameters &amp;params)</arglist>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>a9a0cf7882b3882b88773db1b4a50e4bf</anchor>
+      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location, const WriteSparseMatrixToHdf5Parameters &amp;params)</arglist>
     </member>
     <member kind="function">
       <type>void</type>
       <name>write_sparse_matrix_to_hdf5</name>
-      <anchorfile>write__sparse__matrix__to__hdf5_8hpp.html</anchorfile>
-      <anchor>a1d442b17fcd1bb69171136c85172288a</anchor>
-      <arglist>(const Matrix&lt; T, IDX &gt; *mat, H5::Group &amp;location)</arglist>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>a831a53fbca90181db7cae439bde28b1d</anchor>
+      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location)</arglist>
     </member>
   </compound>
   <compound kind="class">
@@ -192,6 +202,41 @@
       <anchorfile>structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html</anchorfile>
       <anchor>ab826ad41c914cc2b92f08dceac019ba3</anchor>
       <arglist></arglist>
+    </member>
+  </compound>
+  <compound kind="namespace">
+    <name>tatami_hdf5</name>
+    <filename>namespacetatami__hdf5.html</filename>
+    <class kind="class">tatami_hdf5::Hdf5CompressedSparseMatrix</class>
+    <class kind="class">tatami_hdf5::Hdf5DenseMatrix</class>
+    <class kind="struct">tatami_hdf5::WriteSparseMatrixToHdf5Parameters</class>
+    <member kind="function">
+      <type>tatami::CompressedSparseMatrix&lt; row_, Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_ &gt;</type>
+      <name>load_hdf5_compressed_sparse_matrix</name>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>acf08ac352e8f0caa63483d0967ea88a3</anchor>
+      <arglist>(size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr)</arglist>
+    </member>
+    <member kind="function">
+      <type>tatami::DenseMatrix&lt;!transpose_, Value_, Index_, ValueStorage_ &gt;</type>
+      <name>load_hdf5_dense_matrix</name>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>a9c60ce93385d89902f042f3c43fae5bb</anchor>
+      <arglist>(const std::string &amp;file, const std::string &amp;name)</arglist>
+    </member>
+    <member kind="function">
+      <type>void</type>
+      <name>write_sparse_matrix_to_hdf5</name>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>a9a0cf7882b3882b88773db1b4a50e4bf</anchor>
+      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location, const WriteSparseMatrixToHdf5Parameters &amp;params)</arglist>
+    </member>
+    <member kind="function">
+      <type>void</type>
+      <name>write_sparse_matrix_to_hdf5</name>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>a831a53fbca90181db7cae439bde28b1d</anchor>
+      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location)</arglist>
     </member>
   </compound>
   <compound kind="page">
