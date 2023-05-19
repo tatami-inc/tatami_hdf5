@@ -18,7 +18,7 @@
  * @brief Defines a class for a HDF5-backed compressed sparse matrix.
  */
 
-namespace tatami {
+namespace tatami_hdf5 {
 
 /**
  * @brief Compressed sparse matrix in a HDF5 file.
@@ -87,16 +87,16 @@ public:
 
         H5::H5File file_handle(file_name, H5F_ACC_RDONLY);
 
-        auto dhandle = HDF5::open_and_check_dataset<false>(file_handle, data_name);
-        const Index_ nonzeros = HDF5::get_array_dimensions<1>(dhandle, "vals")[0];
+        auto dhandle = open_and_check_dataset<false>(file_handle, data_name);
+        const Index_ nonzeros = get_array_dimensions<1>(dhandle, "vals")[0];
 
-        auto ihandle = HDF5::open_and_check_dataset<true>(file_handle, index_name);
-        if (HDF5::get_array_dimensions<1>(ihandle, "idx")[0] != nonzeros) {
+        auto ihandle = open_and_check_dataset<true>(file_handle, index_name);
+        if (get_array_dimensions<1>(ihandle, "idx")[0] != nonzeros) {
             throw std::runtime_error("number of non-zero elements is not consistent between 'data' and 'idx'");
         }
 
-        auto phandle = HDF5::open_and_check_dataset<true>(file_handle, ptr);
-        const Index_ ptr_size = HDF5::get_array_dimensions<1>(phandle, "ptr")[0];
+        auto phandle = open_and_check_dataset<true>(file_handle, ptr);
+        const Index_ ptr_size = get_array_dimensions<1>(phandle, "ptr")[0];
         if (ptr_size != pointers.size()) {
             throw std::runtime_error("'ptr' dataset should have length equal to the number of " + (row_ ? std::string("rows") : std::string("columns")) + " plus 1");
         }
@@ -344,10 +344,10 @@ private:
         work.dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
         work.memspace.setExtentSimple(1, &extraction_len);
         work.memspace.selectAll();
-        work.index.read(current_cache.index.data(), HDF5::define_mem_type<Index_>(), work.memspace, work.dataspace);
+        work.index.read(current_cache.index.data(), define_mem_type<Index_>(), work.memspace, work.dataspace);
 
         if (needs_value) {
-            work.data.read(current_cache.value.data(), HDF5::define_mem_type<Value_>(), work.memspace, work.dataspace);
+            work.data.read(current_cache.value.data(), define_mem_type<Value_>(), work.memspace, work.dataspace);
         }
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
@@ -557,9 +557,9 @@ private:
 
             work.memspace.setExtentSimple(1, &combined_len);
             work.memspace.selectAll();
-            work.index.read(pred.cache_index.data() + dest_offset, HDF5::define_mem_type<Index_>(), work.memspace, work.dataspace);
+            work.index.read(pred.cache_index.data() + dest_offset, define_mem_type<Index_>(), work.memspace, work.dataspace);
             if (needs_value) {
-                work.data.read(pred.cache_value.data() + dest_offset, HDF5::define_mem_type<Value_>(), work.memspace, work.dataspace);
+                work.data.read(pred.cache_value.data() + dest_offset, define_mem_type<Value_>(), work.memspace, work.dataspace);
             }
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
@@ -834,7 +834,7 @@ private:
         core.dataspace.selectHyperslab(H5S_SELECT_SET, &count, &offset);
         core.memspace.setExtentSimple(1, &count);
         core.memspace.selectAll();
-        core.index.read(core.index_cache.data(), HDF5::define_mem_type<Index_>(), core.memspace, core.dataspace);
+        core.index.read(core.index_cache.data(), define_mem_type<Index_>(), core.memspace, core.dataspace);
 
         auto it = std::lower_bound(core.index_cache.begin(), core.index_cache.end(), secondary);
         if (it != core.index_cache.end() && *it == secondary) {
@@ -846,7 +846,7 @@ private:
                 core.memspace.selectAll();
 
                 Value_ dest;
-                core.data.read(&dest, HDF5::define_mem_type<Value_>(), core.memspace, core.dataspace);
+                core.data.read(&dest, define_mem_type<Value_>(), core.memspace, core.dataspace);
                 fill(primary, dest);
             } else {
                 fill(primary, 0);

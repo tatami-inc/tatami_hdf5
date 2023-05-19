@@ -73,8 +73,8 @@ public:
 #endif
 
         H5::H5File fhandle(file_name, H5F_ACC_RDONLY);
-        auto dhandle = HDF5::open_and_check_dataset<false>(fhandle, dataset_name);
-        auto dims = HDF5::get_array_dimensions<2>(dhandle, dataset_name);
+        auto dhandle = open_and_check_dataset<false>(fhandle, dataset_name);
+        auto dims = get_array_dimensions<2>(dhandle, dataset_name);
         firstdim = dims[0];
         seconddim = dims[1];
 
@@ -254,7 +254,7 @@ private:
         work.memspace.setExtentSimple(2, count);
         work.memspace.selectAll();
 
-        work.dataset.read(target, HDF5::define_mem_type<Value_>(), work.memspace, work.dataspace);
+        work.dataset.read(target, define_mem_type<Value_>(), work.memspace, work.dataspace);
     }
 
     template<bool accrow_, typename ExtractType_>

@@ -29,8 +29,8 @@ add_executable(
 )
 target_compile_definitions(cusparh5test PRIVATE TEST_CUSTOM_PARALLEL=1)
 
-target_link_libraries(h5test gtest_main tatami hdf5::hdf5 hdf5::hdf5_cpp)
-target_link_libraries(cusparh5test gtest_main tatami hdf5::hdf5 hdf5::hdf5_cpp)
+target_link_libraries(h5test gtest_main tatami_hdf5 hdf5::hdf5 hdf5::hdf5_cpp)
+target_link_libraries(cusparh5test gtest_main tatami_hdf5 hdf5::hdf5 hdf5::hdf5_cpp)
 
 if (NOT HAVE_CXX_FS) 
     target_link_libraries(h5test stdc++fs) 

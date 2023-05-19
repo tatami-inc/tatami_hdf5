@@ -1,8 +1,8 @@
 #ifndef TATAMI_WRITE_SPARSE_MATRIX_TO_HDF5_HPP
 #define TATAMI_WRITE_SPARSE_MATRIX_TO_HDF5_HPP
 
-#include "../../base/Matrix.hpp"
-#include "utils.hpp"
+#include "tatami/tatami.hpp"
+#include "../class/utils.hpp"
 
 #include "H5Cpp.h"
 
@@ -17,7 +17,7 @@
  * @brief Write a sparse matrix into a HDF5 file.
  */
 
-namespace tatami {
+namespace tatami_hdf5 {
 
 /**
  * @brief Parameters for `write_sparse_matrix_to_hdf5()`.
@@ -99,8 +99,6 @@ struct WriteSparseMatrixToHdf5Parameters {
 /**
  * @cond
  */
-namespace HDF5 {
-
 inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, const H5::DataType& dtype, const std::string& name, hsize_t length, int deflate_level, hsize_t chunk) {
     H5::DataSpace dspace(1, &length);
  	H5::DSetCreatPropList plist;
@@ -157,8 +155,6 @@ template<typename Native>
 bool fits_lower_limit(int64_t min) {
     int64_t limit = std::numeric_limits<Native>::min();
     return limit <= min;
-}
-
 }
 /**
  * @endcond
@@ -233,17 +229,17 @@ void write_sparse_matrix_to_hdf5(const Matrix<T, IDX>* mat, H5::Group& location,
             data_type = WriteSparseMatrixToHdf5Parameters::StorageType::DOUBLE;
         } else {
             if (lower_data < 0) {
-                if (HDF5::fits_lower_limit<int8_t>(lower_data) && HDF5::fits_upper_limit<int8_t>(upper_data)) {
+                if (fits_lower_limit<int8_t>(lower_data) && fits_upper_limit<int8_t>(upper_data)) {
                     data_type = WriteSparseMatrixToHdf5Parameters::StorageType::INT8;
-                } else if (HDF5::fits_lower_limit<int16_t>(lower_data) && HDF5::fits_upper_limit<int16_t>(upper_data)) {
+                } else if (fits_lower_limit<int16_t>(lower_data) && fits_upper_limit<int16_t>(upper_data)) {
                     data_type = WriteSparseMatrixToHdf5Parameters::StorageType::INT16;
                 } else {
                     data_type = WriteSparseMatrixToHdf5Parameters::StorageType::INT32;
                 }
             } else {
-                if (HDF5::fits_upper_limit<uint8_t>(upper_data)) {
+                if (fits_upper_limit<uint8_t>(upper_data)) {
                     data_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT8;
-                } else if (HDF5::fits_upper_limit<uint16_t>(upper_data)) {
+                } else if (fits_upper_limit<uint16_t>(upper_data)) {
                     data_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT16;
                 } else {
                     data_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT32;
@@ -254,9 +250,9 @@ void write_sparse_matrix_to_hdf5(const Matrix<T, IDX>* mat, H5::Group& location,
 
     auto index_type = params.index_type;
     if (index_type == WriteSparseMatrixToHdf5Parameters::StorageType::AUTOMATIC) {
-        if (HDF5::fits_upper_limit<uint8_t>(upper_index)) {
+        if (fits_upper_limit<uint8_t>(upper_index)) {
             index_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT8;
-        } else if (HDF5::fits_upper_limit<uint16_t>(upper_index)) {
+        } else if (fits_upper_limit<uint16_t>(upper_index)) {
             index_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT16;
         } else {
             index_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT32;
@@ -264,13 +260,13 @@ void write_sparse_matrix_to_hdf5(const Matrix<T, IDX>* mat, H5::Group& location,
     }
 
     // And then saving it. This time we have no choice but to iterate by the desired dimension.
-    H5::DataSet data_ds = HDF5::create_1d_compressed_hdf5_dataset(location, data_type, params.data_name, non_zeros, params.deflate_level, params.chunk_size);
-    H5::DataSet index_ds = HDF5::create_1d_compressed_hdf5_dataset(location, index_type, params.index_name, non_zeros, params.deflate_level, params.chunk_size);
+    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, params.data_name, non_zeros, params.deflate_level, params.chunk_size);
+    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, params.index_name, non_zeros, params.deflate_level, params.chunk_size);
     hsize_t count = 0, offset = 0;
     H5::DataSpace inspace(1, &non_zeros);
     H5::DataSpace outspace(1, &non_zeros);
-    const auto& dstype = HDF5::define_mem_type<T>();
-    const auto& ixtype = HDF5::define_mem_type<IDX>();
+    const auto& dstype = define_mem_type<T>();
+    const auto& ixtype = define_mem_type<IDX>();
 
     auto fill_datasets = [&](const SparseRange<T, IDX>& extracted) -> void {
         count = extracted.number;
@@ -317,7 +313,7 @@ void write_sparse_matrix_to_hdf5(const Matrix<T, IDX>* mat, H5::Group& location,
 
     // Saving the pointers.
     hsize_t ptr_len = ptrs.size();
-    H5::DataSet ptr_ds = HDF5::create_1d_compressed_hdf5_dataset(location, H5::PredType::NATIVE_HSIZE, params.ptr_name, ptr_len, params.deflate_level, params.chunk_size);
+    H5::DataSet ptr_ds = create_1d_compressed_hdf5_dataset(location, H5::PredType::NATIVE_HSIZE, params.ptr_name, ptr_len, params.deflate_level, params.chunk_size);
     H5::DataSpace ptr_space(1, &ptr_len);
     ptr_ds.write(ptrs.data(), H5::PredType::NATIVE_HSIZE, ptr_space);
 

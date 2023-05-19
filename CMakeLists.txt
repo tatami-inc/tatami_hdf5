@@ -11,6 +11,8 @@ add_library(tatami_hdf5 INTERFACE)
 
 add_subdirectory(extern)
 
+target_link_libraries(tatami_hdf5 INTERFACE tatami)
+
 # Switch between include directories depending on whether the downstream is
 # using the build directly or is using the installed package.
 target_include_directories(tatami_hdf5 

@@ -40,10 +40,16 @@ template<typename Value_, typename Index_>
 using IndexSparseExtractor = tatami::IndexSparseExtractor<Value_, Index_>;
 
 template<DimensionSelectionType selection_, bool sparse_, typename Value_, typename Index_>
-using Extractor = tatami::Extractor<sparse_, selection_, Value_, Index_>;
+using Extractor = tatami::Extractor<selection_, sparse_, Value_, Index_>;
 
 template<typename Index_>
 using Oracle = tatami::Oracle<Index_>;
+
+template<typename Index_>
+using OracleStream = tatami::OracleStream<Index_>;
+
+template<typename Value_, typename Index_>
+using SparseRange = tatami::SparseRange<Value_, Index_>;
 
 template<typename T>
 const H5::PredType& define_mem_type() {

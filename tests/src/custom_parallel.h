@@ -1,6 +1,11 @@
 #ifndef HDF5_CUSTOM_LOCK_H
 #define HDF5_CUSTOM_LOCK_H
 
+#include <thread>
+#include <mutex>
+#include <vector>
+#include <cmath>
+
 template<class Function>
 static void hdf5_serialize(Function f) {
     static std::mutex hdf5_lock;
