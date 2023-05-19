@@ -6,8 +6,14 @@
  * @brief Create matrix representations for HDF5-backed data.
  */
 
-#include "HDF5CompressedSparseMatrix.hpp"
-#include "HDF5DenseMatrix.hpp"
+/**
+ * @namespace tatami_hdf5
+ * @brief Representations for matrix data in HDF5 files.
+ */
+namespace tatami_hdf5 {}
+
+#include "Hdf5CompressedSparseMatrix.hpp"
+#include "Hdf5DenseMatrix.hpp"
 #include "load_hdf5_matrix.hpp"
 #include "write_sparse_matrix_to_hdf5.hpp"
 

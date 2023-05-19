@@ -7,8 +7,8 @@
 
 #include "H5Cpp.h"
 #include "tatami/base/sparse/CompressedSparseMatrix.hpp"
-#include "tatami_hdf5/utils/load_hdf5_matrix.hpp"
-#include "tatami_hdf5/utils/write_sparse_matrix_to_hdf5.hpp"
+#include "tatami_hdf5/load_hdf5_matrix.hpp"
+#include "tatami_hdf5/write_sparse_matrix_to_hdf5.hpp"
 
 #include "tatami_test/tatami_test.hpp"
 #include "tatami_test/temp_file_path.hpp"

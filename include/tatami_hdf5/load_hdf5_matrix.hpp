@@ -9,7 +9,7 @@
 #include <cmath>
 
 #include "tatami/tatami.hpp"
-#include "../class/utils.hpp"
+#include "utils.hpp"
 
 /**
  * @file load_hdf5_matrix.hpp

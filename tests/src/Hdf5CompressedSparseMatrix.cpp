@@ -7,7 +7,7 @@
 #include "H5Cpp.h"
 #include "tatami/base/sparse/CompressedSparseMatrix.hpp"
 #include "tatami/base/other/DelayedTranspose.hpp"
-#include "tatami_hdf5/class/Hdf5CompressedSparseMatrix.hpp"
+#include "tatami_hdf5/Hdf5CompressedSparseMatrix.hpp"
 #include "tatami/stats/sums.hpp"
 
 #include "tatami_test/tatami_test.hpp"

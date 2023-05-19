@@ -2,7 +2,7 @@
 #define TATAMI_WRITE_SPARSE_MATRIX_TO_HDF5_HPP
 
 #include "tatami/tatami.hpp"
-#include "../class/utils.hpp"
+#include "utils.hpp"
 
 #include "H5Cpp.h"
 

@@ -7,7 +7,7 @@
 #include "H5Cpp.h"
 #include "tatami/base/dense/DenseMatrix.hpp"
 #include "tatami/base/other/DelayedTranspose.hpp"
-#include "tatami_hdf5/class/Hdf5DenseMatrix.hpp"
+#include "tatami_hdf5/Hdf5DenseMatrix.hpp"
 #include "tatami/stats/sums.hpp"
 
 #include "tatami_test/tatami_test.hpp"
