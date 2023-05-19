@@ -103,7 +103,7 @@ tatami::CompressedSparseMatrix<ROW, T, IDX, U, V, W> load_hdf5_compressed_sparse
  * This should refer to a 2-dimensional dataset of integer or floating-point type.
  *
  * @return A `DenseMatrix` where all values are in memory.
- * This differs from a `HDF5DenseMatrix`, where the loading of data is deferred until requested.
+ * This differs from a `Hdf5DenseMatrix`, where the loading of data is deferred until requested.
  */
 template<typename T, typename IDX = int, class V = std::vector<T>, bool transpose = false>
 tatami::DenseMatrix<!transpose, T, IDX, V> load_hdf5_dense_matrix(const std::string& file, const std::string& name) {
