@@ -88,13 +88,13 @@ $(function() {
 <div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="preprocessor">#include &lt;type_traits&gt;</span></div>
 <div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span><span class="preprocessor">#include &lt;cmath&gt;</span></div>
 <div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span> </div>
-<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span><span class="preprocessor">#include &quot;tatami/tatami.hpp&quot;</span></div>
+<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span><span class="preprocessor">#include &quot;<a class="codeRef" href="https://tatami-inc.github.io/tatami/tatami_8hpp.html">tatami/tatami.hpp</a>&quot;</span></div>
 <div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="preprocessor">#include &quot;../class/utils.hpp&quot;</span></div>
 <div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span> </div>
 <div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span><span class="keyword">namespace </span>tatami_hdf5 {</div>
 <div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span> </div>
 <div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span><span class="keyword">template</span>&lt;<span class="keywordtype">bool</span> ROW, <span class="keyword">typename</span> T, <span class="keyword">typename</span> IDX = <span class="keywordtype">int</span>, <span class="keyword">class</span> U = std::vector&lt;T&gt;, <span class="keyword">class</span> V = std::vector&lt;IDX&gt;, <span class="keyword">class</span> W = std::vector&lt;<span class="keywordtype">size_t</span>&gt; &gt;</div>
-<div class="line"><a id="l00047" name="l00047"></a><span class="lineno"><a class="line" href="load__hdf5__matrix_8hpp.html#a86048761a58f8043420ba870cc64465e">   47</a></span>tatami::CompressedSparseMatrix&lt;ROW, T, IDX, U, V, W&gt; <a class="code hl_function" href="load__hdf5__matrix_8hpp.html#a86048761a58f8043420ba870cc64465e">load_hdf5_compressed_sparse_matrix</a>(</div>
+<div class="line"><a id="l00047" name="l00047"></a><span class="lineno"><a class="line" href="load__hdf5__matrix_8hpp.html#a86048761a58f8043420ba870cc64465e">   47</a></span><a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1CompressedSparseMatrix.html">tatami::CompressedSparseMatrix&lt;ROW, T, IDX, U, V, W&gt;</a> <a class="code hl_function" href="load__hdf5__matrix_8hpp.html#a86048761a58f8043420ba870cc64465e">load_hdf5_compressed_sparse_matrix</a>(</div>
 <div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>    <span class="keywordtype">size_t</span> nr, </div>
 <div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>    <span class="keywordtype">size_t</span> nc, </div>
 <div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>    <span class="keyword">const</span> std::string&amp; file, </div>
@@ -136,11 +136,11 @@ $(function() {
 <div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>        phandle.read(p.data(), define_mem_type&lt;typename W::value_type&gt;());</div>
 <div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>    }</div>
 <div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span> </div>
-<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>    <span class="keywordflow">return</span> tatami::CompressedSparseMatrix&lt;ROW, T, IDX, U, V, W&gt;(nr, nc, std::move(x), std::move(i), std::move(p));</div>
+<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>    <span class="keywordflow">return</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1CompressedSparseMatrix.html">tatami::CompressedSparseMatrix&lt;ROW, T, IDX, U, V, W&gt;</a>(nr, nc, std::move(x), std::move(i), std::move(p));</div>
 <div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span>}</div>
 <div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span> </div>
 <div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T, <span class="keyword">typename</span> IDX = <span class="keywordtype">int</span>, <span class="keyword">class</span> V = std::vector&lt;T&gt;, <span class="keywordtype">bool</span> transpose = false&gt;</div>
-<div class="line"><a id="l00109" name="l00109"></a><span class="lineno"><a class="line" href="load__hdf5__matrix_8hpp.html#a3bc9d3c09c149124154e4236689d15ab">  109</a></span>tatami::DenseMatrix&lt;!transpose, T, IDX, V&gt; <a class="code hl_function" href="load__hdf5__matrix_8hpp.html#a3bc9d3c09c149124154e4236689d15ab">load_hdf5_dense_matrix</a>(<span class="keyword">const</span> std::string&amp; file, <span class="keyword">const</span> std::string&amp; name) {</div>
+<div class="line"><a id="l00109" name="l00109"></a><span class="lineno"><a class="line" href="load__hdf5__matrix_8hpp.html#a3bc9d3c09c149124154e4236689d15ab">  109</a></span><a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1DenseMatrix.html">tatami::DenseMatrix&lt;!transpose, T, IDX, V&gt;</a> <a class="code hl_function" href="load__hdf5__matrix_8hpp.html#a3bc9d3c09c149124154e4236689d15ab">load_hdf5_dense_matrix</a>(<span class="keyword">const</span> std::string&amp; file, <span class="keyword">const</span> std::string&amp; name) {</div>
 <div class="line"><a id="l00110" name="l00110"></a><span class="lineno">  110</span>    H5::H5File fhandle(file, H5F_ACC_RDONLY);</div>
 <div class="line"><a id="l00111" name="l00111"></a><span class="lineno">  111</span>    <span class="keyword">auto</span> dhandle = open_and_check_dataset&lt;false&gt;(fhandle, name);</div>
 <div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span> </div>
@@ -149,17 +149,20 @@ $(function() {
 <div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>    dhandle.read(values.data(), define_mem_type&lt;typename V::value_type&gt;());</div>
 <div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span> </div>
 <div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span>    <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(transpose) {</div>
-<div class="line"><a id="l00118" name="l00118"></a><span class="lineno">  118</span>        <span class="keywordflow">return</span> tatami::DenseMatrix&lt;false, T, IDX, V&gt;(dims[1], dims[0], std::move(values));</div>
+<div class="line"><a id="l00118" name="l00118"></a><span class="lineno">  118</span>        <span class="keywordflow">return</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1DenseMatrix.html">tatami::DenseMatrix&lt;false, T, IDX, V&gt;</a>(dims[1], dims[0], std::move(values));</div>
 <div class="line"><a id="l00119" name="l00119"></a><span class="lineno">  119</span>    } <span class="keywordflow">else</span> {</div>
-<div class="line"><a id="l00120" name="l00120"></a><span class="lineno">  120</span>        <span class="keywordflow">return</span> tatami::DenseMatrix&lt;true, T, IDX, V&gt;(dims[0], dims[1], std::move(values));</div>
+<div class="line"><a id="l00120" name="l00120"></a><span class="lineno">  120</span>        <span class="keywordflow">return</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1DenseMatrix.html">tatami::DenseMatrix&lt;true, T, IDX, V&gt;</a>(dims[0], dims[1], std::move(values));</div>
 <div class="line"><a id="l00121" name="l00121"></a><span class="lineno">  121</span>    }</div>
 <div class="line"><a id="l00122" name="l00122"></a><span class="lineno">  122</span>}</div>
 <div class="line"><a id="l00123" name="l00123"></a><span class="lineno">  123</span> </div>
 <div class="line"><a id="l00124" name="l00124"></a><span class="lineno">  124</span>}</div>
 <div class="line"><a id="l00125" name="l00125"></a><span class="lineno">  125</span> </div>
 <div class="line"><a id="l00126" name="l00126"></a><span class="lineno">  126</span><span class="preprocessor">#endif</span></div>
+<div class="ttc" id="aclasstatami_1_1CompressedSparseMatrix_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/classtatami_1_1CompressedSparseMatrix.html">tatami::CompressedSparseMatrix</a></div></div>
+<div class="ttc" id="aclasstatami_1_1DenseMatrix_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/classtatami_1_1DenseMatrix.html">tatami::DenseMatrix</a></div></div>
 <div class="ttc" id="aload__hdf5__matrix_8hpp_html_a3bc9d3c09c149124154e4236689d15ab"><div class="ttname"><a href="load__hdf5__matrix_8hpp.html#a3bc9d3c09c149124154e4236689d15ab">tatami_hdf5::load_hdf5_dense_matrix</a></div><div class="ttdeci">tatami::DenseMatrix&lt;!transpose, T, IDX, V &gt; load_hdf5_dense_matrix(const std::string &amp;file, const std::string &amp;name)</div><div class="ttdef"><b>Definition:</b> load_hdf5_matrix.hpp:109</div></div>
 <div class="ttc" id="aload__hdf5__matrix_8hpp_html_a86048761a58f8043420ba870cc64465e"><div class="ttname"><a href="load__hdf5__matrix_8hpp.html#a86048761a58f8043420ba870cc64465e">tatami_hdf5::load_hdf5_compressed_sparse_matrix</a></div><div class="ttdeci">tatami::CompressedSparseMatrix&lt; ROW, T, IDX, U, V, W &gt; load_hdf5_compressed_sparse_matrix(size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr)</div><div class="ttdef"><b>Definition:</b> load_hdf5_matrix.hpp:47</div></div>
+<div class="ttc" id="atatami_8hpp_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/tatami_8hpp.html">tatami.hpp</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>

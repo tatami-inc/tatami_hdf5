@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['writesparsematrixtohdf5parameters_0',['WriteSparseMatrixToHdf5Parameters',['../structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html',1,'tatami_hdf5']]]
+  ['blockextractor_0',['BlockExtractor',['https://tatami-inc.github.io/tatami/structtatami_1_1BlockExtractor.html',1,'tatami']]]
 ];

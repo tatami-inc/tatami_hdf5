@@ -86,68 +86,152 @@ $(function() {
  <a href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="Hdf5CompressedSparseMatrix_8hpp_source.html">Hdf5CompressedSparseMatrix.hpp</a>&gt;</code></p>
-
-<p>Inherits Matrix&lt; Value_, Index_ &gt;.</p>
+<div class="dynheader">
+Inheritance diagram for tatami_hdf5::Hdf5CompressedSparseMatrix&lt; row_, Value_, Index_ &gt;:</div>
+<div class="dyncontent">
+<div class="center"><img src="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix__inherit__graph.png" border="0" usemap="#atatami__hdf5_1_1Hdf5CompressedSparseMatrix_3_01row___00_01Value___00_01Index___01_4_inherit__map" alt="Inheritance graph"/></div>
+<map name="atatami__hdf5_1_1Hdf5CompressedSparseMatrix_3_01row___00_01Value___00_01Index___01_4_inherit__map" id="atatami__hdf5_1_1Hdf5CompressedSparseMatrix_3_01row___00_01Value___00_01Index___01_4_inherit__map">
+<area shape="rect" title="Compressed sparse matrix in a HDF5 file." alt="" coords="5,79,202,135"/>
+<area shape="rect" target="_parent" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html" title=" " alt="" coords="22,5,185,31"/>
+</map>
+<center><span class="legend">[<a href="graph_legend.html">legend</a>]</span></center></div>
+<div class="dynheader">
+Collaboration diagram for tatami_hdf5::Hdf5CompressedSparseMatrix&lt; row_, Value_, Index_ &gt;:</div>
+<div class="dyncontent">
+<div class="center"><img src="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix__coll__graph.png" border="0" usemap="#atatami__hdf5_1_1Hdf5CompressedSparseMatrix_3_01row___00_01Value___00_01Index___01_4_coll__map" alt="Collaboration graph"/></div>
+<map name="atatami__hdf5_1_1Hdf5CompressedSparseMatrix_3_01row___00_01Value___00_01Index___01_4_coll__map" id="atatami__hdf5_1_1Hdf5CompressedSparseMatrix_3_01row___00_01Value___00_01Index___01_4_coll__map">
+<area shape="rect" title="Compressed sparse matrix in a HDF5 file." alt="" coords="5,79,202,135"/>
+<area shape="rect" target="_parent" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html" title=" " alt="" coords="22,5,185,31"/>
+</map>
+<center><span class="legend">[<a href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a1fc10df50e937237dd4ca2d0535251ac"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a1fc10df50e937237dd4ca2d0535251ac">Hdf5CompressedSparseMatrix</a> (Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, size_t cache_limit=100000000)</td></tr>
 <tr class="separator:a1fc10df50e937237dd4ca2d0535251ac"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac15825868a4ec6fef1a2446c817050b3"><td class="memItemLeft" align="right" valign="top"><a id="ac15825868a4ec6fef1a2446c817050b3" name="ac15825868a4ec6fef1a2446c817050b3"></a>
-Index_&#160;</td><td class="memItemRight" valign="bottom"><b>nrow</b> () const</td></tr>
+<tr class="memitem:ac15825868a4ec6fef1a2446c817050b3"><td class="memItemLeft" align="right" valign="top">Index_&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#ac15825868a4ec6fef1a2446c817050b3">nrow</a> () const</td></tr>
 <tr class="separator:ac15825868a4ec6fef1a2446c817050b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab61d26cbfa372719822990dc5f4159f3"><td class="memItemLeft" align="right" valign="top"><a id="ab61d26cbfa372719822990dc5f4159f3" name="ab61d26cbfa372719822990dc5f4159f3"></a>
-Index_&#160;</td><td class="memItemRight" valign="bottom"><b>ncol</b> () const</td></tr>
+<tr class="memitem:ab61d26cbfa372719822990dc5f4159f3"><td class="memItemLeft" align="right" valign="top">Index_&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#ab61d26cbfa372719822990dc5f4159f3">ncol</a> () const</td></tr>
 <tr class="separator:ab61d26cbfa372719822990dc5f4159f3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa30949483d19850e85bd8c17cede4379"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#aa30949483d19850e85bd8c17cede4379">sparse</a> () const</td></tr>
 <tr class="separator:aa30949483d19850e85bd8c17cede4379"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a966b806b10195e4ca0b1937fad02b876"><td class="memItemLeft" align="right" valign="top"><a id="a966b806b10195e4ca0b1937fad02b876" name="a966b806b10195e4ca0b1937fad02b876"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><b>sparse_proportion</b> () const</td></tr>
+<tr class="memitem:a966b806b10195e4ca0b1937fad02b876"><td class="memItemLeft" align="right" valign="top">double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a966b806b10195e4ca0b1937fad02b876">sparse_proportion</a> () const</td></tr>
 <tr class="separator:a966b806b10195e4ca0b1937fad02b876"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a40d9e46a358b683951866700423d8e3a"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a40d9e46a358b683951866700423d8e3a">prefer_rows</a> () const</td></tr>
 <tr class="separator:a40d9e46a358b683951866700423d8e3a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaec2495f48246206bf89e65a6fbc966f"><td class="memItemLeft" align="right" valign="top"><a id="aaec2495f48246206bf89e65a6fbc966f" name="aaec2495f48246206bf89e65a6fbc966f"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><b>prefer_rows_proportion</b> () const</td></tr>
+<tr class="memitem:aaec2495f48246206bf89e65a6fbc966f"><td class="memItemLeft" align="right" valign="top">double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#aaec2495f48246206bf89e65a6fbc966f">prefer_rows_proportion</a> () const</td></tr>
 <tr class="separator:aaec2495f48246206bf89e65a6fbc966f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab03c887dedf1e8c24bfe296d5de0e034"><td class="memItemLeft" align="right" valign="top"><a id="ab03c887dedf1e8c24bfe296d5de0e034" name="ab03c887dedf1e8c24bfe296d5de0e034"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>uses_oracle</b> (bool) const</td></tr>
+<tr class="memitem:ab03c887dedf1e8c24bfe296d5de0e034"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#ab03c887dedf1e8c24bfe296d5de0e034">uses_oracle</a> (bool) const</td></tr>
 <tr class="separator:ab03c887dedf1e8c24bfe296d5de0e034"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5da85af9a9a05fc76c449069721bf51b"><td class="memItemLeft" align="right" valign="top"><a id="a5da85af9a9a05fc76c449069721bf51b" name="a5da85af9a9a05fc76c449069721bf51b"></a>
-std::unique_ptr&lt; FullDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>dense_row</b> (const Options &amp;opt) const</td></tr>
+<tr class="memitem:a5da85af9a9a05fc76c449069721bf51b"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; FullDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a5da85af9a9a05fc76c449069721bf51b">dense_row</a> (const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:a5da85af9a9a05fc76c449069721bf51b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8ffcaa20434e9230fb12648f72a6e9e6"><td class="memItemLeft" align="right" valign="top"><a id="a8ffcaa20434e9230fb12648f72a6e9e6" name="a8ffcaa20434e9230fb12648f72a6e9e6"></a>
-std::unique_ptr&lt; BlockDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>dense_row</b> (Index_ block_start, Index_ block_length, const Options &amp;opt) const</td></tr>
+<tr class="memitem:a8ffcaa20434e9230fb12648f72a6e9e6"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; BlockDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a8ffcaa20434e9230fb12648f72a6e9e6">dense_row</a> (Index_ block_start, Index_ block_length, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:a8ffcaa20434e9230fb12648f72a6e9e6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8c7e2b5b6ce96ade9f65c1d80cc5ad2a"><td class="memItemLeft" align="right" valign="top"><a id="a8c7e2b5b6ce96ade9f65c1d80cc5ad2a" name="a8c7e2b5b6ce96ade9f65c1d80cc5ad2a"></a>
-std::unique_ptr&lt; IndexDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>dense_row</b> (std::vector&lt; Index_ &gt; indices, const Options &amp;opt) const</td></tr>
+<tr class="memitem:a8c7e2b5b6ce96ade9f65c1d80cc5ad2a"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; IndexDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a8c7e2b5b6ce96ade9f65c1d80cc5ad2a">dense_row</a> (std::vector&lt; Index_ &gt; indices, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:a8c7e2b5b6ce96ade9f65c1d80cc5ad2a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2a739655ae7bbb260fbeafd803561724"><td class="memItemLeft" align="right" valign="top"><a id="a2a739655ae7bbb260fbeafd803561724" name="a2a739655ae7bbb260fbeafd803561724"></a>
-std::unique_ptr&lt; FullDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>dense_column</b> (const Options &amp;opt) const</td></tr>
+<tr class="memitem:a2a739655ae7bbb260fbeafd803561724"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; FullDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a2a739655ae7bbb260fbeafd803561724">dense_column</a> (const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:a2a739655ae7bbb260fbeafd803561724"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0fddca0591e45e9e16cd8f40a023932a"><td class="memItemLeft" align="right" valign="top"><a id="a0fddca0591e45e9e16cd8f40a023932a" name="a0fddca0591e45e9e16cd8f40a023932a"></a>
-std::unique_ptr&lt; BlockDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>dense_column</b> (Index_ block_start, Index_ block_length, const Options &amp;opt) const</td></tr>
+<tr class="memitem:a0fddca0591e45e9e16cd8f40a023932a"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; BlockDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a0fddca0591e45e9e16cd8f40a023932a">dense_column</a> (Index_ block_start, Index_ block_length, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:a0fddca0591e45e9e16cd8f40a023932a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7596337a5add96a8e59142ccc7c63fd0"><td class="memItemLeft" align="right" valign="top"><a id="a7596337a5add96a8e59142ccc7c63fd0" name="a7596337a5add96a8e59142ccc7c63fd0"></a>
-std::unique_ptr&lt; IndexDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>dense_column</b> (std::vector&lt; Index_ &gt; indices, const Options &amp;opt) const</td></tr>
+<tr class="memitem:a7596337a5add96a8e59142ccc7c63fd0"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; IndexDenseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a7596337a5add96a8e59142ccc7c63fd0">dense_column</a> (std::vector&lt; Index_ &gt; indices, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:a7596337a5add96a8e59142ccc7c63fd0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac8e8ffc3b1b4386649a2306a93f325c7"><td class="memItemLeft" align="right" valign="top"><a id="ac8e8ffc3b1b4386649a2306a93f325c7" name="ac8e8ffc3b1b4386649a2306a93f325c7"></a>
-std::unique_ptr&lt; FullSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>sparse_row</b> (const Options &amp;opt) const</td></tr>
+<tr class="memitem:ac8e8ffc3b1b4386649a2306a93f325c7"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; FullSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#ac8e8ffc3b1b4386649a2306a93f325c7">sparse_row</a> (const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:ac8e8ffc3b1b4386649a2306a93f325c7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acd11d3c7aacba8cc528fb4dcdf2410d1"><td class="memItemLeft" align="right" valign="top"><a id="acd11d3c7aacba8cc528fb4dcdf2410d1" name="acd11d3c7aacba8cc528fb4dcdf2410d1"></a>
-std::unique_ptr&lt; BlockSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>sparse_row</b> (Index_ block_start, Index_ block_length, const Options &amp;opt) const</td></tr>
+<tr class="memitem:acd11d3c7aacba8cc528fb4dcdf2410d1"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; BlockSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#acd11d3c7aacba8cc528fb4dcdf2410d1">sparse_row</a> (Index_ block_start, Index_ block_length, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:acd11d3c7aacba8cc528fb4dcdf2410d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adfd23f41bd9df2fc67c45c05461a2692"><td class="memItemLeft" align="right" valign="top"><a id="adfd23f41bd9df2fc67c45c05461a2692" name="adfd23f41bd9df2fc67c45c05461a2692"></a>
-std::unique_ptr&lt; IndexSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>sparse_row</b> (std::vector&lt; Index_ &gt; indices, const Options &amp;opt) const</td></tr>
+<tr class="memitem:adfd23f41bd9df2fc67c45c05461a2692"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; IndexSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#adfd23f41bd9df2fc67c45c05461a2692">sparse_row</a> (std::vector&lt; Index_ &gt; indices, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:adfd23f41bd9df2fc67c45c05461a2692"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0e0eaaadea3154e934f6d96fb2f0285a"><td class="memItemLeft" align="right" valign="top"><a id="a0e0eaaadea3154e934f6d96fb2f0285a" name="a0e0eaaadea3154e934f6d96fb2f0285a"></a>
-std::unique_ptr&lt; FullSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>sparse_column</b> (const Options &amp;opt) const</td></tr>
+<tr class="memitem:a0e0eaaadea3154e934f6d96fb2f0285a"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; FullSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#a0e0eaaadea3154e934f6d96fb2f0285a">sparse_column</a> (const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:a0e0eaaadea3154e934f6d96fb2f0285a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab9a8319a4a3411c26754486248bcc62c"><td class="memItemLeft" align="right" valign="top"><a id="ab9a8319a4a3411c26754486248bcc62c" name="ab9a8319a4a3411c26754486248bcc62c"></a>
-std::unique_ptr&lt; BlockSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>sparse_column</b> (Index_ block_start, Index_ block_length, const Options &amp;opt) const</td></tr>
+<tr class="memitem:ab9a8319a4a3411c26754486248bcc62c"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; BlockSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#ab9a8319a4a3411c26754486248bcc62c">sparse_column</a> (Index_ block_start, Index_ block_length, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:ab9a8319a4a3411c26754486248bcc62c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aed307b6c69fd6c9c315c24c019a95cab"><td class="memItemLeft" align="right" valign="top"><a id="aed307b6c69fd6c9c315c24c019a95cab" name="aed307b6c69fd6c9c315c24c019a95cab"></a>
-std::unique_ptr&lt; IndexSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>sparse_column</b> (std::vector&lt; Index_ &gt; indices, const Options &amp;opt) const</td></tr>
+<tr class="memitem:aed307b6c69fd6c9c315c24c019a95cab"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; IndexSparseExtractor&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html#aed307b6c69fd6c9c315c24c019a95cab">sparse_column</a> (std::vector&lt; Index_ &gt; indices, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const</td></tr>
 <tr class="separator:aed307b6c69fd6c9c315c24c019a95cab"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_methods_classtatami_1_1Matrix"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_classtatami_1_1Matrix')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el"  href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix&lt; Value_, Index_ &gt;</a></td></tr>
+<tr class="memitem:a54fe7b4baf78069d35ff00357a1b6cc6 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual Index_&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a54fe7b4baf78069d35ff00357a1b6cc6">nrow</a> () const =0</td></tr>
+<tr class="separator:a54fe7b4baf78069d35ff00357a1b6cc6 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1f6fec43d5bae3f831841646bc02377b inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual Index_&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a1f6fec43d5bae3f831841646bc02377b">ncol</a> () const =0</td></tr>
+<tr class="separator:a1f6fec43d5bae3f831841646bc02377b inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9de24a05a6aee62d4ba59799a73242e7 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a9de24a05a6aee62d4ba59799a73242e7">sparse</a> () const =0</td></tr>
+<tr class="separator:a9de24a05a6aee62d4ba59799a73242e7 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8a1a29b602b903201fc36ad65f76c78c inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual double&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a8a1a29b602b903201fc36ad65f76c78c">sparse_proportion</a> () const =0</td></tr>
+<tr class="separator:a8a1a29b602b903201fc36ad65f76c78c inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a69382d2a4e66cda1a9eb48dc25ab113a inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a69382d2a4e66cda1a9eb48dc25ab113a">prefer_rows</a> () const =0</td></tr>
+<tr class="separator:a69382d2a4e66cda1a9eb48dc25ab113a inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2ddcc730155ca894df1c58b0a963d5e7 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual double&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a2ddcc730155ca894df1c58b0a963d5e7">prefer_rows_proportion</a> () const =0</td></tr>
+<tr class="separator:a2ddcc730155ca894df1c58b0a963d5e7 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a68da21245203cf9349648c5452cdb2ca inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a68da21245203cf9349648c5452cdb2ca">uses_oracle</a> (bool row) const =0</td></tr>
+<tr class="separator:a68da21245203cf9349648c5452cdb2ca inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa29b9428f53453369256d7febc9ed0fc inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a6008dbced6de41e5619156b5335f5762">FullDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#aa29b9428f53453369256d7febc9ed0fc">dense_row</a> (const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:aa29b9428f53453369256d7febc9ed0fc inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7d96127de1d22a5d976b9a2f46ae0ab4 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ae75de1fc78b7d361ea8b59a5379ea4da">BlockDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a7d96127de1d22a5d976b9a2f46ae0ab4">dense_row</a> (Index_ block_start, Index_ block_length, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:a7d96127de1d22a5d976b9a2f46ae0ab4 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aba9cc13a9df94e59d03772bde6ef565a inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a47ce406c32c3914c2ecce187e21b6ced">IndexDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#aba9cc13a9df94e59d03772bde6ef565a">dense_row</a> (std::vector&lt; Index_ &gt; indices, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:aba9cc13a9df94e59d03772bde6ef565a inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3913e6cfd25586f37c0833a21c8f0ca6 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a3913e6cfd25586f37c0833a21c8f0ca6" name="a3913e6cfd25586f37c0833a21c8f0ca6"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a6008dbced6de41e5619156b5335f5762">FullDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a3913e6cfd25586f37c0833a21c8f0ca6">dense_row</a> () const</td></tr>
+<tr class="separator:a3913e6cfd25586f37c0833a21c8f0ca6 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6456594fe017e5f61a2adce0ce152ee4 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a6456594fe017e5f61a2adce0ce152ee4" name="a6456594fe017e5f61a2adce0ce152ee4"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ae75de1fc78b7d361ea8b59a5379ea4da">BlockDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a6456594fe017e5f61a2adce0ce152ee4">dense_row</a> (Index_ block_start, Index_ block_length) const</td></tr>
+<tr class="separator:a6456594fe017e5f61a2adce0ce152ee4 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa2b4e61e29787566fcd78209d4930c2e inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="aa2b4e61e29787566fcd78209d4930c2e" name="aa2b4e61e29787566fcd78209d4930c2e"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a47ce406c32c3914c2ecce187e21b6ced">IndexDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#aa2b4e61e29787566fcd78209d4930c2e">dense_row</a> (std::vector&lt; Index_ &gt; indices) const</td></tr>
+<tr class="separator:aa2b4e61e29787566fcd78209d4930c2e inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9f6c3453a5c0c28a764f300f45bf860f inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a6008dbced6de41e5619156b5335f5762">FullDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a9f6c3453a5c0c28a764f300f45bf860f">dense_column</a> (const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:a9f6c3453a5c0c28a764f300f45bf860f inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3ddceca01de5d1985aafa6e8bfdcf604 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ae75de1fc78b7d361ea8b59a5379ea4da">BlockDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a3ddceca01de5d1985aafa6e8bfdcf604">dense_column</a> (Index_ block_start, Index_ block_length, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:a3ddceca01de5d1985aafa6e8bfdcf604 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a28ddabd4babf3d162f0901578c520a9a inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a47ce406c32c3914c2ecce187e21b6ced">IndexDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a28ddabd4babf3d162f0901578c520a9a">dense_column</a> (std::vector&lt; Index_ &gt; indices, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:a28ddabd4babf3d162f0901578c520a9a inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a94a543328188b8212c9267f9c5edc431 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a94a543328188b8212c9267f9c5edc431" name="a94a543328188b8212c9267f9c5edc431"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a6008dbced6de41e5619156b5335f5762">FullDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a94a543328188b8212c9267f9c5edc431">dense_column</a> () const</td></tr>
+<tr class="separator:a94a543328188b8212c9267f9c5edc431 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a39764e844f1da2b4027b61eb92b28674 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a39764e844f1da2b4027b61eb92b28674" name="a39764e844f1da2b4027b61eb92b28674"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ae75de1fc78b7d361ea8b59a5379ea4da">BlockDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a39764e844f1da2b4027b61eb92b28674">dense_column</a> (Index_ block_start, Index_ block_length) const</td></tr>
+<tr class="separator:a39764e844f1da2b4027b61eb92b28674 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a35af5355144252c421d3f4ee6c2aa51b inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a35af5355144252c421d3f4ee6c2aa51b" name="a35af5355144252c421d3f4ee6c2aa51b"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a47ce406c32c3914c2ecce187e21b6ced">IndexDenseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a35af5355144252c421d3f4ee6c2aa51b">dense_column</a> (std::vector&lt; Index_ &gt; indices) const</td></tr>
+<tr class="separator:a35af5355144252c421d3f4ee6c2aa51b inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adee56bee86c500a4f4a3940e8ef18459 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0fbb0624c8e1913a87e8fb5c975400e1">FullSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#adee56bee86c500a4f4a3940e8ef18459">sparse_row</a> (const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:adee56bee86c500a4f4a3940e8ef18459 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a82e592bf93aa216045a93efb923107e6 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ac8d0024399a66ce61f6315f5f46ebb63">BlockSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a82e592bf93aa216045a93efb923107e6">sparse_row</a> (Index_ block_start, Index_ block_length, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:a82e592bf93aa216045a93efb923107e6 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa452ec9e476c69cdd9c7079a4d382af9 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a4b67b4d1b6c00cd0bd449703432a5f7b">IndexSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#aa452ec9e476c69cdd9c7079a4d382af9">sparse_row</a> (std::vector&lt; Index_ &gt; indices, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:aa452ec9e476c69cdd9c7079a4d382af9 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7274f8de1b6918f45291e10c054252a1 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a7274f8de1b6918f45291e10c054252a1" name="a7274f8de1b6918f45291e10c054252a1"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0fbb0624c8e1913a87e8fb5c975400e1">FullSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a7274f8de1b6918f45291e10c054252a1">sparse_row</a> () const</td></tr>
+<tr class="separator:a7274f8de1b6918f45291e10c054252a1 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae49828cfac71e469c569bd74a4ed006e inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="ae49828cfac71e469c569bd74a4ed006e" name="ae49828cfac71e469c569bd74a4ed006e"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ac8d0024399a66ce61f6315f5f46ebb63">BlockSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#ae49828cfac71e469c569bd74a4ed006e">sparse_row</a> (Index_ block_start, Index_ block_length) const</td></tr>
+<tr class="separator:ae49828cfac71e469c569bd74a4ed006e inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a26f66f9ce349aabc63227aa4f1cad6ab inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a26f66f9ce349aabc63227aa4f1cad6ab" name="a26f66f9ce349aabc63227aa4f1cad6ab"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a4b67b4d1b6c00cd0bd449703432a5f7b">IndexSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a26f66f9ce349aabc63227aa4f1cad6ab">sparse_row</a> (std::vector&lt; Index_ &gt; indices) const</td></tr>
+<tr class="separator:a26f66f9ce349aabc63227aa4f1cad6ab inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6fcbdc787f4b4980f57c228dc89f6289 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0fbb0624c8e1913a87e8fb5c975400e1">FullSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a6fcbdc787f4b4980f57c228dc89f6289">sparse_column</a> (const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:a6fcbdc787f4b4980f57c228dc89f6289 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a369b6b56d1f290d0b298ef840119468a inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ac8d0024399a66ce61f6315f5f46ebb63">BlockSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a369b6b56d1f290d0b298ef840119468a">sparse_column</a> (Index_ block_start, Index_ block_length, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:a369b6b56d1f290d0b298ef840119468a inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a120c3a294a1ffd715c86b136902b8c51 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a4b67b4d1b6c00cd0bd449703432a5f7b">IndexSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a120c3a294a1ffd715c86b136902b8c51">sparse_column</a> (std::vector&lt; Index_ &gt; indices, const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;opt) const =0</td></tr>
+<tr class="separator:a120c3a294a1ffd715c86b136902b8c51 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8bfc42ee94b0068d1542c579718b52b4 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a8bfc42ee94b0068d1542c579718b52b4" name="a8bfc42ee94b0068d1542c579718b52b4"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0fbb0624c8e1913a87e8fb5c975400e1">FullSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a8bfc42ee94b0068d1542c579718b52b4">sparse_column</a> () const</td></tr>
+<tr class="separator:a8bfc42ee94b0068d1542c579718b52b4 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a390f34d93c2b8d9dd561c6807aa8eac5 inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a390f34d93c2b8d9dd561c6807aa8eac5" name="a390f34d93c2b8d9dd561c6807aa8eac5"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#ac8d0024399a66ce61f6315f5f46ebb63">BlockSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a390f34d93c2b8d9dd561c6807aa8eac5">sparse_column</a> (Index_ block_start, Index_ block_length) const</td></tr>
+<tr class="separator:a390f34d93c2b8d9dd561c6807aa8eac5 inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a80f0867067f1b1e5a235a99ecf58924b inherit pub_methods_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a80f0867067f1b1e5a235a99ecf58924b" name="a80f0867067f1b1e5a235a99ecf58924b"></a>
+std::unique_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a4b67b4d1b6c00cd0bd449703432a5f7b">IndexSparseExtractor</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a80f0867067f1b1e5a235a99ecf58924b">sparse_column</a> (std::vector&lt; Index_ &gt; indices) const</td></tr>
+<tr class="separator:a80f0867067f1b1e5a235a99ecf58924b inherit pub_methods_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="inherited" name="inherited"></a>
+Additional Inherited Members</h2></td></tr>
+<tr class="inherit_header pub_types_classtatami_1_1Matrix"><td colspan="2" onclick="javascript:toggleInherit('pub_types_classtatami_1_1Matrix')"><img src="closed.png" alt="-"/>&#160;Public Types inherited from <a class="el"  href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix&lt; Value_, Index_ &gt;</a></td></tr>
+<tr class="memitem:a5b783d3ab440b7696c635a4b16516ba8 inherit pub_types_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="a5b783d3ab440b7696c635a4b16516ba8" name="a5b783d3ab440b7696c635a4b16516ba8"></a>
+typedef Value_&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a5b783d3ab440b7696c635a4b16516ba8">value_type</a></td></tr>
+<tr class="separator:a5b783d3ab440b7696c635a4b16516ba8 inherit pub_types_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adebf536caf3a3c1751eefc6e10f0b16e inherit pub_types_classtatami_1_1Matrix"><td class="memItemLeft" align="right" valign="top"><a id="adebf536caf3a3c1751eefc6e10f0b16e" name="adebf536caf3a3c1751eefc6e10f0b16e"></a>
+typedef Index_&#160;</td><td class="memItemRight" valign="bottom"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#adebf536caf3a3c1751eefc6e10f0b16e">index_type</a></td></tr>
+<tr class="separator:adebf536caf3a3c1751eefc6e10f0b16e inherit pub_types_classtatami_1_1Matrix"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><div class="compoundTemplParams">template&lt;bool row_, typename Value_, typename Index_&gt;<br />
@@ -247,6 +331,64 @@ template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
+<a id="ac15825868a4ec6fef1a2446c817050b3" name="ac15825868a4ec6fef1a2446c817050b3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac15825868a4ec6fef1a2446c817050b3">&#9670;&#160;</a></span>nrow()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Index_ <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::nrow </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a54fe7b4baf78069d35ff00357a1b6cc6">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="ab61d26cbfa372719822990dc5f4159f3" name="ab61d26cbfa372719822990dc5f4159f3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab61d26cbfa372719822990dc5f4159f3">&#9670;&#160;</a></span>ncol()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Index_ <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::ncol </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a1f6fec43d5bae3f831841646bc02377b">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
 <a id="aa30949483d19850e85bd8c17cede4379" name="aa30949483d19850e85bd8c17cede4379"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aa30949483d19850e85bd8c17cede4379">&#9670;&#160;</a></span>sparse()</h2>
 
@@ -267,11 +409,42 @@ template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 <dl class="section return"><dt>Returns</dt><dd><code>true</code>. </dd></dl>
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a9de24a05a6aee62d4ba59799a73242e7">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="a966b806b10195e4ca0b1937fad02b876" name="a966b806b10195e4ca0b1937fad02b876"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a966b806b10195e4ca0b1937fad02b876">&#9670;&#160;</a></span>sparse_proportion()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">double <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::sparse_proportion </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a8a1a29b602b903201fc36ad65f76c78c">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
 
 </div>
 </div>
@@ -295,11 +468,536 @@ template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 <dl class="section return"><dt>Returns</dt><dd><code>true</code> if this is in compressed sparse row format. </dd></dl>
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a69382d2a4e66cda1a9eb48dc25ab113a">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="aaec2495f48246206bf89e65a6fbc966f" name="aaec2495f48246206bf89e65a6fbc966f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aaec2495f48246206bf89e65a6fbc966f">&#9670;&#160;</a></span>prefer_rows_proportion()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">double <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::prefer_rows_proportion </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a2ddcc730155ca894df1c58b0a963d5e7">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="ab03c887dedf1e8c24bfe296d5de0e034" name="ab03c887dedf1e8c24bfe296d5de0e034"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab03c887dedf1e8c24bfe296d5de0e034">&#9670;&#160;</a></span>uses_oracle()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::uses_oracle </td>
+          <td>(</td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a68da21245203cf9349648c5452cdb2ca">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="a5da85af9a9a05fc76c449069721bf51b" name="a5da85af9a9a05fc76c449069721bf51b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5da85af9a9a05fc76c449069721bf51b">&#9670;&#160;</a></span>dense_row() <span class="overload">[1/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; FullDenseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::dense_row </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#aa29b9428f53453369256d7febc9ed0fc">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="a8ffcaa20434e9230fb12648f72a6e9e6" name="a8ffcaa20434e9230fb12648f72a6e9e6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8ffcaa20434e9230fb12648f72a6e9e6">&#9670;&#160;</a></span>dense_row() <span class="overload">[2/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; BlockDenseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::dense_row </td>
+          <td>(</td>
+          <td class="paramtype">Index_&#160;</td>
+          <td class="paramname"><em>block_start</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Index_&#160;</td>
+          <td class="paramname"><em>block_length</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a7d96127de1d22a5d976b9a2f46ae0ab4">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="a8c7e2b5b6ce96ade9f65c1d80cc5ad2a" name="a8c7e2b5b6ce96ade9f65c1d80cc5ad2a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8c7e2b5b6ce96ade9f65c1d80cc5ad2a">&#9670;&#160;</a></span>dense_row() <span class="overload">[3/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; IndexDenseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::dense_row </td>
+          <td>(</td>
+          <td class="paramtype">std::vector&lt; Index_ &gt;&#160;</td>
+          <td class="paramname"><em>indices</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#aba9cc13a9df94e59d03772bde6ef565a">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="a2a739655ae7bbb260fbeafd803561724" name="a2a739655ae7bbb260fbeafd803561724"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2a739655ae7bbb260fbeafd803561724">&#9670;&#160;</a></span>dense_column() <span class="overload">[1/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; FullDenseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::dense_column </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a9f6c3453a5c0c28a764f300f45bf860f">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="a0fddca0591e45e9e16cd8f40a023932a" name="a0fddca0591e45e9e16cd8f40a023932a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0fddca0591e45e9e16cd8f40a023932a">&#9670;&#160;</a></span>dense_column() <span class="overload">[2/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; BlockDenseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::dense_column </td>
+          <td>(</td>
+          <td class="paramtype">Index_&#160;</td>
+          <td class="paramname"><em>block_start</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Index_&#160;</td>
+          <td class="paramname"><em>block_length</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a3ddceca01de5d1985aafa6e8bfdcf604">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="a7596337a5add96a8e59142ccc7c63fd0" name="a7596337a5add96a8e59142ccc7c63fd0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7596337a5add96a8e59142ccc7c63fd0">&#9670;&#160;</a></span>dense_column() <span class="overload">[3/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; IndexDenseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::dense_column </td>
+          <td>(</td>
+          <td class="paramtype">std::vector&lt; Index_ &gt;&#160;</td>
+          <td class="paramname"><em>indices</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a28ddabd4babf3d162f0901578c520a9a">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="ac8e8ffc3b1b4386649a2306a93f325c7" name="ac8e8ffc3b1b4386649a2306a93f325c7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac8e8ffc3b1b4386649a2306a93f325c7">&#9670;&#160;</a></span>sparse_row() <span class="overload">[1/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; FullSparseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::sparse_row </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#adee56bee86c500a4f4a3940e8ef18459">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="acd11d3c7aacba8cc528fb4dcdf2410d1" name="acd11d3c7aacba8cc528fb4dcdf2410d1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acd11d3c7aacba8cc528fb4dcdf2410d1">&#9670;&#160;</a></span>sparse_row() <span class="overload">[2/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; BlockSparseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::sparse_row </td>
+          <td>(</td>
+          <td class="paramtype">Index_&#160;</td>
+          <td class="paramname"><em>block_start</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Index_&#160;</td>
+          <td class="paramname"><em>block_length</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a82e592bf93aa216045a93efb923107e6">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="adfd23f41bd9df2fc67c45c05461a2692" name="adfd23f41bd9df2fc67c45c05461a2692"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#adfd23f41bd9df2fc67c45c05461a2692">&#9670;&#160;</a></span>sparse_row() <span class="overload">[3/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; IndexSparseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::sparse_row </td>
+          <td>(</td>
+          <td class="paramtype">std::vector&lt; Index_ &gt;&#160;</td>
+          <td class="paramname"><em>indices</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#aa452ec9e476c69cdd9c7079a4d382af9">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="a0e0eaaadea3154e934f6d96fb2f0285a" name="a0e0eaaadea3154e934f6d96fb2f0285a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0e0eaaadea3154e934f6d96fb2f0285a">&#9670;&#160;</a></span>sparse_column() <span class="overload">[1/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; FullSparseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::sparse_column </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a6fcbdc787f4b4980f57c228dc89f6289">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="ab9a8319a4a3411c26754486248bcc62c" name="ab9a8319a4a3411c26754486248bcc62c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab9a8319a4a3411c26754486248bcc62c">&#9670;&#160;</a></span>sparse_column() <span class="overload">[2/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; BlockSparseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::sparse_column </td>
+          <td>(</td>
+          <td class="paramtype">Index_&#160;</td>
+          <td class="paramname"><em>block_start</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Index_&#160;</td>
+          <td class="paramname"><em>block_length</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a369b6b56d1f290d0b298ef840119468a">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
+
+</div>
+</div>
+<a id="aed307b6c69fd6c9c315c24c019a95cab" name="aed307b6c69fd6c9c315c24c019a95cab"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aed307b6c69fd6c9c315c24c019a95cab">&#9670;&#160;</a></span>sparse_column() <span class="overload">[3/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;bool row_, typename Value_ , typename Index_ &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; IndexSparseExtractor&lt; Value_, Index_ &gt; &gt; <a class="el" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a>&lt; row_, Value_, Index_ &gt;::sparse_column </td>
+          <td>(</td>
+          <td class="paramtype">std::vector&lt; Index_ &gt;&#160;</td>
+          <td class="paramname"><em>indices</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>opt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html#a120c3a294a1ffd715c86b136902b8c51">tatami::Matrix&lt; Value_, Index_ &gt;</a>.</p>
 
 </div>
 </div>

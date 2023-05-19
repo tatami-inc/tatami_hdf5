@@ -1,5 +1,10 @@
 var searchData=
 [
-  ['index_5fname_0',['index_name',['../structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html#ade0989560a212da6dedcd56c7608e3bf',1,'tatami_hdf5::WriteSparseMatrixToHdf5Parameters']]],
-  ['index_5ftype_1',['index_type',['../structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html#a551c36906afbad5495f7fcca8081c44b',1,'tatami_hdf5::WriteSparseMatrixToHdf5Parameters']]]
+  ['end_0',['end',['https://tatami-inc.github.io/tatami/classtatami_1_1ArrayView.html#a904e6d03b59a20f2cc7831fbb318cf33',1,'tatami::ArrayView::end()'],['https://tatami-inc.github.io/tatami/structtatami_1_1SomeNumericArray.html#aaf5d7921f2356a9a3aca745723611d71',1,'tatami::SomeNumericArray::end()']]],
+  ['extract_5fheader_5ffrom_5fbuffer_1',['extract_header_from_buffer',['https://tatami-inc.github.io/tatami/namespacetatami_1_1MatrixMarket.html#ae0ced3181c20a3281a2ab4844b978313',1,'tatami::MatrixMarket']]],
+  ['extract_5fheader_5ffrom_5ffile_2',['extract_header_from_file',['https://tatami-inc.github.io/tatami/namespacetatami_1_1MatrixMarket.html#afc195d253d64d0a67216cfd6d52e8639',1,'tatami::MatrixMarket']]],
+  ['extracted_5flength_3',['extracted_length',['https://tatami-inc.github.io/tatami/namespacetatami.html#af9d13ceaa112d2c091265510d741488d',1,'tatami']]],
+  ['extractor_4',['Extractor',['https://tatami-inc.github.io/tatami/namespacetatami.html#ae9f8db5316521603085577d977a6955f',1,'tatami']]],
+  ['extractor_2ehpp_5',['Extractor.hpp',['https://tatami-inc.github.io/tatami/Extractor_8hpp.html',1,'']]],
+  ['extractorbase_6',['ExtractorBase',['https://tatami-inc.github.io/tatami/structtatami_1_1ExtractorBase.html',1,'tatami']]]
 ];
