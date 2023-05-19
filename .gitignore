@@ -1,4 +1,5 @@
 build/
 *.swp
+*.tag
 docs/html
 docs/latex
