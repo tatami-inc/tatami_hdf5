@@ -20,10 +20,6 @@ jobs:
             os: ubuntu-latest,
             cov: true
           }
-        - {
-            name: "macOS Latest Clang", 
-            os: macos-latest
-          }
 
     steps:
     - uses: actions/checkout@v1
@@ -31,20 +27,15 @@ jobs:
     - name: Get latest CMake
       uses: lukka/get-cmake@latest
 
-    - name: Configure the build for Mac
-      if: ${{ matrix.config.os == 'macos-latest' }}
-      run: cmake -S . -B build
-
     - name: Install HDF5
-      if: ${{ matrix.config.os == 'ubuntu-latest' }}
       run: sudo apt-get install libhdf5-dev
 
     - name: Configure the build with coverage
-      if: ${{ matrix.config.os == 'ubuntu-latest' && matrix.config.cov }}
+      if: ${{ matrix.config.cov }}
       run: cmake -S . -B build -DCODE_COVERAGE=ON 
 
     - name: Configure the build with OpenMP
-      if: ${{ matrix.config.os == 'ubuntu-latest' && matrix.config.omp }}
+      if: ${{ matrix.config.omp }}
       run: cmake -S . -B build -DUSE_OPENMP=ON
 
     - name: Run the build

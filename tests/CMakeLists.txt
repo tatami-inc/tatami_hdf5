@@ -37,8 +37,11 @@ if (NOT HAVE_CXX_FS)
     target_link_libraries(cusparh5test stdc++fs) 
 endif()
 
+# Checking whether to add OpenMP support. This is turned off
+# by default to make it easier to debug test failures.
+set(USE_OPENMP OFF CACHE BOOL "Compile with OpenMP support")
 if (USE_OPENMP)
-    # Assume that the package has already been found.
+    find_package(OpenMP REQUIRED)
     target_link_libraries(h5test OpenMP::OpenMP_CXX)
 endif()
 
