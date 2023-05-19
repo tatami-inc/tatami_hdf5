@@ -2,7 +2,7 @@
 #define TATAMI_HDF5_HPP
 
 /**
- * @file hdf5.hpp
+ * @file tatami_hdf5.hpp
  * @brief Create matrix representations for HDF5-backed data.
  */
 

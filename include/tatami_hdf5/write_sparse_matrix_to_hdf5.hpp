@@ -165,27 +165,27 @@ bool fits_lower_limit(int64_t min) {
  * On return, `location` will be populated with three datasets containing the matrix contents in a compressed sparse format.
  * Storage of dimensions and other metadata (e.g., related to column versus row layout) is left to the caller. 
  *
- * @tparam T Type of the matrix values.
- * @tparam IDX Type of the row/column indices.
+ * @tparam Value_ Type of the matrix values.
+ * @tparam Index_ Type of the row/column indices.
  *
  * @param mat Pointer to the (presumably sparse) matrix to be written.
  * @param location Handle to a HDF5 group in which to write the matrix contents.
  * @param params Parameters to use when writing the matrix.
  */
-template<typename T, typename IDX>
-void write_sparse_matrix_to_hdf5(const tatami::Matrix<T, IDX>* mat, H5::Group& location, const WriteSparseMatrixToHdf5Parameters& params) {
+template<typename Value_, typename Index_>
+void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::Group& location, const WriteSparseMatrixToHdf5Parameters& params) {
     // Firstly, figuring out the number of non-zero elements, and the maximum value of the indices and data.
-    T lower_data = 0, upper_data = 0;
-    IDX upper_index = 0;
+    Value_ lower_data = 0, upper_data = 0;
+    Index_ upper_index = 0;
     size_t NR = mat->nrow(), NC = mat->ncol();
     hsize_t non_zeros = 0;
     bool non_integer = false;
 
-    auto update_stats = [&](const tatami::SparseRange<T, IDX>& extracted) -> void {
+    auto update_stats = [&](const tatami::SparseRange<Value_, Index_>& extracted) -> void {
         non_zeros += extracted.number;
         for (size_t i = 0; i < extracted.number; ++i) {
             auto val = extracted.value[i];
-            if constexpr(!std::is_integral<T>::value) {
+            if constexpr(!std::is_integral<Value_>::value) {
                 if (std::trunc(val) != val || std::isinf(val)) {
                     non_integer = true;
                 }
@@ -206,16 +206,16 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<T, IDX>* mat, H5::Group& l
 
     if (mat->prefer_rows()) {
         auto wrk = mat->sparse_row();
-        std::vector<T> xbuffer(NC);
-        std::vector<IDX> ibuffer(NC);
+        std::vector<Value_> xbuffer(NC);
+        std::vector<Index_> ibuffer(NC);
         for (size_t r = 0; r < NR; ++r) {
             auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
             update_stats(extracted);
         }
     } else {
         auto wrk = mat->sparse_column();
-        std::vector<T> xbuffer(NR);
-        std::vector<IDX> ibuffer(NR);
+        std::vector<Value_> xbuffer(NR);
+        std::vector<Index_> ibuffer(NR);
         for (size_t c = 0; c < NC; ++c) {
             auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
             update_stats(extracted);
@@ -265,10 +265,10 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<T, IDX>* mat, H5::Group& l
     hsize_t count = 0, offset = 0;
     H5::DataSpace inspace(1, &non_zeros);
     H5::DataSpace outspace(1, &non_zeros);
-    const auto& dstype = define_mem_type<T>();
-    const auto& ixtype = define_mem_type<IDX>();
+    const auto& dstype = define_mem_type<Value_>();
+    const auto& ixtype = define_mem_type<Index_>();
 
-    auto fill_datasets = [&](const tatami::SparseRange<T, IDX>& extracted) -> void {
+    auto fill_datasets = [&](const tatami::SparseRange<Value_, Index_>& extracted) -> void {
         count = extracted.number;
         if (count) {
             inspace.setExtentSimple(1, &count);
@@ -292,8 +292,8 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<T, IDX>* mat, H5::Group& l
     if (layout == WriteSparseMatrixToHdf5Parameters::StorageLayout::ROW) {
         ptrs.resize(NR + 1);
         auto wrk = mat->sparse_row();
-        std::vector<T> xbuffer(NC);
-        std::vector<IDX> ibuffer(NC);
+        std::vector<Value_> xbuffer(NC);
+        std::vector<Index_> ibuffer(NC);
         for (size_t r = 0; r < NR; ++r) {
             auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
             fill_datasets(extracted);
@@ -302,8 +302,8 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<T, IDX>* mat, H5::Group& l
     } else {
         ptrs.resize(NC + 1);
         auto wrk = mat->sparse_column();
-        std::vector<T> xbuffer(NR);
-        std::vector<IDX> ibuffer(NR);
+        std::vector<Value_> xbuffer(NR);
+        std::vector<Index_> ibuffer(NR);
         for (size_t c = 0; c < NC; ++c) {
             auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
             fill_datasets(extracted);
@@ -325,14 +325,14 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<T, IDX>* mat, H5::Group& l
  * On return, `location` will be populated with three datasets containing the matrix contents in a compressed sparse format.
  * Storage of dimensions and other metadata (e.g., related to column versus row layout) is left to the caller. 
  *
- * @tparam T Type of the matrix values.
- * @tparam IDX Type of the row/column indices.
+ * @tparam Value_ Type of the matrix values.
+ * @tparam Index_ Type of the row/column indices.
  *
  * @param mat Pointer to the (presumably sparse) matrix to be written.
  * @param location Handle to a HDF5 group in which to write the matrix contents.
  */
-template<typename T, typename IDX>
-void write_sparse_matrix_to_hdf5(const tatami::Matrix<T, IDX>* mat, H5::Group& location) {
+template<typename Value_, typename Index_>
+void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::Group& location) {
     WriteSparseMatrixToHdf5Parameters params;
     write_sparse_matrix_to_hdf5(mat, location, params);
     return;

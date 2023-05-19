@@ -13,6 +13,9 @@
 
 namespace tatami_hdf5 {
 
+template<class Storage_>
+using Stored = typename std::remove_reference<decltype(std::declval<Storage_>()[0])>::type;
+
 template<typename T>
 const H5::PredType& define_mem_type() {
     if constexpr(std::is_same<int, T>::value) {
