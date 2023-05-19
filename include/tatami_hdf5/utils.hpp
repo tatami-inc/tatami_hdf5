@@ -13,44 +13,6 @@
 
 namespace tatami_hdf5 {
 
-// Setting up aliases to make life a little easier.
-template<typename Value_, typename Index_>
-using Matrix = tatami::Matrix<Value_, Index_>;
-
-typedef tatami::Options Options;
-
-typedef tatami::DimensionSelectionType DimensionSelectionType;
-
-template<typename Value_, typename Index_>
-using FullDenseExtractor = tatami::FullDenseExtractor<Value_, Index_>;
-
-template<typename Value_, typename Index_>
-using BlockDenseExtractor = tatami::BlockDenseExtractor<Value_, Index_>;
-
-template<typename Value_, typename Index_>
-using IndexDenseExtractor = tatami::IndexDenseExtractor<Value_, Index_>;
-
-template<typename Value_, typename Index_>
-using FullSparseExtractor = tatami::FullSparseExtractor<Value_, Index_>;
-
-template<typename Value_, typename Index_>
-using BlockSparseExtractor = tatami::BlockSparseExtractor<Value_, Index_>;
-
-template<typename Value_, typename Index_>
-using IndexSparseExtractor = tatami::IndexSparseExtractor<Value_, Index_>;
-
-template<DimensionSelectionType selection_, bool sparse_, typename Value_, typename Index_>
-using Extractor = tatami::Extractor<selection_, sparse_, Value_, Index_>;
-
-template<typename Index_>
-using Oracle = tatami::Oracle<Index_>;
-
-template<typename Index_>
-using OracleStream = tatami::OracleStream<Index_>;
-
-template<typename Value_, typename Index_>
-using SparseRange = tatami::SparseRange<Value_, Index_>;
-
 template<typename T>
 const H5::PredType& define_mem_type() {
     if constexpr(std::is_same<int, T>::value) {

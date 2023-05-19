@@ -152,13 +152,13 @@ public:
         return true;
     }
 
-    using Matrix<Value_, Index_>::dense_row;
+    using tatami::Matrix<Value_, Index_>::dense_row;
 
-    using Matrix<Value_, Index_>::dense_column;
+    using tatami::Matrix<Value_, Index_>::dense_column;
 
-    using Matrix<Value_, Index_>::sparse_row;
+    using tatami::Matrix<Value_, Index_>::sparse_row;
 
-    using Matrix<Value_, Index_>::sparse_column;
+    using tatami::Matrix<Value_, Index_>::sparse_column;
 
 private:
     template<bool accrow_>
@@ -168,7 +168,7 @@ private:
         std::vector<std::pair<Index_, Index_> > chunks_in_need; 
         typename std::conditional<accrow_ == transpose_, std::vector<std::pair<Index_, Index_> >, bool>::type cache_transpose_info;
 
-        OracleStream<Index_> prediction_stream;
+        tatami::OracleStream<Index_> prediction_stream;
         std::vector<std::pair<Index_, Index_> > predictions_made;
         size_t predictions_fulfilled = 0;
     };
@@ -522,17 +522,17 @@ private:
     }
 
 private:
-    template<bool accrow_, DimensionSelectionType selection_>
-    struct Hdf5Extractor : public Extractor<selection_, false, Value_, Index_> {
+    template<bool accrow_, tatami::DimensionSelectionType selection_>
+    struct Hdf5Extractor : public tatami::Extractor<selection_, false, Value_, Index_> {
         Hdf5Extractor(const Hdf5DenseMatrix* p) : parent(p) {
-            if constexpr(selection_ == DimensionSelectionType::FULL) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 this->full_length = (accrow_ ? parent->ncol() : parent->nrow());
                 base.fill(parent, this->full_length); 
             }
         }
 
         Hdf5Extractor(const Hdf5DenseMatrix* p, Index_ start, Index_ length) : parent(p) {
-            if constexpr(selection_ == DimensionSelectionType::BLOCK) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 this->block_start = start;
                 this->block_length = length;
                 base.fill(parent, this->block_length); 
@@ -540,7 +540,7 @@ private:
         }
 
         Hdf5Extractor(const Hdf5DenseMatrix* p, std::vector<Index_> idx) : parent(p) {
-            if constexpr(selection_ == DimensionSelectionType::INDEX) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::INDEX) {
                 this->index_length = idx.size();
                 indices = std::move(idx);
                 base.fill(parent, this->index_length); 
@@ -550,11 +550,11 @@ private:
     protected:
         const Hdf5DenseMatrix* parent;
         Workspace<accrow_> base;
-        typename std::conditional<selection_ == DimensionSelectionType::INDEX, std::vector<Index_>, bool>::type indices;
+        typename std::conditional<selection_ == tatami::DimensionSelectionType::INDEX, std::vector<Index_>, bool>::type indices;
 
     public:
         const Index_* index_start() const {
-            if constexpr(selection_ == DimensionSelectionType::INDEX) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::INDEX) {
                 return indices.data();
             } else {
                 return NULL;
@@ -562,25 +562,25 @@ private:
         }
 
         const Value_* fetch(Index_ i, Value_* buffer) {
-            if constexpr(selection_ == DimensionSelectionType::FULL) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 return parent->extract<accrow_>(i, buffer, 0, this->full_length, this->base);
-            } else if constexpr(selection_ == DimensionSelectionType::BLOCK) {
+            } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 return parent->extract<accrow_>(i, buffer, this->block_start, this->block_length, this->base);
             } else {
                 return parent->extract<accrow_>(i, buffer, this->indices, this->index_length, this->base);
             }
         }
 
-        void set_oracle(std::unique_ptr<Oracle<Index_> > o) {
+        void set_oracle(std::unique_ptr<tatami::Oracle<Index_> > o) {
             base.futurist.reset(new OracleCache<accrow_>);
             base.futurist->prediction_stream.set(std::move(o));
             base.historian.reset();
         }
     };
 
-    template<bool accrow_, DimensionSelectionType selection_, typename ... Args_>
-    std::unique_ptr<Extractor<selection_, false, Value_, Index_> > populate(const Options& opt, Args_... args) const {
-        std::unique_ptr<Extractor<selection_, false, Value_, Index_> > output;
+    template<bool accrow_, tatami::DimensionSelectionType selection_, typename ... Args_>
+    std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > populate(const tatami::Options& opt, Args_... args) const {
+        std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > output;
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
         #pragma omp critical
@@ -601,28 +601,28 @@ private:
     }
 
 public:
-    std::unique_ptr<FullDenseExtractor<Value_, Index_> > dense_row(const Options& opt) const {
-        return populate<true, DimensionSelectionType::FULL>(opt);
+    std::unique_ptr<tatami::FullDenseExtractor<Value_, Index_> > dense_row(const tatami::Options& opt) const {
+        return populate<true, tatami::DimensionSelectionType::FULL>(opt);
     }
 
-    std::unique_ptr<BlockDenseExtractor<Value_, Index_> > dense_row(Index_ block_start, Index_ block_length, const Options& opt) const {
-        return populate<true, DimensionSelectionType::BLOCK>(opt, block_start, block_length);
+    std::unique_ptr<tatami::BlockDenseExtractor<Value_, Index_> > dense_row(Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
+        return populate<true, tatami::DimensionSelectionType::BLOCK>(opt, block_start, block_length);
     }
 
-    std::unique_ptr<IndexDenseExtractor<Value_, Index_> > dense_row(std::vector<Index_> indices, const Options& opt) const {
-        return populate<true, DimensionSelectionType::INDEX>(opt, std::move(indices));
+    std::unique_ptr<tatami::IndexDenseExtractor<Value_, Index_> > dense_row(std::vector<Index_> indices, const tatami::Options& opt) const {
+        return populate<true, tatami::DimensionSelectionType::INDEX>(opt, std::move(indices));
     }
 
-    std::unique_ptr<FullDenseExtractor<Value_, Index_> > dense_column(const Options& opt) const {
-        return populate<false, DimensionSelectionType::FULL>(opt);
+    std::unique_ptr<tatami::FullDenseExtractor<Value_, Index_> > dense_column(const tatami::Options& opt) const {
+        return populate<false, tatami::DimensionSelectionType::FULL>(opt);
     }
 
-    std::unique_ptr<BlockDenseExtractor<Value_, Index_> > dense_column(Index_ block_start, Index_ block_length, const Options& opt) const {
-        return populate<false, DimensionSelectionType::BLOCK>(opt, block_start, block_length);
+    std::unique_ptr<tatami::BlockDenseExtractor<Value_, Index_> > dense_column(Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
+        return populate<false, tatami::DimensionSelectionType::BLOCK>(opt, block_start, block_length);
     }
 
-    std::unique_ptr<IndexDenseExtractor<Value_, Index_> > dense_column(std::vector<Index_> indices, const Options& opt) const {
-        return populate<false, DimensionSelectionType::INDEX>(opt, std::move(indices));
+    std::unique_ptr<tatami::IndexDenseExtractor<Value_, Index_> > dense_column(std::vector<Index_> indices, const tatami::Options& opt) const {
+        return populate<false, tatami::DimensionSelectionType::INDEX>(opt, std::move(indices));
     }
 };
 

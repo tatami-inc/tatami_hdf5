@@ -45,7 +45,7 @@ namespace tatami_hdf5 {
  * @tparam Index_ Type of the row/column indices.
  */
 template<bool row_, typename Value_, typename Index_>
-class Hdf5CompressedSparseMatrix : public Matrix<Value_, Index_> {
+class Hdf5CompressedSparseMatrix : public tatami::Matrix<Value_, Index_> {
     Index_ nrows, ncols;
     std::string file_name;
     std::string data_name, index_name;
@@ -161,13 +161,13 @@ public:
         return false; // placeholder for proper support.
     }
 
-    using Matrix<Value_, Index_>::dense_row;
+    using tatami::Matrix<Value_, Index_>::dense_row;
 
-    using Matrix<Value_, Index_>::dense_column;
+    using tatami::Matrix<Value_, Index_>::dense_column;
 
-    using Matrix<Value_, Index_>::sparse_row;
+    using tatami::Matrix<Value_, Index_>::sparse_row;
 
-    using Matrix<Value_, Index_>::sparse_column;
+    using tatami::Matrix<Value_, Index_>::sparse_column;
 
     /********************************************
      ************ Primary extraction ************
@@ -186,7 +186,7 @@ private:
         std::unordered_map<Index_, Index_> cache_exists, next_cache_exists;
         std::vector<Element> cache_data, next_cache_data;
 
-        OracleStream<Index_> prediction_stream;
+        tatami::OracleStream<Index_> prediction_stream;
         std::vector<Index_> predictions_made;
         std::vector<Index_> needed;
         std::vector<Index_> present;
@@ -650,7 +650,7 @@ private:
         return buffer;
     }
 
-    SparseRange<Value_, Index_> extract_primary(size_t i, Value_* dbuffer, Index_* ibuffer, Index_ start, Index_ length, PrimaryWorkspace& work, bool needs_value, bool needs_index) const {
+    tatami::SparseRange<Value_, Index_> extract_primary(size_t i, Value_* dbuffer, Index_* ibuffer, Index_ start, Index_ length, PrimaryWorkspace& work, bool needs_value, bool needs_index) const {
         Index_ counter = 0;
 
         if (length) {
@@ -686,7 +686,7 @@ private:
             ibuffer = NULL;
         }
 
-        return SparseRange<Value_, Index_>(counter, dbuffer, ibuffer);
+        return tatami::SparseRange<Value_, Index_>(counter, dbuffer, ibuffer);
     }
 
 private:
@@ -758,7 +758,7 @@ private:
         return original;
     }
 
-    SparseRange<Value_, Index_> extract_primary(size_t i, Value_* dbuffer, Index_* ibuffer, const std::vector<Index_>& indices, PrimaryWorkspace& work, bool needs_value, bool needs_index) const {
+    tatami::SparseRange<Value_, Index_> extract_primary(size_t i, Value_* dbuffer, Index_* ibuffer, const std::vector<Index_>& indices, PrimaryWorkspace& work, bool needs_value, bool needs_index) const {
         Index_ counter = 0;
 
         if (indices.size()) {
@@ -792,7 +792,7 @@ private:
             dbuffer = NULL;
         }
 
-        return SparseRange<Value_, Index_>(counter, dbuffer, ibuffer);
+        return tatami::SparseRange<Value_, Index_>(counter, dbuffer, ibuffer);
     }
 
     /**********************************************
@@ -894,7 +894,7 @@ private:
         return buffer;
     }
 
-    SparseRange<Value_, Index_> extract_secondary(size_t i, Value_* dbuffer, Index_* ibuffer, Index_ start, Index_ length, SecondaryWorkspace& core, bool needs_value, bool needs_index) const {
+    tatami::SparseRange<Value_, Index_> extract_secondary(size_t i, Value_* dbuffer, Index_* ibuffer, Index_ start, Index_ length, SecondaryWorkspace& core, bool needs_value, bool needs_index) const {
         Index_ counter = 0;
 
         extract_secondary_raw_loop(i, 
@@ -920,7 +920,7 @@ private:
             ibuffer = NULL;
         }
 
-        return SparseRange<Value_, Index_>(counter, dbuffer, ibuffer);
+        return tatami::SparseRange<Value_, Index_>(counter, dbuffer, ibuffer);
     }
 
     template<class Function_, class Skip_>
@@ -963,7 +963,7 @@ private:
         return original;
     }
 
-    SparseRange<Value_, Index_> extract_secondary(size_t i, Value_* dbuffer, Index_* ibuffer, const std::vector<Index_>& indices, SecondaryWorkspace& core, bool needs_value, bool needs_index) const {
+    tatami::SparseRange<Value_, Index_> extract_secondary(size_t i, Value_* dbuffer, Index_* ibuffer, const std::vector<Index_>& indices, SecondaryWorkspace& core, bool needs_value, bool needs_index) const {
         Index_ counter = 0;
 
         extract_secondary_raw_loop(i, 
@@ -989,17 +989,17 @@ private:
             ibuffer = NULL;
         }
 
-        return SparseRange<Value_, Index_>(counter, dbuffer, ibuffer);
+        return tatami::SparseRange<Value_, Index_>(counter, dbuffer, ibuffer);
     }
 
     /******************************************
      ************ Public overrides ************
      ******************************************/
 private:
-    template<bool accrow_, DimensionSelectionType selection_, bool sparse_>
-    struct Hdf5SparseExtractor : public Extractor<selection_, sparse_, Value_, Index_> {
-        Hdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const Options& opt) : parent(p) {
-            if constexpr(selection_ == DimensionSelectionType::FULL) {
+    template<bool accrow_, tatami::DimensionSelectionType selection_, bool sparse_>
+    struct Hdf5SparseExtractor : public tatami::Extractor<selection_, sparse_, Value_, Index_> {
+        Hdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt) : parent(p) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 this->full_length = (accrow_ ? parent->ncols : parent->nrows);
             }
 
@@ -1014,15 +1014,15 @@ private:
             }
         }
 
-        Hdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const Options& opt, Index_ bs, Index_ bl) : Hdf5SparseExtractor(p, opt) {
-            if constexpr(selection_ == DimensionSelectionType::BLOCK) {
+        Hdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, Index_ bs, Index_ bl) : Hdf5SparseExtractor(p, opt) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 this->block_start = bs;
                 this->block_length = bl;
             }
         }
 
-        Hdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const Options& opt, std::vector<Index_> idx) : Hdf5SparseExtractor(p, opt) {
-            if constexpr(selection_ == DimensionSelectionType::INDEX) {
+        Hdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, std::vector<Index_> idx) : Hdf5SparseExtractor(p, opt) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::INDEX) {
                 this->index_length = idx.size();
                 indices = std::move(idx);
             }
@@ -1031,11 +1031,11 @@ private:
     protected:
         const Hdf5CompressedSparseMatrix* parent;
         typename std::conditional<row_ == accrow_, PrimaryWorkspace, SecondaryWorkspace>::type core;
-        typename std::conditional<selection_ == DimensionSelectionType::INDEX, std::vector<Index_>, bool>::type indices;
+        typename std::conditional<selection_ == tatami::DimensionSelectionType::INDEX, std::vector<Index_>, bool>::type indices;
 
     public:
         const Index_* index_start() const {
-            if constexpr(selection_ == DimensionSelectionType::INDEX) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::INDEX) {
                 return indices.data();
             } else {
                 return NULL;
@@ -1043,7 +1043,7 @@ private:
         }
 
     public:
-        void set_oracle(std::unique_ptr<Oracle<Index_> > o) {
+        void set_oracle(std::unique_ptr<tatami::Oracle<Index_> > o) {
             if constexpr(row_ == accrow_) {
                 core.futurist.reset(new OracleCache);
                 core.futurist->prediction_stream.set(std::move(o));
@@ -1052,20 +1052,20 @@ private:
         }
     };
 
-    template<bool accrow_, DimensionSelectionType selection_>
+    template<bool accrow_, tatami::DimensionSelectionType selection_>
     struct DenseHdf5SparseExtractor : public Hdf5SparseExtractor<accrow_, selection_, false> {
         template<typename... Args_>
-        DenseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const Options& opt, Args_... args) : 
+        DenseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, Args_... args) : 
             Hdf5SparseExtractor<accrow_, selection_, false>(p, opt, std::move(args)...) {}
 
         const Value_* fetch(Index_ i, Value_* buffer) {
-            if constexpr(selection_ == DimensionSelectionType::FULL) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 if constexpr(row_ == accrow_) {
                     return this->parent->extract_primary(i, buffer, 0, this->full_length, this->core);
                 } else {
                     return this->parent->extract_secondary(i, buffer, 0, this->full_length, this->core);
                 }
-            } else if constexpr(selection_ == DimensionSelectionType::BLOCK) {
+            } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 if constexpr(row_ == accrow_) {
                     return this->parent->extract_primary(i, buffer, this->block_start, this->block_length, this->core);
                 } else {
@@ -1081,25 +1081,25 @@ private:
         }
     };
 
-    template<bool accrow_, DimensionSelectionType selection_>
+    template<bool accrow_, tatami::DimensionSelectionType selection_>
     struct SparseHdf5SparseExtractor : public Hdf5SparseExtractor<accrow_, selection_, true> {
         template<typename... Args_>
-        SparseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const Options& opt, Args_... args) : 
+        SparseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, Args_... args) : 
             Hdf5SparseExtractor<accrow_, selection_, true>(p, opt, std::move(args)...), needs_value(opt.sparse_extract_value), needs_index(opt.sparse_extract_index) {}
 
-        SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
-            if constexpr(selection_ == DimensionSelectionType::FULL) {
+        tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
+            if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 if constexpr(row_ == accrow_) {
                     if (needs_index || needs_value) {
                         return this->parent->extract_primary(i, vbuffer, ibuffer, 0, this->full_length, this->core, needs_value, needs_index);
                     } else {
                         // Quick return is possible if we don't need any indices or values.
-                        return SparseRange<Value_, Index_>(this->parent->pointers[i+1] - this->parent->pointers[i], NULL, NULL);
+                        return tatami::SparseRange<Value_, Index_>(this->parent->pointers[i+1] - this->parent->pointers[i], NULL, NULL);
                     }
                 } else {
                     return this->parent->extract_secondary(i, vbuffer, ibuffer, 0, this->full_length, this->core, needs_value, needs_index);
                 }
-            } else if constexpr(selection_ == DimensionSelectionType::BLOCK) {
+            } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 if constexpr(row_ == accrow_) {
                     return this->parent->extract_primary(i, vbuffer, ibuffer, this->block_start, this->block_length, this->core, needs_value, needs_index);
                 } else {
@@ -1119,9 +1119,9 @@ private:
         bool needs_index;
     };
 
-    template<bool accrow_, DimensionSelectionType selection_, bool sparse_, typename ... Args_>
-    std::unique_ptr<Extractor<selection_, sparse_, Value_, Index_> > populate(const Options& opt, Args_... args) const {
-        std::unique_ptr<Extractor<selection_, sparse_, Value_, Index_> > output;
+    template<bool accrow_, tatami::DimensionSelectionType selection_, bool sparse_, typename ... Args_>
+    std::unique_ptr<tatami::Extractor<selection_, sparse_, Value_, Index_> > populate(const tatami::Options& opt, Args_... args) const {
+        std::unique_ptr<tatami::Extractor<selection_, sparse_, Value_, Index_> > output;
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
         #pragma omp critical
@@ -1146,53 +1146,53 @@ private:
     }
 
 public:
-    std::unique_ptr<FullDenseExtractor<Value_, Index_> > dense_row(const Options& opt) const {
-        return populate<true, DimensionSelectionType::FULL, false>(opt);
+    std::unique_ptr<tatami::FullDenseExtractor<Value_, Index_> > dense_row(const tatami::Options& opt) const {
+        return populate<true, tatami::DimensionSelectionType::FULL, false>(opt);
     }
 
-    std::unique_ptr<BlockDenseExtractor<Value_, Index_> > dense_row(Index_ block_start, Index_ block_length, const Options& opt) const {
-        return populate<true, DimensionSelectionType::BLOCK, false>(opt, block_start, block_length);
+    std::unique_ptr<tatami::BlockDenseExtractor<Value_, Index_> > dense_row(Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
+        return populate<true, tatami::DimensionSelectionType::BLOCK, false>(opt, block_start, block_length);
     }
 
-    std::unique_ptr<IndexDenseExtractor<Value_, Index_> > dense_row(std::vector<Index_> indices, const Options& opt) const {
-        return populate<true, DimensionSelectionType::INDEX, false>(opt, std::move(indices));
+    std::unique_ptr<tatami::IndexDenseExtractor<Value_, Index_> > dense_row(std::vector<Index_> indices, const tatami::Options& opt) const {
+        return populate<true, tatami::DimensionSelectionType::INDEX, false>(opt, std::move(indices));
     }
 
-    std::unique_ptr<FullDenseExtractor<Value_, Index_> > dense_column(const Options& opt) const {
-        return populate<false, DimensionSelectionType::FULL, false>(opt);
+    std::unique_ptr<tatami::FullDenseExtractor<Value_, Index_> > dense_column(const tatami::Options& opt) const {
+        return populate<false, tatami::DimensionSelectionType::FULL, false>(opt);
     }
 
-    std::unique_ptr<BlockDenseExtractor<Value_, Index_> > dense_column(Index_ block_start, Index_ block_length, const Options& opt) const {
-        return populate<false, DimensionSelectionType::BLOCK, false>(opt, block_start, block_length);
+    std::unique_ptr<tatami::BlockDenseExtractor<Value_, Index_> > dense_column(Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
+        return populate<false, tatami::DimensionSelectionType::BLOCK, false>(opt, block_start, block_length);
     }
 
-    std::unique_ptr<IndexDenseExtractor<Value_, Index_> > dense_column(std::vector<Index_> indices, const Options& opt) const {
-        return populate<false, DimensionSelectionType::INDEX, false>(opt, std::move(indices));
+    std::unique_ptr<tatami::IndexDenseExtractor<Value_, Index_> > dense_column(std::vector<Index_> indices, const tatami::Options& opt) const {
+        return populate<false, tatami::DimensionSelectionType::INDEX, false>(opt, std::move(indices));
     }
 
 public:
-    std::unique_ptr<FullSparseExtractor<Value_, Index_> > sparse_row(const Options& opt) const {
-        return populate<true, DimensionSelectionType::FULL, true>(opt);
+    std::unique_ptr<tatami::FullSparseExtractor<Value_, Index_> > sparse_row(const tatami::Options& opt) const {
+        return populate<true, tatami::DimensionSelectionType::FULL, true>(opt);
     }
 
-    std::unique_ptr<BlockSparseExtractor<Value_, Index_> > sparse_row(Index_ block_start, Index_ block_length, const Options& opt) const {
-        return populate<true, DimensionSelectionType::BLOCK, true>(opt, block_start, block_length);
+    std::unique_ptr<tatami::BlockSparseExtractor<Value_, Index_> > sparse_row(Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
+        return populate<true, tatami::DimensionSelectionType::BLOCK, true>(opt, block_start, block_length);
     }
 
-    std::unique_ptr<IndexSparseExtractor<Value_, Index_> > sparse_row(std::vector<Index_> indices, const Options& opt) const {
-        return populate<true, DimensionSelectionType::INDEX, true>(opt, std::move(indices));
+    std::unique_ptr<tatami::IndexSparseExtractor<Value_, Index_> > sparse_row(std::vector<Index_> indices, const tatami::Options& opt) const {
+        return populate<true, tatami::DimensionSelectionType::INDEX, true>(opt, std::move(indices));
     }
 
-    std::unique_ptr<FullSparseExtractor<Value_, Index_> > sparse_column(const Options& opt) const {
-        return populate<false, DimensionSelectionType::FULL, true>(opt);
+    std::unique_ptr<tatami::FullSparseExtractor<Value_, Index_> > sparse_column(const tatami::Options& opt) const {
+        return populate<false, tatami::DimensionSelectionType::FULL, true>(opt);
     }
 
-    std::unique_ptr<BlockSparseExtractor<Value_, Index_> > sparse_column(Index_ block_start, Index_ block_length, const Options& opt) const {
-        return populate<false, DimensionSelectionType::BLOCK, true>(opt, block_start, block_length);
+    std::unique_ptr<tatami::BlockSparseExtractor<Value_, Index_> > sparse_column(Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
+        return populate<false, tatami::DimensionSelectionType::BLOCK, true>(opt, block_start, block_length);
     }
 
-    std::unique_ptr<IndexSparseExtractor<Value_, Index_> > sparse_column(std::vector<Index_> indices, const Options& opt) const {
-        return populate<false, DimensionSelectionType::INDEX, true>(opt, std::move(indices));
+    std::unique_ptr<tatami::IndexSparseExtractor<Value_, Index_> > sparse_column(std::vector<Index_> indices, const tatami::Options& opt) const {
+        return populate<false, tatami::DimensionSelectionType::INDEX, true>(opt, std::move(indices));
     }
 };
 

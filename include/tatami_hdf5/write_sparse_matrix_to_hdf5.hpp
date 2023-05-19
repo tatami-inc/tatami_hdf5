@@ -173,7 +173,7 @@ bool fits_lower_limit(int64_t min) {
  * @param params Parameters to use when writing the matrix.
  */
 template<typename T, typename IDX>
-void write_sparse_matrix_to_hdf5(const Matrix<T, IDX>* mat, H5::Group& location, const WriteSparseMatrixToHdf5Parameters& params) {
+void write_sparse_matrix_to_hdf5(const tatami::Matrix<T, IDX>* mat, H5::Group& location, const WriteSparseMatrixToHdf5Parameters& params) {
     // Firstly, figuring out the number of non-zero elements, and the maximum value of the indices and data.
     T lower_data = 0, upper_data = 0;
     IDX upper_index = 0;
@@ -181,7 +181,7 @@ void write_sparse_matrix_to_hdf5(const Matrix<T, IDX>* mat, H5::Group& location,
     hsize_t non_zeros = 0;
     bool non_integer = false;
 
-    auto update_stats = [&](const SparseRange<T, IDX>& extracted) -> void {
+    auto update_stats = [&](const tatami::SparseRange<T, IDX>& extracted) -> void {
         non_zeros += extracted.number;
         for (size_t i = 0; i < extracted.number; ++i) {
             auto val = extracted.value[i];
@@ -268,7 +268,7 @@ void write_sparse_matrix_to_hdf5(const Matrix<T, IDX>* mat, H5::Group& location,
     const auto& dstype = define_mem_type<T>();
     const auto& ixtype = define_mem_type<IDX>();
 
-    auto fill_datasets = [&](const SparseRange<T, IDX>& extracted) -> void {
+    auto fill_datasets = [&](const tatami::SparseRange<T, IDX>& extracted) -> void {
         count = extracted.number;
         if (count) {
             inspace.setExtentSimple(1, &count);
@@ -332,7 +332,7 @@ void write_sparse_matrix_to_hdf5(const Matrix<T, IDX>* mat, H5::Group& location,
  * @param location Handle to a HDF5 group in which to write the matrix contents.
  */
 template<typename T, typename IDX>
-void write_sparse_matrix_to_hdf5(const Matrix<T, IDX>* mat, H5::Group& location) {
+void write_sparse_matrix_to_hdf5(const tatami::Matrix<T, IDX>* mat, H5::Group& location) {
     WriteSparseMatrixToHdf5Parameters params;
     write_sparse_matrix_to_hdf5(mat, location, params);
     return;
