@@ -303,7 +303,7 @@ private:
             /* swap = */ [](std::vector<Value_>& left, std::vector<Value_>& right) -> void {
                 left.swap(right);
             },
-            /* ready = */ [](std::vector<Value_>& x) -> bool {
+            /* ready = */ [](const std::vector<Value_>& x) -> bool {
                 return !x.empty();
             },
             /* allocate = */ [&](std::vector<Value_>& x) -> void {
