@@ -1055,8 +1055,8 @@ private:
     template<bool accrow_, tatami::DimensionSelectionType selection_>
     struct DenseHdf5SparseExtractor : public Hdf5SparseExtractor<accrow_, selection_, false> {
         template<typename... Args_>
-        DenseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, Args_... args) : 
-            Hdf5SparseExtractor<accrow_, selection_, false>(p, opt, std::move(args)...) {}
+        DenseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, Args_&&... args) : 
+            Hdf5SparseExtractor<accrow_, selection_, false>(p, opt, std::forward<Args_>(args)...) {}
 
         const Value_* fetch(Index_ i, Value_* buffer) {
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
@@ -1084,8 +1084,8 @@ private:
     template<bool accrow_, tatami::DimensionSelectionType selection_>
     struct SparseHdf5SparseExtractor : public Hdf5SparseExtractor<accrow_, selection_, true> {
         template<typename... Args_>
-        SparseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, Args_... args) : 
-            Hdf5SparseExtractor<accrow_, selection_, true>(p, opt, std::move(args)...), needs_value(opt.sparse_extract_value), needs_index(opt.sparse_extract_index) {}
+        SparseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, Args_&&... args) : 
+            Hdf5SparseExtractor<accrow_, selection_, true>(p, opt, std::forward<Args_>(args)...), needs_value(opt.sparse_extract_value), needs_index(opt.sparse_extract_index) {}
 
         tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
@@ -1120,7 +1120,7 @@ private:
     };
 
     template<bool accrow_, tatami::DimensionSelectionType selection_, bool sparse_, typename ... Args_>
-    std::unique_ptr<tatami::Extractor<selection_, sparse_, Value_, Index_> > populate(const tatami::Options& opt, Args_... args) const {
+    std::unique_ptr<tatami::Extractor<selection_, sparse_, Value_, Index_> > populate(const tatami::Options& opt, Args_&&... args) const {
         std::unique_ptr<tatami::Extractor<selection_, sparse_, Value_, Index_> > output;
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
@@ -1131,9 +1131,9 @@ private:
 #endif
 
         if constexpr(sparse_) {
-            output.reset(new SparseHdf5SparseExtractor<accrow_, selection_>(this, opt, std::move(args)...));
+            output.reset(new SparseHdf5SparseExtractor<accrow_, selection_>(this, opt, std::forward<Args_>(args)...));
         } else {
-            output.reset(new DenseHdf5SparseExtractor<accrow_, selection_>(this, opt, std::move(args)...));
+            output.reset(new DenseHdf5SparseExtractor<accrow_, selection_>(this, opt, std::forward<Args_>(args)...));
         }
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK

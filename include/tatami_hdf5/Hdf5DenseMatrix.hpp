@@ -483,7 +483,7 @@ private:
     };
 
     template<bool accrow_, tatami::DimensionSelectionType selection_, typename ... Args_>
-    std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > populate(const tatami::Options& opt, Args_... args) const {
+    std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > populate(const tatami::Options& opt, Args_&&... args) const {
         std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > output;
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
@@ -493,7 +493,7 @@ private:
         TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
 #endif
 
-        output.reset(new Hdf5Extractor<accrow_, selection_>(this, args...));
+        output.reset(new Hdf5Extractor<accrow_, selection_>(this, std::forward<Args_>(args)...));
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
         }
