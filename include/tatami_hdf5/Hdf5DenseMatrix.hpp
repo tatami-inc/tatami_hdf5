@@ -163,21 +163,14 @@ public:
 private:
     template<bool accrow_>
     struct OracleCache {
-        std::unordered_map<Index_, Index_> cache_exists, next_cache_exists;
-        std::vector<std::vector<Value_> > cache_data, next_cache_data;
-        std::vector<std::pair<Index_, Index_> > chunks_in_need; 
+        template<typename ... Args_>
+        OracleCache(Args_&& ... args) : cache(std::forward<Args_>(args)...) {}
+
+        tatami::OracleChunkCache<Index_, Index_, std::vector<Value_> > cache;
         typename std::conditional<accrow_ == transpose_, std::vector<std::pair<Index_, Index_> >, bool>::type cache_transpose_info;
-
-        tatami::OracleStream<Index_> prediction_stream;
-        std::vector<std::pair<Index_, Index_> > predictions_made;
-        size_t predictions_fulfilled = 0;
     };
 
-    struct LruCache {
-        typedef std::pair<std::vector<Value_>, Index_> Element;
-        std::list<Element> cache_data;
-        std::unordered_map<Index_, typename std::list<Element>::iterator> cache_exists;
-    };
+    typedef tatami::LruChunkCache<Index_, std::vector<Value_> > LruCache;
 
     template<bool accrow_>
     struct Workspace {
@@ -197,7 +190,7 @@ private:
             per_cache_size = static_cast<size_t>(chunk_dim) * static_cast<size_t>(other_dim);
             num_chunks = static_cast<double>(parent->total_cache_size) / per_cache_size;
 
-            historian.reset(new LruCache);
+            historian.reset(new LruCache(num_chunks));
         }
 
     public:
@@ -302,144 +295,56 @@ private:
 
     template<bool accrow_, typename ExtractType_>
     const Value_* extract_with_oracle(Index_ mydim, Index_ chunk_mydim, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
-        auto& pred = *work.futurist;
-        if (pred.predictions_made.size() > pred.predictions_fulfilled) {
-            const auto& chosen = pred.predictions_made[pred.predictions_fulfilled++];
-            return pred.cache_data[chosen.first].data() + extract_length * chosen.second;
-        }
-
-        /* We use the oracle to batch together multiple HDF5 library
-         * calls so that we don't have to reenter the critical section
-         * for every fetch() call. Extracted data are cached for 
-         * easy parallel retrieval without involving the HDF5 library.
-         *
-         * We don't bother trying to bundle everything into a single
-         * HDF5 call, as this is a pain to pull data out into the
-         * individual cache buffers afterwards.
-         */
-        Index_ num_chunks = work.num_chunks;
-        Index_ used = 0;
-
-        bool starting = pred.cache_data.empty();
-        if (starting) {
-            pred.cache_data.resize(num_chunks);
-            pred.next_cache_data.resize(num_chunks, std::vector<Value_>(1)); // using a placeholder value for availability checks.
-            pred.chunks_in_need.reserve(num_chunks);
-        } else {
-            pred.next_cache_exists.clear();
-            pred.chunks_in_need.clear();
-        }
-
-        size_t max_predictions = static_cast<size_t>(num_chunks) * chunk_mydim * 2; // double the cache size, basically.
-        pred.predictions_made.clear();
-        pred.predictions_made.reserve(max_predictions);
-
-        for (size_t p = 0; p < max_predictions; ++p) {
-            Index_ current;
-            if (!pred.prediction_stream.next(current)) {
-                break;
-            }
-
-            auto curchunk = current / chunk_mydim;
-            auto curindex = current % chunk_mydim;
-
-            auto it = pred.next_cache_exists.find(curchunk);
-            if (it == pred.next_cache_exists.end()) {
-                pred.next_cache_exists[curchunk] = used;
-                pred.predictions_made.emplace_back(used, curindex);
-
-                auto it2 = pred.cache_exists.find(curchunk);
-                if (it2 != pred.cache_exists.end()) {
-                    pred.next_cache_data[used].swap(pred.cache_data[it2->second]);
-                } else {
-                    pred.chunks_in_need.emplace_back(curchunk, used);
+        auto& to_transpose = work.futurist->cache_transpose_info;
+        auto info = work.futurist->cache.next_chunk(
+            /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
+                return std::pair<Index_, Index_>(current / chunk_mydim, current % chunk_mydim);
+            }, 
+            /* swap = */ [](std::vector<Value_>& left, std::vector<Value_>& right) -> void {
+                left.swap(right);
+            },
+            /* ready = */ [](const std::vector<Value_>& x) -> bool {
+                return !x.empty();
+            },
+            /* allocate = */ [&](std::vector<Value_>& x) -> void {
+                x.resize(work.per_cache_size);
+            },
+            /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<std::vector<Value_> >& chunk_data) -> void {
+                if constexpr(accrow_ == transpose_) {
+                    to_transpose.clear();
                 }
-
-                ++used;
-                if (used == num_chunks) {
-                    break;
-                }
-            } else {
-                pred.predictions_made.emplace_back(it->second, curindex);
-            }
-        }
-
-        /**
-         * Doing a linear scan across chunks to find the currently unused cache
-         * elements. This is the simplest and safest approach; trying to keep
-         * track of the unused caches would require a scan to fill a map/set
-         * anyway, and deleting an iterator from cache_exists only works if
-         * cache_exists actually contains all cache elements, which it might
-         * not be if we reached max_predictions without filling up the cache.
-         *
-         * In any case, a linear scan should be pretty good for consecutive
-         * access; the first cache elements would be the oldest, so there
-         * wouldn't be any wasted iterations to find available cache elements.
-         */
-        size_t search = 0;
-        for (const auto& c : pred.chunks_in_need) {
-            // If we're lucky enough to already be sitting on an allocation
-            // (e.g., if the last call to this function didn't consume all
-            // cache elements), we just use it directly.
-            if (pred.next_cache_data[c.second].empty()) { 
-                while (pred.cache_data[search].empty()) { 
-                    ++search;
-                }
-
-#ifdef DEBUG
-                // This should never reach the end, as there should always be
-                // 'num_chunks' non-empty elements across cache_data and
-                // next_cache_data. Nonetheless, we add an assertion here.
-                if (search >= pred.cache_data.size()) {
-                    throw std::runtime_error("internal cache management error for Hdf5DenseMatrix with oracles");
-                }
-#endif
-
-                pred.next_cache_data[c.second].swap(pred.cache_data[search]);
-                ++search;
-            }
-
-            pred.next_cache_data[c.second].resize(work.per_cache_size); // eventually no-op when all available caches are of the right size.
-        }
-
-        if constexpr(accrow_ == transpose_) {
-            pred.cache_transpose_info.clear();
-        }
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
+                #pragma omp critical
+                {
 #else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+                TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
 #endif
 
-        for (const auto& c : pred.chunks_in_need) {
-            auto& cache_target = pred.next_cache_data[c.second];
-            auto actual_dim = extract_chunk<accrow_>(c.first, mydim, chunk_mydim, cache_target.data(), extract_value, extract_length, work);
-            if constexpr(accrow_ == transpose_) {
-                pred.cache_transpose_info.emplace_back(c.second, actual_dim);
-            }
-        }
+                for (const auto& c : chunks_in_need) {
+                    auto& cache_target = chunk_data[c.second];
+                    auto actual_dim = this->extract_chunk<accrow_>(c.first, mydim, chunk_mydim, cache_target.data(), extract_value, extract_length, work);
+                    if constexpr(accrow_ == transpose_) {
+                        to_transpose.emplace_back(c.second, actual_dim);
+                    }
+                }
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
-        }
+                }
 #else
-        });
+                });
 #endif
 
-        // Applying transpositions to all cached buffers for easier retrieval, but only once the lock is released.
-        if constexpr(accrow_ == transpose_) {
-            for (const auto& x : pred.cache_transpose_info) {
-                transpose(pred.next_cache_data[x.first], work.transposition_buffer, x.second, extract_length);
+                // Applying transpositions to all cached buffers for easier retrieval, but only once the lock is released.
+                if constexpr(accrow_ == transpose_) {
+                    for (const auto& x : to_transpose) {
+                        transpose(chunk_data[x.first], work.transposition_buffer, x.second, extract_length);
+                    }
+                }
             }
-        }
+        );
 
-        pred.cache_data.swap(pred.next_cache_data);
-        pred.cache_exists.swap(pred.next_cache_exists);
-
-        pred.predictions_fulfilled = 1; // well, because we just used one.
-        const auto& chosen = pred.predictions_made.front(); // assuming at least one prediction was made, otherwise, why was fetch() even called?
-        return pred.cache_data[chosen.first].data() + extract_length * chosen.second;
+        return info.first->data() + extract_length * info.second;
     }
 
     template<bool accrow_, typename ExtractType_>
@@ -447,51 +352,55 @@ private:
         auto chunk = i / chunk_mydim;
         auto index = i % chunk_mydim;
 
-        auto& historian = *(work.historian);
-        auto it = historian.cache_exists.find(chunk);
-        if (it != historian.cache_exists.end()) {
-            auto chosen = it->second;
-            historian.cache_data.splice(historian.cache_data.end(), historian.cache_data, chosen); // move to end.
-            return chosen->first.data() + index * extract_length;
-        }
-
-        // Adding a new last element, or recycling the front to the back.
-        typename std::list<typename LruCache::Element>::iterator location;
-        if (historian.cache_data.size() < static_cast<size_t>(work.num_chunks)) {
-            historian.cache_data.emplace_back(std::vector<Value_>(work.per_cache_size), chunk);
-            location = std::prev(historian.cache_data.end());
-        } else {
-            location = historian.cache_data.begin();
-            historian.cache_exists.erase(location->second);
-            location->second = chunk;
-            historian.cache_data.splice(historian.cache_data.end(), historian.cache_data, location); // move to end.
-        }
-        historian.cache_exists[chunk] = location;
-
-        auto& cache_target = location->first;
-        Index_ actual_dim;
+        const auto& cache_target = work.historian->find_chunk(
+            chunk, 
+            /* create = */ [&]() -> std::vector<Value_> {
+                return std::vector<Value_>(work.per_cache_size);
+            },
+            /* populate = */ [&](Index_ id, std::vector<Value_>& chunk_contents) -> void {
+                Index_ actual_dim;
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
+                #pragma omp critical
+                {
 #else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+                TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
 #endif
 
-        actual_dim = extract_chunk<accrow_>(chunk, mydim, chunk_mydim, cache_target.data(), extract_value, extract_length, work);
+                actual_dim = extract_chunk<accrow_>(chunk, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
-        }
+                }
 #else
-        });
+                });
 #endif
 
-        // Applying a transposition for easier retrieval, but only once the lock is released.
-        if constexpr(accrow_ == transpose_) {
-            transpose(cache_target, work.transposition_buffer, actual_dim, extract_length);
-        }
+                // Applying a transposition for easier retrieval, but only once the lock is released.
+                if constexpr(accrow_ == transpose_) {
+                    transpose(chunk_contents, work.transposition_buffer, actual_dim, extract_length);
+                }
+            }
+        );
 
         return cache_target.data() + index * extract_length;
+    }
+
+    template<bool accrow_>
+    Index_ get_target_dim() const {
+        if constexpr(accrow_ != transpose_) {
+            return firstdim;
+        } else {
+            return seconddim;
+        }
+    }
+
+    template<bool accrow_>
+    Index_ get_target_chunk_dim() const {
+        if constexpr(accrow_ != transpose_) {
+            return chunk_firstdim;
+        } else {
+            return chunk_seconddim;
+        }
     }
 
     template<bool accrow_, typename ExtractType_>
@@ -501,20 +410,14 @@ private:
             return extract_without_cache(i, buffer, extract_value, extract_length, work);
         }
 
-        Index_ chunk_mydim, mydim;
-        if constexpr(accrow_ != transpose_) {
-            chunk_mydim = chunk_firstdim;
-            mydim = firstdim;
-        } else {
-            chunk_mydim = chunk_seconddim;
-            mydim = seconddim;
-        }
+        Index_ mydim = get_target_dim<accrow_>();
+        Index_ chunk_mydim = get_target_chunk_dim<accrow_>();
 
         const Value_* cache;
         if (work.futurist) {
             cache = extract_with_oracle(mydim, chunk_mydim, extract_value, extract_length, work);
         } else {
-            cache = extract_without_oracle(i, mydim, chunk_mydim, extract_value, extract_length, work);;
+            cache = extract_without_oracle(i, mydim, chunk_mydim, extract_value, extract_length, work);
         }
 
         std::copy(cache, cache + extract_length, buffer);
@@ -572,8 +475,9 @@ private:
         }
 
         void set_oracle(std::unique_ptr<tatami::Oracle<Index_> > o) {
-            base.futurist.reset(new OracleCache<accrow_>);
-            base.futurist->prediction_stream.set(std::move(o));
+            auto chunk_mydim = parent->get_target_chunk_dim<accrow_>();
+            size_t max_predictions = static_cast<size_t>(base.num_chunks) * chunk_mydim * 2; // double the cache size, basically.
+            base.futurist.reset(new OracleCache<accrow_>(std::move(o), max_predictions, base.num_chunks));
             base.historian.reset();
         }
     };
