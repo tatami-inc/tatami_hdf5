@@ -297,19 +297,19 @@ private:
     const Value_* extract_with_oracle(Index_ mydim, Index_ chunk_mydim, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
         auto& to_transpose = work.futurist->cache_transpose_info;
         auto info = work.futurist->cache.next_chunk(
-            [&](Index_ current) -> std::pair<Index_, Index_> {
+            /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
                 return std::pair<Index_, Index_>(current / chunk_mydim, current % chunk_mydim);
             }, 
-            [](std::vector<Value_>& left, std::vector<Value_>& right) -> void {
+            /* swap = */ [](std::vector<Value_>& left, std::vector<Value_>& right) -> void {
                 left.swap(right);
             },
-            [](std::vector<Value_>& x) -> bool {
-                return x.empty();
+            /* ready = */ [](std::vector<Value_>& x) -> bool {
+                return !x.empty();
             },
-            [&](std::vector<Value_>& x) -> void {
+            /* allocate = */ [&](std::vector<Value_>& x) -> void {
                 x.resize(work.per_cache_size);
             },
-            [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<std::vector<Value_> >& chunk_data) -> void {
+            /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<std::vector<Value_> >& chunk_data) -> void {
                 if constexpr(accrow_ == transpose_) {
                     to_transpose.clear();
                 }
@@ -354,10 +354,10 @@ private:
 
         const auto& cache_target = work.historian->find_chunk(
             chunk, 
-            [&]() -> std::vector<Value_> {
+            /* create = */ [&]() -> std::vector<Value_> {
                 return std::vector<Value_>(work.per_cache_size);
             },
-            [&](Index_ id, std::vector<Value_>& chunk_contents) -> void {
+            /* populate = */ [&](Index_ id, std::vector<Value_>& chunk_contents) -> void {
                 Index_ actual_dim;
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
@@ -417,7 +417,7 @@ private:
         if (work.futurist) {
             cache = extract_with_oracle(mydim, chunk_mydim, extract_value, extract_length, work);
         } else {
-            cache = extract_without_oracle(i, mydim, chunk_mydim, extract_value, extract_length, work);;
+            cache = extract_without_oracle(i, mydim, chunk_mydim, extract_value, extract_length, work);
         }
 
         std::copy(cache, cache + extract_length, buffer);
