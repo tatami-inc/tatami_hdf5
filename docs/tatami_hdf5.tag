@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
-<tagfile doxygen_version="1.9.6">
+<tagfile doxygen_version="1.9.7">
   <compound kind="file">
     <name>Hdf5CompressedSparseMatrix.hpp</name>
     <path>tatami_hdf5/</path>
@@ -243,6 +243,6 @@
     <name>index</name>
     <title>tatami for HDF5 matrices</title>
     <filename>index.html</filename>
-    <docanchor file="index.html">md__github_workspace_README</docanchor>
+    <docanchor file="index.html">md__2github_2workspace_2README</docanchor>
   </compound>
 </tagfile>
