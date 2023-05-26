@@ -519,7 +519,7 @@ $(function() {
 <div class="line"><a id="l00483" name="l00483"></a><span class="lineno">  483</span>    };</div>
 <div class="line"><a id="l00484" name="l00484"></a><span class="lineno">  484</span> </div>
 <div class="line"><a id="l00485" name="l00485"></a><span class="lineno">  485</span>    <span class="keyword">template</span>&lt;<span class="keywordtype">bool</span> accrow_, <a class="code hl_enumerationRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0a2ecaf58e2b69bb4a808e814aeb16a1">tatami::DimensionSelectionType</a> selection_, <span class="keyword">typename</span> ... Args_&gt;</div>
-<div class="line"><a id="l00486" name="l00486"></a><span class="lineno">  486</span>    std::unique_ptr&lt;tatami::Extractor&lt;selection_, false, Value_, Index_&gt; &gt; populate(<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt, Args_... args)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00486" name="l00486"></a><span class="lineno">  486</span>    std::unique_ptr&lt;tatami::Extractor&lt;selection_, false, Value_, Index_&gt; &gt; populate(<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt, Args_&amp;&amp;... args)<span class="keyword"> const </span>{</div>
 <div class="line"><a id="l00487" name="l00487"></a><span class="lineno">  487</span>        std::unique_ptr&lt;tatami::Extractor&lt;selection_, false, Value_, Index_&gt; &gt; output;</div>
 <div class="line"><a id="l00488" name="l00488"></a><span class="lineno">  488</span> </div>
 <div class="line"><a id="l00489" name="l00489"></a><span class="lineno">  489</span><span class="preprocessor">#ifndef TATAMI_HDF5_PARALLEL_LOCK</span></div>
@@ -529,7 +529,7 @@ $(function() {
 <div class="line"><a id="l00493" name="l00493"></a><span class="lineno">  493</span>        TATAMI_HDF5_PARALLEL_LOCK([&amp;]() -&gt; <span class="keywordtype">void</span> {</div>
 <div class="line"><a id="l00494" name="l00494"></a><span class="lineno">  494</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00495" name="l00495"></a><span class="lineno">  495</span> </div>
-<div class="line"><a id="l00496" name="l00496"></a><span class="lineno">  496</span>        output.reset(<span class="keyword">new</span> Hdf5Extractor&lt;accrow_, selection_&gt;(<span class="keyword">this</span>, args...));</div>
+<div class="line"><a id="l00496" name="l00496"></a><span class="lineno">  496</span>        output.reset(<span class="keyword">new</span> Hdf5Extractor&lt;accrow_, selection_&gt;(<span class="keyword">this</span>, std::forward&lt;Args_&gt;(args)...));</div>
 <div class="line"><a id="l00497" name="l00497"></a><span class="lineno">  497</span> </div>
 <div class="line"><a id="l00498" name="l00498"></a><span class="lineno">  498</span><span class="preprocessor">#ifndef TATAMI_HDF5_PARALLEL_LOCK</span></div>
 <div class="line"><a id="l00499" name="l00499"></a><span class="lineno">  499</span>        }</div>
