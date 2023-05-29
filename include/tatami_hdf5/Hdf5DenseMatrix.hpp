@@ -229,12 +229,14 @@ private:
             // Take slices across the current chunk for each index. This should be okay if consecutive,
             // but hopefully they've fixed the problem with non-consecutive slices in:
             // https://forum.hdfgroup.org/t/union-of-non-consecutive-hyperslabs-is-very-slow/5062
-            count[dimdex] = 1;
             work.dataspace.selectNone();
-            for (auto idx : extract_value) {
-                offset[dimdex] = idx;
-                work.dataspace.selectHyperslab(H5S_SELECT_OR, count, offset);
-            }
+            tatami::process_consecutive_indices<Index_>(extract_value.data(), extract_length,
+                [&](Index_ start, Index_ length) {
+                    offset[dimdex] = start;
+                    count[dimdex] = length;
+                    work.dataspace.selectHyperslab(H5S_SELECT_OR, count, offset);
+                }
+            );
             count[dimdex] = extract_length; // for the memspace setter.
         } else {
             offset[dimdex] = extract_value;
