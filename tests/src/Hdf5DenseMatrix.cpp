@@ -143,6 +143,22 @@ TEST_P(Hdf5DenseAccessUncachedTest, Basic) {
     tatami_test::test_simple_row_access(&mat, &ref, FORWARD, JUMP);
 }
 
+TEST_P(Hdf5DenseAccessUncachedTest, Transposed) {
+    auto param = GetParam(); 
+    bool FORWARD = std::get<0>(param);
+    size_t JUMP = std::get<1>(param);
+
+    // Any chunking will do, we're not using this information anyway.
+    dump(std::pair<int, int>(20, 5));
+
+    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, 0); 
+    std::shared_ptr<tatami::Matrix<double, int> > ptr(new tatami::DenseRowMatrix<double, int>(NR, NC, values));
+    tatami::DelayedTranspose<double, int> ref(std::move(ptr));
+
+    tatami_test::test_simple_column_access(&mat, &ref, FORWARD, JUMP);
+    tatami_test::test_simple_row_access(&mat, &ref, FORWARD, JUMP);
+}
+
 INSTANTIATE_TEST_CASE_P(
     Hdf5DenseMatrix,
     Hdf5DenseAccessUncachedTest,
