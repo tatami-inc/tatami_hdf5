@@ -49,7 +49,7 @@ class Hdf5DenseMatrix : public tatami::VirtualDenseMatrix<Value_, Index_> {
     std::string file_name, dataset_name;
 
     Index_ chunk_firstdim, chunk_seconddim;
-    size_t total_cache_size;
+    size_t cache_size_in_elements;
     bool prefer_firstdim;
 
 public:
@@ -63,7 +63,8 @@ public:
      */
     Hdf5DenseMatrix(std::string file, std::string name, size_t cache_limit = 100000000) : 
         file_name(std::move(file)), 
-        dataset_name(std::move(name))
+        dataset_name(std::move(name)),
+        cache_size_in_elements(static_cast<double>(cache_limit) / sizeof(Value_))
     {
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
         #pragma omp critical
@@ -91,11 +92,9 @@ public:
         }
 
         // Favoring extraction on the dimension that involves pulling out fewer chunks per dimension element.
-        double nchunks_firstdim = static_cast<double>(firstdim)/static_cast<double>(chunk_firstdim);
-        double nchunks_seconddim = static_cast<double>(seconddim)/static_cast<double>(chunk_seconddim);
-        prefer_firstdim = (nchunks_firstdim > nchunks_seconddim);
-
-        total_cache_size = static_cast<double>(cache_limit) / sizeof(Value_);
+        double chunks_per_firstdim = static_cast<double>(seconddim)/static_cast<double>(chunk_seconddim);
+        double chunks_per_seconddim = static_cast<double>(firstdim)/static_cast<double>(chunk_firstdim);
+        prefer_firstdim = (chunks_per_seconddim > chunks_per_firstdim);
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
         }
@@ -187,10 +186,10 @@ private:
             dataspace = dataset.getSpace();
 
             auto chunk_dim = (accrow_ != transpose_ ? parent->chunk_firstdim : parent->chunk_seconddim);
-            per_cache_size = static_cast<size_t>(chunk_dim) * static_cast<size_t>(other_dim);
-            num_chunks = static_cast<double>(parent->total_cache_size) / per_cache_size;
+            chunk_size_in_elements = static_cast<size_t>(chunk_dim) * static_cast<size_t>(other_dim);
+            num_chunks_in_cache = static_cast<double>(parent->cache_size_in_elements) / chunk_size_in_elements;
 
-            historian.reset(new LruCache(num_chunks));
+            historian.reset(new LruCache(num_chunks_in_cache));
         }
 
     public:
@@ -202,8 +201,8 @@ private:
 
     public:
         // Caching members.
-        size_t per_cache_size;
-        Index_ num_chunks;
+        size_t chunk_size_in_elements;
+        Index_ num_chunks_in_cache;
         typename std::conditional<accrow_ == transpose_, std::vector<Value_>, bool>::type transposition_buffer;
 
         // Cache with an oracle.
@@ -309,7 +308,7 @@ private:
                 return !x.empty();
             },
             /* allocate = */ [&](std::vector<Value_>& x) -> void {
-                x.resize(work.per_cache_size);
+                x.resize(work.chunk_size_in_elements);
             },
             /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<std::vector<Value_> >& chunk_data) -> void {
                 if constexpr(accrow_ == transpose_) {
@@ -357,7 +356,7 @@ private:
         const auto& cache_target = work.historian->find_chunk(
             chunk, 
             /* create = */ [&]() -> std::vector<Value_> {
-                return std::vector<Value_>(work.per_cache_size);
+                return std::vector<Value_>(work.chunk_size_in_elements);
             },
             /* populate = */ [&](Index_ id, std::vector<Value_>& chunk_contents) -> void {
                 Index_ actual_dim;
@@ -408,7 +407,7 @@ private:
     template<bool accrow_, typename ExtractType_>
     const Value_* extract(Index_ i, Value_* buffer, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
         // If there isn't any space for caching, we just extract directly.
-        if (work.num_chunks == 0) {
+        if (work.num_chunks_in_cache == 0) {
             return extract_without_cache(i, buffer, extract_value, extract_length, work);
         }
 
@@ -478,8 +477,8 @@ private:
 
         void set_oracle(std::unique_ptr<tatami::Oracle<Index_> > o) {
             auto chunk_mydim = parent->get_target_chunk_dim<accrow_>();
-            size_t max_predictions = static_cast<size_t>(base.num_chunks) * chunk_mydim * 2; // double the cache size, basically.
-            base.futurist.reset(new OracleCache<accrow_>(std::move(o), max_predictions, base.num_chunks));
+            size_t max_predictions = static_cast<size_t>(base.num_chunks_in_cache) * chunk_mydim * 2; // double the cache size, basically.
+            base.futurist.reset(new OracleCache<accrow_>(std::move(o), max_predictions, base.num_chunks_in_cache));
             base.historian.reset();
         }
     };
