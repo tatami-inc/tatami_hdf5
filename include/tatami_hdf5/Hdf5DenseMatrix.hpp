@@ -27,8 +27,9 @@ namespace tatami_hdf5 {
  * This allows us to handle very large datasets in limited memory at the cost of some speed.
  *
  * We manually handle the chunk caching to speed up access for consecutive rows and columns.
- * The policy is to minimize the number of calls to the HDF5 library by requesting large contiguous slices where possible.
- * The size of the slice is determined by the cache limit in the constructor.
+ * The policy is to minimize the number of calls to the HDF5 library by requesting large contiguous slices where possible,
+ * where each slice typically consists of multiple rows/columns that belong in the same HDF5 chunk.
+ * The size of the slice is determined by the `options` in the constructor.
  *
  * Callers should follow the `prefer_rows()` suggestion when extracting data,
  * as this tries to minimize the number of chunks that need to be read per access request.
@@ -48,23 +49,23 @@ class Hdf5DenseMatrix : public tatami::VirtualDenseMatrix<Value_, Index_> {
     Index_ firstdim, seconddim;
     std::string file_name, dataset_name;
 
-    Index_ chunk_firstdim, chunk_seconddim;
     size_t cache_size_in_elements;
+    bool require_minimum_cache;
+
+    Index_ chunk_firstdim, chunk_seconddim;
     bool prefer_firstdim;
 
 public:
     /**
      * @param file Path to the file.
      * @param name Path to the dataset inside the file.
-     * @param cache_limit Limit to the size of the chunk cache, in bytes.
-     *
-     * The cache size should be large enough to fit all chunks spanned by a row or column, for (near-)consecutive row and column access respectively.
-     * Otherwise, performance will degrade as the same chunks may need to be repeatedly read back into memory.
+     * @param options Further options.
      */
-    Hdf5DenseMatrix(std::string file, std::string name, size_t cache_limit = 100000000) : 
+    Hdf5DenseMatrix(std::string file, std::string name, const Hdf5Options& options) :
         file_name(std::move(file)), 
         dataset_name(std::move(name)),
-        cache_size_in_elements(static_cast<double>(cache_limit) / sizeof(Value_))
+        cache_size_in_elements(static_cast<double>(options.maximum_cache_size) / sizeof(Value_)),
+        require_minimum_cache(options.require_minimum_cache)
     {
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
         #pragma omp critical
@@ -91,19 +92,25 @@ public:
             chunk_seconddim = chunk_dims[1];
         }
 
-        // Favoring extraction on the dimension that involves pulling out fewer chunks per dimension element.
-        double chunks_per_firstdim = static_cast<double>(seconddim)/static_cast<double>(chunk_seconddim);
-        double chunks_per_seconddim = static_cast<double>(firstdim)/static_cast<double>(chunk_firstdim);
-        prefer_firstdim = (chunks_per_seconddim > chunks_per_firstdim);
-
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
         }
 #else
         });
 #endif
 
-        return;
+        // Favoring extraction on the dimension that involves pulling out fewer chunks per dimension element.
+        double chunks_per_firstdim = static_cast<double>(seconddim)/static_cast<double>(chunk_seconddim);
+        double chunks_per_seconddim = static_cast<double>(firstdim)/static_cast<double>(chunk_firstdim);
+        prefer_firstdim = (chunks_per_seconddim > chunks_per_firstdim);
     }
+
+    /**
+     * @param file Path to the file.
+     * @param name Path to the dataset inside the file.
+     *
+     * Unlike its overload, this constructor uses the defaults for `Hdf5Options`.
+     */
+    Hdf5DenseMatrix(std::string file, std::string name) : Hdf5DenseMatrix(std::move(file), std::move(name), Hdf5Options()) {}
 
 public:
     Index_ nrow() const {
@@ -189,7 +196,13 @@ private:
             chunk_size_in_elements = static_cast<size_t>(chunk_dim) * static_cast<size_t>(other_dim);
             num_chunks_in_cache = static_cast<double>(parent->cache_size_in_elements) / chunk_size_in_elements;
 
-            historian.reset(new LruCache(num_chunks_in_cache));
+            if (parent->require_minimum_cache && num_chunks_in_cache == 0) {
+                num_chunks_in_cache = 1;
+            }
+
+            if (num_chunks_in_cache > 0) {
+                historian.reset(new LruCache(num_chunks_in_cache));
+            }
         }
 
     public:

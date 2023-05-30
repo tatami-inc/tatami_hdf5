@@ -27,8 +27,9 @@ namespace tatami_hdf5 {
  * This allows us to handle very large datasets in limited memory at the cost of speed.
  *
  * We manually handle the chunk caching to speed up access for consecutive rows or columns (for compressed sparse row and column matrices, respectively).
- * The policy is to minimize the number of calls to the HDF5 library by requesting large contiguous slices where possible.
- * The size of the slice is determined by the cache limit in the constructor.
+ * The policy is to minimize the number of calls to the HDF5 library - and thus expensive file reads - by requesting large contiguous slices where possible, i.e., multiple columns or rows for CSC and CSR matrices, respectively.
+ * These are held in memory in the `Extractor` while the relevant column/row is returned to the user by `row()` or `column()`.
+ * The size of the slice is determined by the `options` in the constructor.
  *
  * Callers should follow the `prefer_rows()` suggestion when extracting data,
  * as this tries to minimize the number of chunks that need to be read per access request.
@@ -64,19 +65,10 @@ public:
      * If `row_ = true`, this should contain column indices sorted within each row, otherwise it should contain row indices sorted within each column.
      * @param ptr Name of the 1D dataset inside `file` containing the index pointers for the start and end of each row (if `row_ = true`) or column (otherwise).
      * This should have length equal to the number of rows (if `row_ = true`) or columns (otherwise).
-     * @param cache_limit Limit to the size of the cache, in bytes.
-     *
-     * The cache is created by extracting multiple columns (for CSC matrices) or rows (CSR) on every call to the HDF5 library.
-     * These are held in memory in the `Extractor` while the relevant column/row is returned to the user by `row()` or `column()`.
-     * The aim is to minimize the number of calls to the HDF5 library - and thus expensive file reads - for consecutive accesses.
+     * @param options Further options.
      */
-    Hdf5CompressedSparseMatrix(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, size_t cache_limit = 100000000) :
-        nrows(nr),
-        ncols(nc),
-        file_name(file),
-        data_name(std::move(vals)),
-        index_name(std::move(idx)),
-        pointers(static_cast<size_t>(row_ ? nr : nc) + 1)
+    Hdf5CompressedSparseMatrix(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, const Hdf5Options& options) :
+        nrows(nr), ncols(nc), file_name(file), data_name(std::move(vals)), index_name(std::move(idx)), cache_size_limit(options.maximum_cache_size)
     {
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
         #pragma omp critical
@@ -86,7 +78,6 @@ public:
 #endif
 
         H5::H5File file_handle(file_name, H5F_ACC_RDONLY);
-
         auto dhandle = open_and_check_dataset<false>(file_handle, data_name);
         const Index_ nonzeros = get_array_dimensions<1>(dhandle, "vals")[0];
 
@@ -97,11 +88,13 @@ public:
 
         auto phandle = open_and_check_dataset<true>(file_handle, ptr);
         const Index_ ptr_size = get_array_dimensions<1>(phandle, "ptr")[0];
-        if (ptr_size != pointers.size()) {
+        auto dim_p1 = static_cast<size_t>(row_ ? nrows : ncols) + 1;
+        if (ptr_size != dim_p1) {
             throw std::runtime_error("'ptr' dataset should have length equal to the number of " + (row_ ? std::string("rows") : std::string("columns")) + " plus 1");
         }
 
         // Checking the contents of the index pointers.
+        pointers.resize(dim_p1);
         phandle.read(pointers.data(), H5::PredType::NATIVE_HSIZE);
         if (pointers[0] != 0) {
             throw std::runtime_error("first index pointer should be zero");
@@ -116,7 +109,6 @@ public:
         });
 #endif
 
-        cache_size_limit = cache_limit;
         max_non_zeros = 0;
         for (size_t i = 1; i < pointers.size(); ++i) {
             Index_ diff = pointers[i] - pointers[i-1];
@@ -125,6 +117,21 @@ public:
             }
         }
     }
+
+    /**
+     * @param nr Number of rows in the matrix.
+     * @param nc Number of columns in the matrix.
+     * @param file Path to the file.
+     * @param vals Name of the 1D dataset inside `file` containing the non-zero elements.
+     * @param idx Name of the 1D dataset inside `file` containing the indices of the non-zero elements.
+     * If `row_ = true`, this should contain column indices sorted within each row, otherwise it should contain row indices sorted within each column.
+     * @param ptr Name of the 1D dataset inside `file` containing the index pointers for the start and end of each row (if `row_ = true`) or column (otherwise).
+     * This should have length equal to the number of rows (if `row_ = true`) or columns (otherwise).
+     * 
+     * Unlike its overload, this constructor uses the defaults for `Hdf5Options`.
+     */
+    Hdf5CompressedSparseMatrix(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr) :
+        Hdf5CompressedSparseMatrix(nr, nc, std::move(file), std::move(vals), std::move(idx), std::move(ptr), Hdf5Options()) {}
 
 public:
     Index_ nrow() const {
@@ -308,7 +315,7 @@ private:
         if (historian.max_cache_number == -1) {
             historian.max_cache_number = cache_size_limit / (max_non_zeros * ((needs_value ? sizeof(Value_) : 0) + sizeof(Index_)));
             if (historian.max_cache_number == 0) {
-                historian.max_cache_number = 1;
+                historian.max_cache_number = 1; // same effect as always setting 'require_minimum_cache = true'.
             }
         }
 

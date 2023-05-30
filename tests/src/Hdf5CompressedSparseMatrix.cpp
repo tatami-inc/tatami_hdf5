@@ -76,8 +76,15 @@ protected:
         return static_cast<double>(NR * NC) * fraction * static_cast<double>(sizeof(double) + sizeof(int));
     }
 
+    template<typename ... Args_>
+    static auto custom_options(size_t cache_size) {
+        tatami_hdf5::Hdf5Options options;
+        options.maximum_cache_size = cache_size;
+        return options;
+    }
+
     template<bool row_>
-    auto create_matrix(size_t NR, size_t NC, size_t cache_size) const {
+    auto create_matrix(size_t NR, size_t NC, const tatami_hdf5::Hdf5Options& hopt) const {
         return tatami_hdf5::Hdf5CompressedSparseMatrix<row_, double, int>(
             row_ ? NR : NC, 
             row_ ? NC : NR, 
@@ -85,7 +92,7 @@ protected:
             name + "/data", 
             name + "/index", 
             name + "/indptr", 
-            cache_size
+            hopt
         ); 
     }
 
@@ -150,16 +157,17 @@ TEST_P(Hdf5SparseAccessTest, Primary) {
 
     const size_t NR = 200, NC = 100;
     dump(std::get<2>(param), NR, NC);
-    int cache_size = compute_cache_size(NR, NC, std::get<3>(param)); // We limit the cache size to ensure that the cache management is not trivial.
+    auto cache_size = compute_cache_size(NR, NC, std::get<3>(param)); // We limit the cache size to ensure that the cache management is not trivial.
+    auto hopt = custom_options(cache_size);
 
     {
-        auto mat = create_matrix<true>(NR, NC, cache_size);
+        auto mat = create_matrix<true>(NR, NC, hopt);
         auto ref = create_reference<true>(NR, NC);
         tatami_test::test_simple_row_access(&mat, &ref, FORWARD, JUMP);
     }
 
     {
-        auto mat = create_matrix<false>(NR, NC, cache_size);
+        auto mat = create_matrix<false>(NR, NC, hopt);
         auto ref = create_reference<false>(NR, NC);
         tatami_test::test_simple_column_access(&mat, &ref, FORWARD, JUMP);
     }
@@ -173,15 +181,16 @@ TEST_P(Hdf5SparseAccessTest, Secondary) {
     const size_t NR = 50, NC = 10; // much smaller for the secondary dimension.
     dump(std::get<2>(param), NR, NC);
     int cache_size = compute_cache_size(NR, NC, std::get<3>(param));
+    auto hopt = custom_options(cache_size);
 
     {
-        auto mat = create_matrix<true>(NR, NC, cache_size);
+        auto mat = create_matrix<true>(NR, NC, hopt);
         auto ref = create_reference<true>(NR, NC);
         tatami_test::test_simple_column_access(&mat, &ref, FORWARD, JUMP);
     }
 
     {
-        auto mat = create_matrix<false>(NR, NC, cache_size);
+        auto mat = create_matrix<false>(NR, NC, hopt);
         auto ref = create_reference<false>(NR, NC);
         tatami_test::test_simple_row_access(&mat, &ref, FORWARD, JUMP);
     }
@@ -212,16 +221,17 @@ TEST_P(Hdf5SparseSlicedTest, Primary) {
     const size_t NR = 128, NC = 256;
     dump(std::get<3>(param), NR, NC);
     int cache_size = compute_cache_size(NR, NC, std::get<4>(param));
+    auto hopt = custom_options(cache_size);
 
     {
-        auto mat = create_matrix<true>(NR, NC, cache_size);
+        auto mat = create_matrix<true>(NR, NC, hopt);
         auto ref = create_reference<true>(NR, NC);
         size_t FIRST = interval_info[0] * NC, LAST = interval_info[1] * NC;
         tatami_test::test_sliced_row_access(&mat, &ref, FORWARD, JUMP, FIRST, LAST);
     }
 
     {
-        auto mat = create_matrix<false>(NR, NC, cache_size);
+        auto mat = create_matrix<false>(NR, NC, hopt);
         auto ref = create_reference<false>(NR, NC);
         size_t FIRST = interval_info[0] * NC, LAST = interval_info[1] * NC; // NC is deliberate, due to the transposition.
         tatami_test::test_sliced_column_access(&mat, &ref, FORWARD, JUMP, FIRST, LAST);
@@ -237,16 +247,17 @@ TEST_P(Hdf5SparseSlicedTest, Secondary) {
     const size_t NR = 50, NC = 10; // much smaller for the secondary dimension.
     dump(std::get<3>(param), NR, NC);
     int cache_size = compute_cache_size(NR, NC, std::get<4>(param));
+    auto hopt = custom_options(cache_size);
 
     {
-        auto mat = create_matrix<true>(NR, NC, cache_size);
+        auto mat = create_matrix<true>(NR, NC, hopt);
         auto ref = create_reference<true>(NR, NC);
         size_t FIRST = interval_info[0] * NR, LAST = interval_info[1] * NR;
         tatami_test::test_sliced_column_access(&mat, &ref, FORWARD, JUMP, FIRST, LAST);
     }
 
     {
-        auto mat = create_matrix<false>(NR, NC, cache_size);
+        auto mat = create_matrix<false>(NR, NC, hopt);
         auto ref = create_reference<false>(NR, NC);
         size_t FIRST = interval_info[0] * NC, LAST = interval_info[1] * NC;
         tatami_test::test_sliced_row_access(&mat, &ref, FORWARD, JUMP, FIRST, LAST);
@@ -283,16 +294,17 @@ TEST_P(Hdf5SparseIndexedTest, Primary) {
     const size_t NR = 200, NC = 100;
     dump(std::get<3>(param), NR, NC);
     int cache_size = compute_cache_size(NR, NC, std::get<4>(param));
+    auto hopt = custom_options(cache_size);
 
     {
-        auto mat = create_matrix<true>(NR, NC, cache_size);
+        auto mat = create_matrix<true>(NR, NC, hopt);
         auto ref = create_reference<true>(NR, NC);
         size_t FIRST = interval_info[0] * NC, STEP = interval_info[1];
         tatami_test::test_indexed_row_access(&mat, &ref, FORWARD, JUMP, FIRST, STEP);
     }
 
     {
-        auto mat = create_matrix<false>(NR, NC, cache_size);
+        auto mat = create_matrix<false>(NR, NC, hopt);
         auto ref = create_reference<false>(NR, NC);
         size_t FIRST = interval_info[0] * NC, STEP = interval_info[1]; // NC is deliberate, due to the transposition.
         tatami_test::test_indexed_column_access(&mat, &ref, FORWARD, JUMP, FIRST, STEP);
@@ -308,16 +320,17 @@ TEST_P(Hdf5SparseIndexedTest, Secondary) {
     const size_t NR = 50, NC = 10; // much smaller for the secondary dimension.
     dump(std::get<3>(param), NR, NC);
     int cache_size = compute_cache_size(NR, NC, std::get<4>(param));
+    auto hopt = custom_options(cache_size);
 
     {
-        auto mat = create_matrix<true>(NR, NC, cache_size);
+        auto mat = create_matrix<true>(NR, NC, hopt);
         auto ref = create_reference<true>(NR, NC);
         size_t FIRST = interval_info[0] * NR, STEP = interval_info[1];
         tatami_test::test_indexed_column_access(&mat, &ref, FORWARD, JUMP, FIRST, STEP);
     }
 
     {
-        auto mat = create_matrix<false>(NR, NC, cache_size);
+        auto mat = create_matrix<false>(NR, NC, hopt);
         auto ref = create_reference<false>(NR, NC);
         size_t FIRST = interval_info[0] * NC, STEP = interval_info[1];
         tatami_test::test_indexed_row_access(&mat, &ref, FORWARD, JUMP, FIRST, STEP);
@@ -350,9 +363,10 @@ TEST_P(Hdf5SparseBasicCacheTest, LruRandomized) {
     const size_t NR = 100, NC = 150; 
     dump(NR, NC);
     int cache_size = compute_cache_size(NR, NC, GetParam());
+    auto hopt = custom_options(cache_size);
 
     {
-        auto mat = create_matrix<true>(NR, NC, cache_size);
+        auto mat = create_matrix<true>(NR, NC, hopt);
         auto ref = create_reference<true>(NR, NC);
 
         std::mt19937_64 rng(cache_size * 123);
@@ -365,7 +379,7 @@ TEST_P(Hdf5SparseBasicCacheTest, LruRandomized) {
     }
 
     {
-        auto mat = create_matrix<false>(NR, NC, cache_size);
+        auto mat = create_matrix<false>(NR, NC, hopt);
         auto ref = create_reference<false>(NR, NC);
 
         std::mt19937_64 rng(cache_size * 456);
@@ -383,9 +397,10 @@ TEST_P(Hdf5SparseBasicCacheTest, SimpleOracle) {
     const size_t NR = 189, NC = 123; 
     dump(NR, NC);
     int cache_size = compute_cache_size(NR, NC, GetParam());
+    auto hopt = custom_options(cache_size);
 
     {
-        auto mat = create_matrix<true>(NR, NC, cache_size);
+        auto mat = create_matrix<true>(NR, NC, hopt);
         auto ref = create_reference<true>(NR, NC);
 
         tatami_test::test_oracle_row_access<tatami::NumericMatrix>(&mat, &ref, false); // consecutive
@@ -409,7 +424,7 @@ TEST_P(Hdf5SparseBasicCacheTest, SimpleOracle) {
     }
 
     {
-        auto mat = create_matrix<false>(NR, NC, cache_size);
+        auto mat = create_matrix<false>(NR, NC, hopt);
         auto ref = create_reference<false>(NR, NC);
 
         tatami_test::test_oracle_column_access<tatami::NumericMatrix>(&mat, &ref, false); // consecutive
@@ -424,6 +439,7 @@ TEST_P(Hdf5SparseBasicCacheTest, Repeated) {
     size_t NR = 199, NC = 288;
     dump(NR, NC);
     int cache_size = compute_cache_size(NR, NC, GetParam());
+    auto hopt = custom_options(cache_size);
 
     // Check that we re-use the cache effectively when no new elements are
     // requested; no additional extractions from file should occur.
@@ -433,7 +449,7 @@ TEST_P(Hdf5SparseBasicCacheTest, Repeated) {
         predictions.push_back(i % 2);
     }
 
-    auto mat = create_matrix<true>(NR, NC, cache_size);
+    auto mat = create_matrix<true>(NR, NC, hopt);
     auto ref = create_reference<true>(NR, NC);
 
     auto rwork = ref.dense_row();
@@ -470,9 +486,11 @@ protected:
         double cache_multiplier = std::get<0>(params);
         int interval_jump = std::get<1>(params);
         int interval_size = std::get<2>(params);
-        int cache_size = compute_cache_size(NR, NC, cache_multiplier);
 
-        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", cache_size));
+        int cache_size = compute_cache_size(NR, NC, cache_multiplier);
+        auto hopt = custom_options(cache_size);
+
+        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt));
         ref.reset(new tatami::CompressedSparseMatrix<
             true, 
             double, 
@@ -564,8 +582,9 @@ TEST_P(Hdf5SparseApplyTest, Basic) {
     size_t NC = 200;
     dump(NR, NC);
     int cache_size = compute_cache_size(NR, NC, GetParam());
+    auto hopt = custom_options(cache_size);
 
-    auto mat = create_matrix<true>(NR, NC, cache_size);
+    auto mat = create_matrix<true>(NR, NC, hopt);
     auto ref = create_reference<true>(NR, NC);
 
     EXPECT_EQ(tatami::row_sums(&mat), tatami::row_sums(&ref));

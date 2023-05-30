@@ -21,15 +21,21 @@ class Hdf5DenseMatrixTestMethods {
 public:
     static constexpr size_t NR = 200, NC = 100;
 
-    // Make sure the cache size is smaller than the dataset, but not too much
-    // smaller, to make sure we do some caching + evictions. Here, the cache is
-    // set at 20% of the size of the entire dataset, i.e., 40 rows or 20 columns.
-    static constexpr size_t global_cache_size = (NR * NC * 8) / 5;
-
 protected:
     std::vector<double> values;
     std::string fpath;
     std::string name;
+
+    static auto custom_options() {
+        tatami_hdf5::Hdf5Options options;
+
+        // Make sure the cache size is smaller than the dataset, but not too much
+        // smaller, to make sure we do some caching + evictions. Here, the cache is
+        // set at 20% of the size of the entire dataset, i.e., 40 rows or 20 columns.
+        options.maximum_cache_size = (NR * NC * 8) / 5;
+
+        return options;
+    }
 
     void dump(const std::pair<int, int>& chunk_sizes) {
         fpath = tatami_test::temp_file_path("tatami-dense-test.h5");
@@ -95,30 +101,20 @@ TEST_F(Hdf5DenseUtilsTest, Preference) {
     {
         // First dimension is compromised, switching to the second dimension.
         dump(std::make_pair<int, int>(NR, 1));
-        tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, NR * sizeof(double));
+        tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name);
         EXPECT_FALSE(mat.prefer_rows());
 
-        tatami_hdf5::Hdf5DenseMatrix<double, int, true> tmat(fpath, name, NR * sizeof(double));
+        tatami_hdf5::Hdf5DenseMatrix<double, int, true> tmat(fpath, name);
         EXPECT_TRUE(tmat.prefer_rows());
     }
 
     {
         // Second dimension is compromised, but we just use the first anyway.
         dump(std::make_pair<int, int>(1, NC));
-        tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, NC * sizeof(double));
+        tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name);
         EXPECT_TRUE(mat.prefer_rows());
 
-        tatami_hdf5::Hdf5DenseMatrix<double, int, true> tmat(fpath, name, NC * sizeof(double));
-        EXPECT_FALSE(tmat.prefer_rows());
-    }
-
-    {
-        // Both are compromised.
-        dump(std::make_pair<int, int>(10, 10));
-        tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, 0);
-        EXPECT_TRUE(mat.prefer_rows());
-
-        tatami_hdf5::Hdf5DenseMatrix<double, int, true> tmat(fpath, name, 0);
+        tatami_hdf5::Hdf5DenseMatrix<double, int, true> tmat(fpath, name);
         EXPECT_FALSE(tmat.prefer_rows());
     }
 }
@@ -126,7 +122,15 @@ TEST_F(Hdf5DenseUtilsTest, Preference) {
 /*************************************
  *************************************/
 
-class Hdf5DenseAccessUncachedTest : public ::testing::TestWithParam<std::tuple<bool, int> >, public Hdf5DenseMatrixTestMethods {};
+class Hdf5DenseAccessUncachedTest : public ::testing::TestWithParam<std::tuple<bool, int> >, public Hdf5DenseMatrixTestMethods {
+protected:
+    static auto uncached_options() {
+        tatami_hdf5::Hdf5Options opt;
+        opt.require_minimum_cache = false;
+        opt.maximum_cache_size = 0;
+        return opt;
+    }
+};
 
 TEST_P(Hdf5DenseAccessUncachedTest, Basic) {
     auto param = GetParam(); 
@@ -136,7 +140,7 @@ TEST_P(Hdf5DenseAccessUncachedTest, Basic) {
     // Any chunking will do, we're not using this information anyway.
     dump(std::pair<int, int>(10, 10));
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, 0); 
+    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, uncached_options()); 
     tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
 
     tatami_test::test_simple_column_access(&mat, &ref, FORWARD, JUMP);
@@ -151,7 +155,26 @@ TEST_P(Hdf5DenseAccessUncachedTest, Transposed) {
     // Any chunking will do, we're not using this information anyway.
     dump(std::pair<int, int>(20, 5));
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, 0); 
+    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, uncached_options()); 
+    std::shared_ptr<tatami::Matrix<double, int> > ptr(new tatami::DenseRowMatrix<double, int>(NR, NC, values));
+    tatami::DelayedTranspose<double, int> ref(std::move(ptr));
+
+    tatami_test::test_simple_column_access(&mat, &ref, FORWARD, JUMP);
+    tatami_test::test_simple_row_access(&mat, &ref, FORWARD, JUMP);
+}
+
+TEST_P(Hdf5DenseAccessUncachedTest, ForcedCache) {
+    auto param = GetParam(); 
+    bool FORWARD = std::get<0>(param);
+    size_t JUMP = std::get<1>(param);
+
+    dump(std::pair<int, int>(15, 20));
+
+    tatami_hdf5::Hdf5Options options;
+    options.maximum_cache_size = 0;
+    options.require_minimum_cache = true; // force a minimum cache size to avoid redundant reads.
+
+    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, options); 
     std::shared_ptr<tatami::Matrix<double, int> > ptr(new tatami::DenseRowMatrix<double, int>(NR, NC, values));
     tatami::DelayedTranspose<double, int> ref(std::move(ptr));
 
@@ -181,7 +204,7 @@ TEST_P(Hdf5DenseAccessTest, Basic) {
     auto chunk_sizes = std::get<2>(param);
     dump(chunk_sizes);
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, global_cache_size); 
+    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, custom_options()); 
     tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
 
     tatami_test::test_simple_column_access(&mat, &ref, FORWARD, JUMP);
@@ -196,7 +219,7 @@ TEST_P(Hdf5DenseAccessTest, Transposed) {
     auto chunk_sizes = std::get<2>(param);
     dump(chunk_sizes);
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, global_cache_size);
+    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, custom_options());
     std::shared_ptr<tatami::Matrix<double, int> > ptr(new tatami::DenseRowMatrix<double, int>(NR, NC, values));
     tatami::DelayedTranspose<double, int> ref(std::move(ptr));
 
@@ -232,7 +255,7 @@ TEST_P(Hdf5DenseAccessMiscTest, Apply) {
     auto chunk_sizes = std::get<0>(param);
     dump(chunk_sizes);
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, global_cache_size);
+    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, custom_options());
     tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
 
     EXPECT_EQ(tatami::row_sums(&mat), tatami::row_sums(&ref));
@@ -246,7 +269,7 @@ TEST_P(Hdf5DenseAccessMiscTest, LruReuse) {
     auto chunk_sizes = std::get<0>(param);
     dump(chunk_sizes);
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, global_cache_size);
+    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, custom_options());
     tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
 
     {
@@ -273,7 +296,7 @@ TEST_P(Hdf5DenseAccessMiscTest, Oracle) {
     auto chunk_sizes = std::get<0>(param);
     dump(chunk_sizes);
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, global_cache_size);
+    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, custom_options());
     tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
 
     tatami_test::test_oracle_row_access<tatami::NumericMatrix>(&mat, &ref, false); // consecutive
@@ -312,7 +335,7 @@ TEST_P(Hdf5DenseSlicedTest, Basic) {
     auto chunk_sizes = std::get<3>(param);
     dump(chunk_sizes);
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, global_cache_size);
+    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, custom_options());
     tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
 
     {
@@ -335,7 +358,7 @@ TEST_P(Hdf5DenseSlicedTest, Transposed) {
     auto chunk_sizes = std::get<3>(param);
     dump(chunk_sizes);
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, global_cache_size);
+    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, custom_options());
     std::shared_ptr<tatami::Matrix<double, int> > ptr(new tatami::DenseRowMatrix<double, int>(NR, NC, values));
     tatami::DelayedTranspose<double, int> ref(std::move(ptr));
 
@@ -383,7 +406,7 @@ TEST_P(Hdf5DenseIndexedTest, Basic) {
     auto chunk_sizes = std::get<3>(param);
     dump(chunk_sizes);
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, global_cache_size);
+    tatami_hdf5::Hdf5DenseMatrix<double, int> mat(fpath, name, custom_options());
     tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
 
     {
@@ -406,7 +429,7 @@ TEST_P(Hdf5DenseIndexedTest, Transposed) {
     auto chunk_sizes = std::get<3>(param);
     dump(chunk_sizes);
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, global_cache_size);
+    tatami_hdf5::Hdf5DenseMatrix<double, int, true> mat(fpath, name, custom_options());
     std::shared_ptr<tatami::Matrix<double, int> > ptr(new tatami::DenseRowMatrix<double, int>(NR, NC, values));
     tatami::DelayedTranspose<double, int> ref(std::move(ptr));
 
