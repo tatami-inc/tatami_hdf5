@@ -155,7 +155,8 @@ public:
     }
     
     bool uses_oracle(bool) const {
-        return true;
+        // A non-zero cache is necessary (but not sufficient) for oracle usage.
+        return cache_size_in_elements > 0;
     }
 
     using tatami::Matrix<Value_, Index_>::dense_row;
@@ -489,10 +490,15 @@ private:
         }
 
         void set_oracle(std::unique_ptr<tatami::Oracle<Index_> > o) {
-            auto chunk_mydim = parent->get_target_chunk_dim<accrow_>();
-            size_t max_predictions = static_cast<size_t>(base.num_chunks_in_cache) * chunk_mydim * 2; // double the cache size, basically.
-            base.futurist.reset(new OracleCache<accrow_>(std::move(o), max_predictions, base.num_chunks_in_cache));
-            base.historian.reset();
+            // If the number of chunks is not greater than 1, we might as well
+            // just let the LRU do its job; oracles are only useful if we can
+            // store multiple chunks corresponding to future predictions.
+            if (base.num_chunks_in_cache > 1) {
+                auto chunk_mydim = parent->get_target_chunk_dim<accrow_>();
+                size_t max_predictions = static_cast<size_t>(base.num_chunks_in_cache) * chunk_mydim * 2; // double the cache size, basically.
+                base.futurist.reset(new OracleCache<accrow_>(std::move(o), max_predictions, base.num_chunks_in_cache));
+                base.historian.reset();
+            }
         }
     };
 
