@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <cmath>
 #include <list>
+#include <algorithm>
 
 /**
  * @file Hdf5CompressedSparseMatrix.hpp
@@ -355,16 +356,7 @@ private:
         auto comp = [&field](size_t l, size_t r) -> bool {
             return field(l) < field(r);
         };
-
-        bool sorted = true;
-        for (size_t i = 1, end = indices.size(); i < end; ++i) {
-            if (!comp(indices[i-1], indices[i])) {
-                sorted = false;
-                break;
-            }
-        }
-
-        if (!sorted) {
+        if (!std::is_sorted(indices.begin(), indices.end(), comp)) {
             std::sort(indices.begin(), indices.end(), comp);
         }
     }
