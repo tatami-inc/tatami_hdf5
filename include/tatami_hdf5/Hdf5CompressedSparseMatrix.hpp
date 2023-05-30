@@ -217,34 +217,18 @@ private:
     };
 
     struct PrimaryWorkspace {
-        void fill(const Hdf5CompressedSparseMatrix* parent, Index_ extraction_cache_size) {
-            // TODO: set more suitable chunk cache values here, to avoid re-reading
-            // chunks on the boundaries of the primary cache.
-            file.openFile(parent->file_name, H5F_ACC_RDONLY);
-
-            data = file.openDataSet(parent->data_name);
-            index = file.openDataSet(parent->index_name);
-            dataspace = data.getSpace();
-
-            extraction_bounds.resize(extraction_cache_size, std::pair<size_t, size_t>(-1, 0));
-
-            historian.reset(new LruCache);
-        }
-
-    public:
+        // HDF5 members.
         H5::H5File file;
         H5::DataSet data, index;
         H5::DataSpace dataspace;
         H5::DataSpace memspace;
 
-    public:
         // Cache with an oracle.
         std::unique_ptr<OracleCache> futurist;
 
         // Cache without an oracle.
         std::unique_ptr<LruCache> historian;
 
-    public:
         // Cache for re-use.
         std::vector<std::pair<size_t, size_t> > extraction_bounds;
     };
@@ -816,17 +800,6 @@ private:
         H5::DataSet data, index;
         H5::DataSpace dataspace;
         H5::DataSpace memspace;
-
-        void fill(const Hdf5CompressedSparseMatrix* parent) {
-            // TODO: set more suitable chunk cache values here, to avoid re-reading
-            // chunks on the boundaries of the primary cache.
-            file.openFile(parent->file_name, H5F_ACC_RDONLY);
-
-            data = file.openDataSet(parent->data_name);
-            index = file.openDataSet(parent->index_name);
-            dataspace = data.getSpace();
-        }
-
         std::vector<Index_> index_cache;
     };
 
@@ -1010,14 +983,19 @@ private:
                 this->full_length = (accrow_ ? parent->ncols : parent->nrows);
             }
 
+            // TODO: set more suitable chunk cache values here, to avoid re-reading
+            // chunks that are only partially consumed.
+            core.file.openFile(parent->file_name, H5F_ACC_RDONLY);
+            core.data = core.file.openDataSet(parent->data_name);
+            core.index = core.file.openDataSet(parent->index_name);
+            core.dataspace = core.data.getSpace();
+
             if constexpr(row_ == accrow_) {
+                core.historian.reset(new LruCache);
                 if (opt.cache_for_reuse) {
-                    core.fill(parent, accrow_ ? parent->nrows : parent->ncols);
-                } else {
-                    core.fill(parent, 0);
+                    auto extraction_cache_size = accrow_ ? p->nrows : p->ncols;
+                    core.extraction_bounds.resize(extraction_cache_size, std::pair<size_t, size_t>(-1, 0));
                 }
-            } else {
-                core.fill(parent);
             }
         }
 

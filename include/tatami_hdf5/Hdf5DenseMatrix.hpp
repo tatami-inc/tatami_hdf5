@@ -181,39 +181,12 @@ private:
 
     template<bool accrow_>
     struct Workspace {
-        void fill(const Hdf5DenseMatrix* parent, Index_ other_dim) {
-            // Turn off HDF5's caching, as we'll be handling that. This allows us
-            // to parallelize extractions without locking when the data has already
-            // been loaded into memory; if we just used HDF5's cache, we would have
-            // to lock on every extraction, given the lack of thread safety.
-            H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
-            fapl.setCache(0, 0, 0, 0);
-
-            file.openFile(parent->file_name, H5F_ACC_RDONLY, fapl);
-            dataset = file.openDataSet(parent->dataset_name);
-            dataspace = dataset.getSpace();
-
-            auto chunk_dim = (accrow_ != transpose_ ? parent->chunk_firstdim : parent->chunk_seconddim);
-            chunk_size_in_elements = static_cast<size_t>(chunk_dim) * static_cast<size_t>(other_dim);
-            num_chunks_in_cache = static_cast<double>(parent->cache_size_in_elements) / chunk_size_in_elements;
-
-            if (parent->require_minimum_cache && num_chunks_in_cache == 0) {
-                num_chunks_in_cache = 1;
-            }
-
-            if (num_chunks_in_cache > 0) {
-                historian.reset(new LruCache(num_chunks_in_cache));
-            }
-        }
-
-    public:
         // HDF5 members.
         H5::H5File file;
         H5::DataSet dataset;
         H5::DataSpace dataspace;
         H5::DataSpace memspace;
 
-    public:
         // Caching members.
         size_t chunk_size_in_elements;
         Index_ num_chunks_in_cache;
@@ -445,7 +418,7 @@ private:
         Hdf5Extractor(const Hdf5DenseMatrix* p) : parent(p) {
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 this->full_length = (accrow_ ? parent->ncol() : parent->nrow());
-                base.fill(parent, this->full_length); 
+                initialize_workspace(this->full_length); 
             }
         }
 
@@ -453,7 +426,7 @@ private:
             if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 this->block_start = start;
                 this->block_length = length;
-                base.fill(parent, this->block_length); 
+                initialize_workspace(this->block_length); 
             }
         }
 
@@ -461,7 +434,7 @@ private:
             if constexpr(selection_ == tatami::DimensionSelectionType::INDEX) {
                 this->index_length = idx.size();
                 indices = std::move(idx);
-                base.fill(parent, this->index_length); 
+                initialize_workspace(this->index_length); 
             }
         }
 
@@ -469,6 +442,33 @@ private:
         const Hdf5DenseMatrix* parent;
         Workspace<accrow_> base;
         typename std::conditional<selection_ == tatami::DimensionSelectionType::INDEX, std::vector<Index_>, bool>::type indices;
+
+    private:
+        void initialize_workspace(Index_ other_dim) {
+            // Turn off HDF5's caching, as we'll be handling that. This allows us
+            // to parallelize extractions without locking when the data has already
+            // been loaded into memory; if we just used HDF5's cache, we would have
+            // to lock on every extraction, given the lack of thread safety.
+            H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
+            fapl.setCache(0, 0, 0, 0);
+
+            base.file.openFile(parent->file_name, H5F_ACC_RDONLY, fapl);
+            base.dataset = base.file.openDataSet(parent->dataset_name);
+            base.dataspace = base.dataset.getSpace();
+
+            auto chunk_dim = (accrow_ != transpose_ ? parent->chunk_firstdim : parent->chunk_seconddim);
+            base.chunk_size_in_elements = static_cast<size_t>(chunk_dim) * static_cast<size_t>(other_dim);
+            base.num_chunks_in_cache = static_cast<double>(parent->cache_size_in_elements) / base.chunk_size_in_elements;
+
+            if (parent->require_minimum_cache && base.num_chunks_in_cache == 0) {
+                base.num_chunks_in_cache = 1;
+            }
+
+            // If we're not caching any chunks, then don't bother to set up the LRU cache.
+            if (base.num_chunks_in_cache > 0) {
+                base.historian.reset(new LruCache(base.num_chunks_in_cache));
+            }
+        }
 
     public:
         const Index_* index_start() const {
