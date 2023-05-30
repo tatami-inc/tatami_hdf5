@@ -113,8 +113,10 @@ Collaboration diagram for tatami_hdf5::Hdf5DenseMatrix&lt; Value_, Index_, trans
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a0645a6c3952aaf2b5d61841709a1d21c"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html#a0645a6c3952aaf2b5d61841709a1d21c">Hdf5DenseMatrix</a> (std::string file, std::string name, size_t cache_limit=100000000)</td></tr>
-<tr class="separator:a0645a6c3952aaf2b5d61841709a1d21c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a408c365ed968ed602c6b7954ff87583a"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html#a408c365ed968ed602c6b7954ff87583a">Hdf5DenseMatrix</a> (std::string file, std::string name, const <a class="el" href="structtatami__hdf5_1_1Hdf5Options.html">Hdf5Options</a> &amp;options)</td></tr>
+<tr class="separator:a408c365ed968ed602c6b7954ff87583a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa7392c0009070f8c42ff8a2c49cc35ea"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html#aa7392c0009070f8c42ff8a2c49cc35ea">Hdf5DenseMatrix</a> (std::string file, std::string name)</td></tr>
+<tr class="separator:aa7392c0009070f8c42ff8a2c49cc35ea"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abf6a816d04e1a366a3c75850d1d951e4"><td class="memItemLeft" align="right" valign="top">Index_&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html#abf6a816d04e1a366a3c75850d1d951e4">nrow</a> () const</td></tr>
 <tr class="separator:abf6a816d04e1a366a3c75850d1d951e4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2dcc5776acbb22d9907f637a20f6ea38"><td class="memItemLeft" align="right" valign="top">Index_&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html#a2dcc5776acbb22d9907f637a20f6ea38">ncol</a> () const</td></tr>
@@ -244,7 +246,7 @@ typedef Index_&#160;</td><td class="memItemRight" valign="bottom"><a class="elRe
 <div class="textblock"><div class="compoundTemplParams">template&lt;typename Value_, typename Index_, bool transpose_ = false&gt;<br />
 class tatami_hdf5::Hdf5DenseMatrix&lt; Value_, Index_, transpose_ &gt;</div><p>Dense matrix backed by a DataSet in a HDF5 file. </p>
 <p>This class retrieves data from the HDF5 file on demand rather than loading it all in at the start. This allows us to handle very large datasets in limited memory at the cost of some speed.</p>
-<p>We manually handle the chunk caching to speed up access for consecutive rows and columns. The policy is to minimize the number of calls to the HDF5 library by requesting large contiguous slices where possible. The size of the slice is determined by the cache limit in the constructor.</p>
+<p>We manually handle the chunk caching to speed up access for consecutive rows and columns. The policy is to minimize the number of calls to the HDF5 library by requesting large contiguous slices where possible, where each slice typically consists of multiple rows/columns that belong in the same HDF5 chunk. The size of the slice is determined by the <code>options</code> in the constructor.</p>
 <p>Callers should follow the <code><a class="el" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html#a09c098a2d7d0b3e7686280b7c9545d37">prefer_rows()</a></code> suggestion when extracting data, as this tries to minimize the number of chunks that need to be read per access request. If they do not, the access pattern on disk may be slightly to highly suboptimal, depending on the chunk dimensions.</p>
 <p>As the HDF5 library is not generally thread-safe, the HDF5-related operations should only be run in a single thread. For OpenMP, this is handled automatically by putting all HDF5 operations in a critical region. For other parallelization schemes, callers should define the <code>TATAMI_HDF5_PARALLEL_LOCK</code> macro; this should be a function that accepts and executes a no-argument lambda within an appropriate serial region (e.g., based on a global mutex).</p>
 <dl class="tparams"><dt>Template Parameters</dt><dd>
@@ -256,8 +258,8 @@ class tatami_hdf5::Hdf5DenseMatrix&lt; Value_, Index_, transpose_ &gt;</div><p>D
   </dd>
 </dl>
 </div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="a0645a6c3952aaf2b5d61841709a1d21c" name="a0645a6c3952aaf2b5d61841709a1d21c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0645a6c3952aaf2b5d61841709a1d21c">&#9670;&#160;</a></span>Hdf5DenseMatrix()</h2>
+<a id="a408c365ed968ed602c6b7954ff87583a" name="a408c365ed968ed602c6b7954ff87583a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a408c365ed968ed602c6b7954ff87583a">&#9670;&#160;</a></span>Hdf5DenseMatrix() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -282,8 +284,8 @@ template&lt;typename Value_ , typename Index_ , bool transpose_ = false&gt; </di
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>cache_limit</em> = <code>100000000</code>&#160;</td>
+          <td class="paramtype">const <a class="el" href="structtatami__hdf5_1_1Hdf5Options.html">Hdf5Options</a> &amp;&#160;</td>
+          <td class="paramname"><em>options</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -301,11 +303,56 @@ template&lt;typename Value_ , typename Index_ , bool transpose_ = false&gt; </di
   <table class="params">
     <tr><td class="paramname">file</td><td>Path to the file. </td></tr>
     <tr><td class="paramname">name</td><td>Path to the dataset inside the file. </td></tr>
-    <tr><td class="paramname">cache_limit</td><td>Limit to the size of the chunk cache, in bytes.</td></tr>
+    <tr><td class="paramname">options</td><td>Further options. </td></tr>
   </table>
   </dd>
 </dl>
-<p>The cache size should be large enough to fit all chunks spanned by a row or column, for (near-)consecutive row and column access respectively. Otherwise, performance will degrade as the same chunks may need to be repeatedly read back into memory. </p>
+
+</div>
+</div>
+<a id="aa7392c0009070f8c42ff8a2c49cc35ea" name="aa7392c0009070f8c42ff8a2c49cc35ea"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa7392c0009070f8c42ff8a2c49cc35ea">&#9670;&#160;</a></span>Hdf5DenseMatrix() <span class="overload">[2/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename Value_ , typename Index_ , bool transpose_ = false&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html">tatami_hdf5::Hdf5DenseMatrix</a>&lt; Value_, Index_, transpose_ &gt;::Hdf5DenseMatrix </td>
+          <td>(</td>
+          <td class="paramtype">std::string&#160;</td>
+          <td class="paramname"><em>file</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">std::string&#160;</td>
+          <td class="paramname"><em>name</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">file</td><td>Path to the file. </td></tr>
+    <tr><td class="paramname">name</td><td>Path to the dataset inside the file.</td></tr>
+  </table>
+  </dd>
+</dl>
+<p>Unlike its overload, this constructor uses the defaults for <code><a class="el" href="structtatami__hdf5_1_1Hdf5Options.html" title="Options for HDF5 extraction.">Hdf5Options</a></code>. </p>
 
 </div>
 </div>

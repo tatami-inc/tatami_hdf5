@@ -41,6 +41,13 @@
     <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
+    <name>utils.hpp</name>
+    <path>tatami_hdf5/</path>
+    <filename>utils_8hpp.html</filename>
+    <class kind="struct">tatami_hdf5::Hdf5Options</class>
+    <namespace>tatami_hdf5</namespace>
+  </compound>
+  <compound kind="file">
     <name>write_sparse_matrix_to_hdf5.hpp</name>
     <path>tatami_hdf5/</path>
     <filename>write__sparse__matrix__to__hdf5_8hpp.html</filename>
@@ -72,8 +79,15 @@
       <type></type>
       <name>Hdf5CompressedSparseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
-      <anchor>a1fc10df50e937237dd4ca2d0535251ac</anchor>
-      <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, size_t cache_limit=100000000)</arglist>
+      <anchor>a4d00f0e7bb8887e82e5a9fede0fe615d</anchor>
+      <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, const Hdf5Options &amp;options)</arglist>
+    </member>
+    <member kind="function">
+      <type></type>
+      <name>Hdf5CompressedSparseMatrix</name>
+      <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
+      <anchor>a7adb22f8f9b723009aa3d13454d5d389</anchor>
+      <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr)</arglist>
     </member>
     <member kind="function">
       <type>bool</type>
@@ -101,8 +115,15 @@
       <type></type>
       <name>Hdf5DenseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5DenseMatrix.html</anchorfile>
-      <anchor>a0645a6c3952aaf2b5d61841709a1d21c</anchor>
-      <arglist>(std::string file, std::string name, size_t cache_limit=100000000)</arglist>
+      <anchor>a408c365ed968ed602c6b7954ff87583a</anchor>
+      <arglist>(std::string file, std::string name, const Hdf5Options &amp;options)</arglist>
+    </member>
+    <member kind="function">
+      <type></type>
+      <name>Hdf5DenseMatrix</name>
+      <anchorfile>classtatami__hdf5_1_1Hdf5DenseMatrix.html</anchorfile>
+      <anchor>aa7392c0009070f8c42ff8a2c49cc35ea</anchor>
+      <arglist>(std::string file, std::string name)</arglist>
     </member>
     <member kind="function">
       <type>bool</type>
@@ -110,6 +131,24 @@
       <anchorfile>classtatami__hdf5_1_1Hdf5DenseMatrix.html</anchorfile>
       <anchor>a09c098a2d7d0b3e7686280b7c9545d37</anchor>
       <arglist>() const</arglist>
+    </member>
+  </compound>
+  <compound kind="struct">
+    <name>tatami_hdf5::Hdf5Options</name>
+    <filename>structtatami__hdf5_1_1Hdf5Options.html</filename>
+    <member kind="variable">
+      <type>size_t</type>
+      <name>maximum_cache_size</name>
+      <anchorfile>structtatami__hdf5_1_1Hdf5Options.html</anchorfile>
+      <anchor>ad72096e3a430f73a05a6c2e7a6a5d3a3</anchor>
+      <arglist></arglist>
+    </member>
+    <member kind="variable">
+      <type>bool</type>
+      <name>require_minimum_cache</name>
+      <anchorfile>structtatami__hdf5_1_1Hdf5Options.html</anchorfile>
+      <anchor>af2a1dfed24de8a01b3c7d9c832e373cd</anchor>
+      <arglist></arglist>
     </member>
   </compound>
   <compound kind="struct">
@@ -209,6 +248,7 @@
     <filename>namespacetatami__hdf5.html</filename>
     <class kind="class">tatami_hdf5::Hdf5CompressedSparseMatrix</class>
     <class kind="class">tatami_hdf5::Hdf5DenseMatrix</class>
+    <class kind="struct">tatami_hdf5::Hdf5Options</class>
     <class kind="struct">tatami_hdf5::WriteSparseMatrixToHdf5Parameters</class>
     <member kind="function">
       <type>tatami::CompressedSparseMatrix&lt; row_, Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_ &gt;</type>

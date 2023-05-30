@@ -18,5 +18,6 @@ var searchData=
   ['matrix_3c_20value_5f_2c_20index_5f_20_3e_15',['Matrix&lt; Value_, Index_ &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
   ['matrix_3c_20value_5fout_5f_2c_20index_5fout_5f_20_3e_16',['Matrix&lt; Value_out_, Index_out_ &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
   ['matrixmarket_2ehpp_17',['MatrixMarket.hpp',['https://tatami-inc.github.io/tatami/MatrixMarket_8hpp.html',1,'']]],
-  ['medians_2ehpp_18',['medians.hpp',['https://tatami-inc.github.io/tatami/medians_8hpp.html',1,'']]]
+  ['maximum_5fcache_5fsize_18',['maximum_cache_size',['../structtatami__hdf5_1_1Hdf5Options.html#ad72096e3a430f73a05a6c2e7a6a5d3a3',1,'tatami_hdf5::Hdf5Options']]],
+  ['medians_2ehpp_19',['medians.hpp',['https://tatami-inc.github.io/tatami/medians_8hpp.html',1,'']]]
 ];
