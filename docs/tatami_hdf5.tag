@@ -74,33 +74,35 @@
     <templarg>bool row_</templarg>
     <templarg>typename Value_</templarg>
     <templarg>typename Index_</templarg>
+    <templarg>typename CachedValue_</templarg>
+    <templarg>typename CachedIndex_</templarg>
     <base>Matrix&lt; Value_, Index_ &gt;</base>
     <member kind="function">
       <type></type>
       <name>Hdf5CompressedSparseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
-      <anchor>a4d00f0e7bb8887e82e5a9fede0fe615d</anchor>
+      <anchor>af8253455457ec3fdfcfb5be707d92c3e</anchor>
       <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, const Hdf5Options &amp;options)</arglist>
     </member>
     <member kind="function">
       <type></type>
       <name>Hdf5CompressedSparseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
-      <anchor>a7adb22f8f9b723009aa3d13454d5d389</anchor>
+      <anchor>a49f8b44c00b690ade286e05407e1e52b</anchor>
       <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr)</arglist>
     </member>
     <member kind="function">
       <type>bool</type>
       <name>sparse</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
-      <anchor>aa30949483d19850e85bd8c17cede4379</anchor>
+      <anchor>a7346b17999e5462c5b693367fd534837</anchor>
       <arglist>() const</arglist>
     </member>
     <member kind="function">
       <type>bool</type>
       <name>prefer_rows</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
-      <anchor>a40d9e46a358b683951866700423d8e3a</anchor>
+      <anchor>a388dff91348c274fb58bf09948c886a0</anchor>
       <arglist>() const</arglist>
     </member>
   </compound>
@@ -110,26 +112,27 @@
     <templarg>typename Value_</templarg>
     <templarg>typename Index_</templarg>
     <templarg>bool transpose_</templarg>
+    <templarg>typename CachedValue_</templarg>
     <base>VirtualDenseMatrix&lt; Value_, Index_ &gt;</base>
     <member kind="function">
       <type></type>
       <name>Hdf5DenseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5DenseMatrix.html</anchorfile>
-      <anchor>a408c365ed968ed602c6b7954ff87583a</anchor>
+      <anchor>ad7615b97a6358cba07d061b29a85dfcf</anchor>
       <arglist>(std::string file, std::string name, const Hdf5Options &amp;options)</arglist>
     </member>
     <member kind="function">
       <type></type>
       <name>Hdf5DenseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5DenseMatrix.html</anchorfile>
-      <anchor>aa7392c0009070f8c42ff8a2c49cc35ea</anchor>
+      <anchor>ae57c4a2e0004c2bdb85b543ce06bc15a</anchor>
       <arglist>(std::string file, std::string name)</arglist>
     </member>
     <member kind="function">
       <type>bool</type>
       <name>prefer_rows</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5DenseMatrix.html</anchorfile>
-      <anchor>a09c098a2d7d0b3e7686280b7c9545d37</anchor>
+      <anchor>a48c68747e848e3e3625f511d6383664e</anchor>
       <arglist>() const</arglist>
     </member>
   </compound>
