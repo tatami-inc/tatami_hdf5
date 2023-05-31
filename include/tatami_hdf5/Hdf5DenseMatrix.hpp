@@ -43,8 +43,11 @@ namespace tatami_hdf5 {
  * @tparam Value_ Type of the matrix values.
  * @tparam Index_ Type of the row/column indices.
  * @tparam transpose_ Whether the dataset is transposed in its storage order, i.e., rows in HDF5 are columns in this matrix.
+ * @tparam CachedValue_ Type of the matrix value to store in the cache.
+ * This can be set to a narrower type than `Value_` to save memory and improve cache performance,
+ * if a smaller type is known to be able to store the values (based on their HDF5 type or other knowledge).
  */
-template<typename Value_, typename Index_, bool transpose_ = false>
+template<typename Value_, typename Index_, bool transpose_ = false, typename CachedValue_ = Value_>
 class Hdf5DenseMatrix : public tatami::VirtualDenseMatrix<Value_, Index_> {
     Index_ firstdim, seconddim;
     std::string file_name, dataset_name;
@@ -64,7 +67,7 @@ public:
     Hdf5DenseMatrix(std::string file, std::string name, const Hdf5Options& options) :
         file_name(std::move(file)), 
         dataset_name(std::move(name)),
-        cache_size_in_elements(static_cast<double>(options.maximum_cache_size) / sizeof(Value_)),
+        cache_size_in_elements(static_cast<double>(options.maximum_cache_size) / sizeof(CachedValue_)),
         require_minimum_cache(options.require_minimum_cache)
     {
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
@@ -173,11 +176,11 @@ private:
         template<typename ... Args_>
         OracleCache(Args_&& ... args) : cache(std::forward<Args_>(args)...) {}
 
-        tatami::OracleChunkCache<Index_, Index_, std::vector<Value_> > cache;
+        tatami::OracleChunkCache<Index_, Index_, std::vector<CachedValue_> > cache;
         typename std::conditional<accrow_ == transpose_, std::vector<std::pair<Index_, Index_> >, bool>::type cache_transpose_info;
     };
 
-    typedef tatami::LruChunkCache<Index_, std::vector<Value_> > LruCache;
+    typedef tatami::LruChunkCache<Index_, std::vector<CachedValue_> > LruCache;
 
     template<bool accrow_>
     struct Workspace {
@@ -190,7 +193,7 @@ private:
         // Caching members.
         size_t chunk_size_in_elements;
         Index_ num_chunks_in_cache;
-        typename std::conditional<accrow_ == transpose_, std::vector<Value_>, bool>::type transposition_buffer;
+        typename std::conditional<accrow_ == transpose_, std::vector<CachedValue_>, bool>::type transposition_buffer;
 
         // Cache with an oracle.
         std::unique_ptr<OracleCache<accrow_> > futurist;
@@ -200,8 +203,8 @@ private:
     };
 
 private:
-    template<bool accrow_, typename ExtractType_>
-    static void extract_base(Index_ primary_start, Index_ primary_length, Value_* target, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) {
+    template<bool accrow_, typename ValueBuffer_, typename ExtractType_>
+    static void extract_base(Index_ primary_start, Index_ primary_length, ValueBuffer_* target, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) {
         hsize_t offset[2];
         hsize_t count[2];
 
@@ -235,11 +238,11 @@ private:
         work.memspace.setExtentSimple(2, count);
         work.memspace.selectAll();
 
-        work.dataset.read(target, define_mem_type<Value_>(), work.memspace, work.dataspace);
+        work.dataset.read(target, define_mem_type<ValueBuffer_>(), work.memspace, work.dataspace);
     }
 
     template<bool accrow_, typename ExtractType_>
-    static Index_ extract_chunk(Index_ chunk_id, Index_ dim, Index_ chunk_dim, Value_* target, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) {
+    static Index_ extract_chunk(Index_ chunk_id, Index_ dim, Index_ chunk_dim, CachedValue_* target, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) {
         Index_ chunk_start = chunk_id * chunk_dim;
         Index_ chunk_end = std::min(dim, chunk_start + chunk_dim);
         Index_ chunk_actual = chunk_end - chunk_start;
@@ -247,7 +250,7 @@ private:
         return chunk_actual;
     }
 
-    static void transpose(std::vector<Value_>& cache, std::vector<Value_>& buffer, Index_ actual_dim, Index_ extract_length) {
+    static void transpose(std::vector<CachedValue_>& cache, std::vector<CachedValue_>& buffer, Index_ actual_dim, Index_ extract_length) {
         buffer.resize(cache.size());
         auto output = buffer.begin();
         for (Index_ x = 0; x < actual_dim; ++x, output += extract_length) {
@@ -282,22 +285,22 @@ private:
     }
 
     template<bool accrow_, typename ExtractType_>
-    const Value_* extract_with_oracle(Index_ mydim, Index_ chunk_mydim, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
+    const CachedValue_* extract_with_oracle(Index_ mydim, Index_ chunk_mydim, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
         auto& to_transpose = work.futurist->cache_transpose_info;
         auto info = work.futurist->cache.next_chunk(
             /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
                 return std::pair<Index_, Index_>(current / chunk_mydim, current % chunk_mydim);
             }, 
-            /* swap = */ [](std::vector<Value_>& left, std::vector<Value_>& right) -> void {
+            /* swap = */ [](std::vector<CachedValue_>& left, std::vector<CachedValue_>& right) -> void {
                 left.swap(right);
             },
-            /* ready = */ [](const std::vector<Value_>& x) -> bool {
+            /* ready = */ [](const std::vector<CachedValue_>& x) -> bool {
                 return !x.empty();
             },
-            /* allocate = */ [&](std::vector<Value_>& x) -> void {
+            /* allocate = */ [&](std::vector<CachedValue_>& x) -> void {
                 x.resize(work.chunk_size_in_elements);
             },
-            /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<std::vector<Value_> >& chunk_data) -> void {
+            /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<std::vector<CachedValue_> >& chunk_data) -> void {
                 if constexpr(accrow_ == transpose_) {
                     to_transpose.clear();
                 }
@@ -336,16 +339,16 @@ private:
     }
 
     template<bool accrow_, typename ExtractType_>
-    const Value_* extract_without_oracle(Index_ i, Index_ mydim, Index_ chunk_mydim, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
+    const CachedValue_* extract_without_oracle(Index_ i, Index_ mydim, Index_ chunk_mydim, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
         auto chunk = i / chunk_mydim;
         auto index = i % chunk_mydim;
 
         const auto& cache_target = work.historian->find_chunk(
             chunk, 
-            /* create = */ [&]() -> std::vector<Value_> {
-                return std::vector<Value_>(work.chunk_size_in_elements);
+            /* create = */ [&]() -> std::vector<CachedValue_> {
+                return std::vector<CachedValue_>(work.chunk_size_in_elements);
             },
-            /* populate = */ [&](Index_ id, std::vector<Value_>& chunk_contents) -> void {
+            /* populate = */ [&](Index_ id, std::vector<CachedValue_>& chunk_contents) -> void {
                 Index_ actual_dim;
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
@@ -401,7 +404,7 @@ private:
         Index_ mydim = get_target_dim<accrow_>();
         Index_ chunk_mydim = get_target_chunk_dim<accrow_>();
 
-        const Value_* cache;
+        const CachedValue_* cache;
         if (work.futurist) {
             cache = extract_with_oracle(mydim, chunk_mydim, extract_value, extract_length, work);
         } else {

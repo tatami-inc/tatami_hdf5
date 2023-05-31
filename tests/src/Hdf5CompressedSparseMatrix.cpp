@@ -596,3 +596,37 @@ INSTANTIATE_TEST_CASE_P(
     Hdf5SparseApplyTest,
     ::testing::Values(0, 0.001, 0.01, 0.1) // cache size multiplier
 );
+
+/*************************************
+ *************************************/
+
+class Hdf5SparseCacheTypeTest : public ::testing::Test, public Hdf5SparseMatrixTestMethods {};
+
+TEST_F(Hdf5SparseCacheTypeTest, CastToInt) {
+    size_t NR = 500;
+    size_t NC = 200;
+    dump(NR, NC);
+
+    tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int, int, uint16_t> mat(
+        NR,
+        NC,
+        fpath, 
+        name + "/data", 
+        name + "/index", 
+        name + "/indptr", 
+        tatami_hdf5::Hdf5Options()
+    );
+
+    std::vector<int> vcasted(triplets.value.begin(), triplets.value.end());
+    std::vector<uint16_t> icasted(triplets.index.begin(), triplets.index.end());
+    tatami::CompressedSparseMatrix<true, double, int, decltype(vcasted), decltype(icasted), decltype(triplets.ptr)> ref(
+        NR,
+        NC, 
+        std::move(vcasted),
+        std::move(icasted),
+        triplets.ptr
+    );
+
+    EXPECT_EQ(tatami::row_sums(&mat), tatami::row_sums(&ref));
+    EXPECT_EQ(tatami::column_sums(&mat), tatami::column_sums(&ref));
+}

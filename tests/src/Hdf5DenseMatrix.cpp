@@ -462,3 +462,19 @@ INSTANTIATE_TEST_CASE_P(
         )
     )
 );
+
+/*************************************
+ *************************************/
+
+class Hdf5DenseCacheTypeTest : public ::testing::Test, public Hdf5DenseMatrixTestMethods {};
+
+TEST_F(Hdf5DenseCacheTypeTest, CastToInt) {
+    dump(std::make_pair(9, 13));
+
+    tatami_hdf5::Hdf5DenseMatrix<double, int, false, int> mat(fpath, name, custom_options()); 
+    std::vector<int> casted(values.begin(), values.end());
+    tatami::DenseRowMatrix<double, int, decltype(casted)> ref(NR, NC, std::move(casted));
+
+    tatami_test::test_simple_column_access(&mat, &ref, true, 1);
+    tatami_test::test_simple_row_access(&mat, &ref, true, 1);
+}
