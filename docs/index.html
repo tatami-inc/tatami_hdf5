@@ -75,25 +75,68 @@ $(function() {
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p><a class="anchor" id="md__2github_2workspace_2README"></a> <img src="https://github.com/tatami-inc/tatami_hdf5/actions/workflows/run-tests.yaml/badge.svg" alt="Unit tests" style="pointer-events: none;" class="inline"/> <img src="https://github.com/tatami-inc/tatami_hdf5/actions/workflows/doxygenate.yaml/badge.svg" alt="Documentation" style="pointer-events: none;" class="inline"/> <a href="https://codecov.io/gh/tatami-inc/tatami_hdf5"><img src="https://codecov.io/gh/tatami-inc/tatami_hdf5/branch/master/graph/badge.svg?token=Z189ORCLLR" alt="Codecov" style="pointer-events: none;" class="inline"/></a></p>
-<p>This repository implements <a href="https://github.com/tatami-inc/tatami"><b>tatami</b></a> bindings for HDF5-backed matrices, allowing some level of random access without loading the entire dataset into memory. Matrices can be conventionally stored as 2-dimensional HDF5 datasets, or in a compressed sparse format with a 1-dimensional dataset for each component (data, indices, pointers).</p>
+<h1>Overview</h1>
+<p>This repository implements <a href="https://github.com/tatami-inc/tatami"><b>tatami</b></a> bindings for HDF5-backed matrices, allowing some level of random access without loading the entire dataset into memory. Matrices can be conventionally stored as 2-dimensional HDF5 datasets, or in an <em>ad hoc</em> compressed sparse format with a 1-dimensional dataset for each component (data, indices, pointers).</p>
+<h1>Quick start</h1>
+<p><b><a class="el" href="namespacetatami__hdf5.html" title="Representations for matrix data in HDF5 files.">tatami_hdf5</a></b> is a header-only library, so it can be easily used by just <code>#include</code>ing the relevant source files:</p>
 <div class="fragment"><div class="line"><span class="preprocessor">#include &quot;<a class="code" href="tatami__hdf5_8hpp.html">tatami_hdf5/tatami_hdf5.hpp</a>&quot;</span></div>
 <div class="line"> </div>
+<div class="line"><span class="comment">// Dense HDF5 datasets.</span></div>
 <div class="line"><a class="code hl_class" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html">tatami_hdf5::Hdf5DenseMatrix&lt;double, int&gt;</a> dense_mat(<span class="stringliteral">&quot;some_file.h5&quot;</span>, <span class="stringliteral">&quot;dataset_name&quot;</span>);</div>
-<div class="line"><a class="code hl_class" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix&lt;false, double, int&gt;</a> sparse_mat(<span class="stringliteral">&quot;some_file.h5&quot;</span>, <span class="stringliteral">&quot;group_name&quot;</span>);</div>
+<div class="line"> </div>
+<div class="line"><span class="comment">// Compressed sparse data stored in an ad hoc group.</span></div>
+<div class="line"><a class="code hl_class" href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix&lt;false, double, int&gt;</a> sparse_mat(</div>
+<div class="line">    nrow,</div>
+<div class="line">    ncol,</div>
+<div class="line">    <span class="stringliteral">&quot;some_file.h5&quot;</span>, </div>
+<div class="line">    <span class="stringliteral">&quot;group_name/data&quot;</span>,</div>
+<div class="line">    <span class="stringliteral">&quot;group_name/index&quot;</span>,</div>
+<div class="line">    <span class="stringliteral">&quot;group_name/ptrs&quot;</span></div>
+<div class="line">);</div>
 <div class="ttc" id="aclasstatami__hdf5_1_1Hdf5CompressedSparseMatrix_html"><div class="ttname"><a href="classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html">tatami_hdf5::Hdf5CompressedSparseMatrix</a></div><div class="ttdoc">Compressed sparse matrix in a HDF5 file.</div><div class="ttdef"><b>Definition</b> Hdf5CompressedSparseMatrix.hpp:50</div></div>
 <div class="ttc" id="aclasstatami__hdf5_1_1Hdf5DenseMatrix_html"><div class="ttname"><a href="classtatami__hdf5_1_1Hdf5DenseMatrix.html">tatami_hdf5::Hdf5DenseMatrix</a></div><div class="ttdoc">Dense matrix backed by a DataSet in a HDF5 file.</div><div class="ttdef"><b>Definition</b> Hdf5DenseMatrix.hpp:48</div></div>
 <div class="ttc" id="atatami__hdf5_8hpp_html"><div class="ttname"><a href="tatami__hdf5_8hpp.html">tatami_hdf5.hpp</a></div><div class="ttdoc">Create matrix representations for HDF5-backed data.</div></div>
 </div><!-- fragment --><p>In cases where performance is more important than memory consumption, we also provide some utilities to quickly create in-memory <b>tatami</b> matrices from their HDF5 representations:</p>
-<div class="fragment"><div class="line"><span class="keyword">auto</span> dense_mat_mem = <a class="code hl_function" href="namespacetatami__hdf5.html#a9c60ce93385d89902f042f3c43fae5bb">tatami_hdf5::load_hdf5_dense_matrix</a>(<span class="stringliteral">&quot;some_file.h5&quot;</span>, <span class="stringliteral">&quot;dataset_name&quot;</span>);</div>
-<div class="line"><span class="keyword">auto</span> sparse_mat_mem = <a class="code hl_function" href="namespacetatami__hdf5.html#acf08ac352e8f0caa63483d0967ea88a3">tatami_hdf5::load_hdf5_compressed_sparse_matrix</a>(<span class="stringliteral">&quot;some_file.h5&quot;</span>, <span class="stringliteral">&quot;group_name&quot;</span>);</div>
-<div class="ttc" id="anamespacetatami__hdf5_html_a9c60ce93385d89902f042f3c43fae5bb"><div class="ttname"><a href="namespacetatami__hdf5.html#a9c60ce93385d89902f042f3c43fae5bb">tatami_hdf5::load_hdf5_dense_matrix</a></div><div class="ttdeci">tatami::DenseMatrix&lt;!transpose_, Value_, Index_, ValueStorage_ &gt; load_hdf5_dense_matrix(const std::string &amp;file, const std::string &amp;name)</div><div class="ttdef"><b>Definition</b> load_hdf5_matrix.hpp:110</div></div>
-<div class="ttc" id="anamespacetatami__hdf5_html_acf08ac352e8f0caa63483d0967ea88a3"><div class="ttname"><a href="namespacetatami__hdf5.html#acf08ac352e8f0caa63483d0967ea88a3">tatami_hdf5::load_hdf5_compressed_sparse_matrix</a></div><div class="ttdeci">tatami::CompressedSparseMatrix&lt; row_, Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_ &gt; load_hdf5_compressed_sparse_matrix(size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr)</div><div class="ttdef"><b>Definition</b> load_hdf5_matrix.hpp:47</div></div>
+<div class="fragment"><div class="line"><span class="keyword">auto</span> dense_mat_mem = tatami_hdf5::load_hdf5_dense_matrix&lt;double, int&gt;(</div>
+<div class="line">    <span class="stringliteral">&quot;some_file.h5&quot;</span>, </div>
+<div class="line">    <span class="stringliteral">&quot;dataset_name&quot;</span></div>
+<div class="line">);</div>
+<div class="line"> </div>
+<div class="line"><span class="keyword">auto</span> sparse_mat_mem = tatami_hdf5::load_hdf5_compressed_sparse_matrix&lt;false, double&gt;(</div>
+<div class="line">    nrow,</div>
+<div class="line">    ncol,</div>
+<div class="line">    <span class="stringliteral">&quot;some_file.h5&quot;</span>, </div>
+<div class="line">    <span class="stringliteral">&quot;group_name/data&quot;</span>,</div>
+<div class="line">    <span class="stringliteral">&quot;group_name/index&quot;</span>,</div>
+<div class="line">    <span class="stringliteral">&quot;group_name/ptrs&quot;</span></div>
+<div class="line">);</div>
 </div><!-- fragment --><p>We can also write a <b>tatami</b> sparse matrix into a HDF5 file:</p>
 <div class="fragment"><div class="line">H5::H5File fhandle(<span class="stringliteral">&quot;some_file2.h5&quot;</span>, H5F_ACC_TRUNC);</div>
 <div class="line"><span class="keyword">auto</span> ghandle = fhandle.createGroup(<span class="stringliteral">&quot;group_name&quot;</span>);</div>
 <div class="line"><a class="code hl_function" href="namespacetatami__hdf5.html#a9a0cf7882b3882b88773db1b4a50e4bf">tatami_hdf5::write_sparse_matrix_to_hdf5</a>(&amp;sparse_mat_mem, ghandle); </div>
 <div class="ttc" id="anamespacetatami__hdf5_html_a9a0cf7882b3882b88773db1b4a50e4bf"><div class="ttname"><a href="namespacetatami__hdf5.html#a9a0cf7882b3882b88773db1b4a50e4bf">tatami_hdf5::write_sparse_matrix_to_hdf5</a></div><div class="ttdeci">void write_sparse_matrix_to_hdf5(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location, const WriteSparseMatrixToHdf5Parameters &amp;params)</div><div class="ttdef"><b>Definition</b> write_sparse_matrix_to_hdf5.hpp:176</div></div>
-</div><!-- fragment --><p>Check out the <a href="https://tatami-inc.github.io/tatami_hdf5">reference documentation</a> for more details. </p>
+</div><!-- fragment --><p>Check out the <a href="https://tatami-inc.github.io/tatami_hdf5">reference documentation</a> for more details.</p>
+<h1>Building projects</h1>
+<p>If you're using CMake, you just need to add something like this to your <code>CMakeLists.txt</code>:</p>
+<div class="fragment"><div class="line">include(FetchContent)</div>
+<div class="line"> </div>
+<div class="line">FetchContent_Declare(</div>
+<div class="line">  tatami</div>
+<div class="line">  GIT_REPOSITORY https://github.com/tatami-inc/tatami_hdf5</div>
+<div class="line">  GIT_TAG master # or any version of interest </div>
+<div class="line">)</div>
+<div class="line"> </div>
+<div class="line">FetchContent_MakeAvailable(tatami_hdf5)</div>
+</div><!-- fragment --><p>Then you can link to <b><a class="el" href="namespacetatami__hdf5.html" title="Representations for matrix data in HDF5 files.">tatami_hdf5</a></b> to make the headers available during compilation:</p>
+<div class="fragment"><div class="line"># For executables:</div>
+<div class="line">target_link_libraries(myexe tatami_hdf5)</div>
+<div class="line"> </div>
+<div class="line"># For libaries</div>
+<div class="line">target_link_libraries(mylib INTERFACE tatami_hdf5)</div>
+</div><!-- fragment --><p>You'll also need to link to the HDF5 library yourself (version 1.10 or higher). In CMake, this is typically done by discovering the system library as shown below. Specific frameworks may come with their own HDF5 binaries, e.g., <a href="https://bioconductor.org/packages/Rhdf5lib"><b>Rhdf5lib</b></a> - <b><a class="el" href="namespacetatami__hdf5.html" title="Representations for matrix data in HDF5 files.">tatami_hdf5</a></b> does not put restrictions on any particular HDF5 installation.</p>
+<div class="fragment"><div class="line">find_package(HDF5 COMPONENTS C CXX REQUIRED)</div>
+<div class="line">target_link_libraries(myexe hdf5::hdf5 hdf5::hdf5_cpp)</div>
+</div><!-- fragment --><p>If you're not using CMake, the simple approach is to just copy the files - either directly or with Git submodules - and include their path during compilation with, e.g., GCC's <code>-I</code>. This will also require the core <a href="https://github.com/tatami-inc/tatami"><b>tatami</b></a> library. </p>
 </div></div><!-- PageDoc -->
 </div><!-- contents -->
 <!-- start footer part -->
