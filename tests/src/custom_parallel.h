@@ -6,10 +6,14 @@
 #include <vector>
 #include <cmath>
 
-template<class Function>
-static void hdf5_serialize(Function f) {
+inline auto& get_hdf5_lock() {
     static std::mutex hdf5_lock;
-    std::lock_guard<std::mutex> thing(hdf5_lock);
+    return hdf5_lock;
+}
+
+template<class Function>
+void hdf5_serialize(Function f) {
+    std::lock_guard<std::mutex> thing(get_hdf5_lock());
     f();
 }
 
