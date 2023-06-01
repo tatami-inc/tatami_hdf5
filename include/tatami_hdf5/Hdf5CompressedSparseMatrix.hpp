@@ -976,23 +976,40 @@ private:
 private:
     template<bool accrow_, tatami::DimensionSelectionType selection_, bool sparse_>
     struct Hdf5SparseExtractor : public tatami::Extractor<selection_, sparse_, Value_, Index_> {
+        typedef typename std::conditional<row_ == accrow_, PrimaryWorkspace, SecondaryWorkspace>::type CoreWorkspace;
+
         Hdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt) : parent(p) {
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 this->full_length = (accrow_ ? parent->ncols : parent->nrows);
             }
 
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            #pragma omp critical
+            {
+#else
+            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+#endif
+
+            core.reset(new CoreWorkspace);
+
             // TODO: set more suitable chunk cache values here, to avoid re-reading
             // chunks that are only partially consumed.
-            core.file.openFile(parent->file_name, H5F_ACC_RDONLY);
-            core.data = core.file.openDataSet(parent->data_name);
-            core.index = core.file.openDataSet(parent->index_name);
-            core.dataspace = core.data.getSpace();
+            core->file.openFile(parent->file_name, H5F_ACC_RDONLY);
+            core->data = core->file.openDataSet(parent->data_name);
+            core->index = core->file.openDataSet(parent->index_name);
+            core->dataspace = core->data.getSpace();
+
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            }
+#else
+            });
+#endif
 
             if constexpr(row_ == accrow_) {
-                core.historian.reset(new LruCache);
+                core->historian.reset(new LruCache);
                 if (opt.cache_for_reuse) {
                     auto extraction_cache_size = accrow_ ? p->nrows : p->ncols;
-                    core.extraction_bounds.resize(extraction_cache_size, std::pair<size_t, size_t>(-1, 0));
+                    core->extraction_bounds.resize(extraction_cache_size, std::pair<size_t, size_t>(-1, 0));
                 }
             }
         }
@@ -1011,9 +1028,28 @@ private:
             }
         }
 
+        ~Hdf5SparseExtractor() {
+            // Destructor also needs to be made thread-safe;
+            // this is why the workspace is a pointer.
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            #pragma omp critical
+            {
+#else
+            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+#endif
+
+            core.reset();
+
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            }
+#else
+            });
+#endif
+        }
+
     protected:
         const Hdf5CompressedSparseMatrix* parent;
-        typename std::conditional<row_ == accrow_, PrimaryWorkspace, SecondaryWorkspace>::type core;
+        std::unique_ptr<CoreWorkspace> core;
         typename std::conditional<selection_ == tatami::DimensionSelectionType::INDEX, std::vector<Index_>, bool>::type indices;
 
     public:
@@ -1028,9 +1064,9 @@ private:
     public:
         void set_oracle(std::unique_ptr<tatami::Oracle<Index_> > o) {
             if constexpr(row_ == accrow_) {
-                core.futurist.reset(new OracleCache);
-                core.futurist->prediction_stream.set(std::move(o));
-                core.historian.reset();
+                core->futurist.reset(new OracleCache);
+                core->futurist->prediction_stream.set(std::move(o));
+                core->historian.reset();
             }
         }
     };
@@ -1044,21 +1080,21 @@ private:
         const Value_* fetch(Index_ i, Value_* buffer) {
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 if constexpr(row_ == accrow_) {
-                    return this->parent->extract_primary(i, buffer, 0, this->full_length, this->core);
+                    return this->parent->extract_primary(i, buffer, 0, this->full_length, *(this->core));
                 } else {
-                    return this->parent->extract_secondary(i, buffer, 0, this->full_length, this->core);
+                    return this->parent->extract_secondary(i, buffer, 0, this->full_length, *(this->core));
                 }
             } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 if constexpr(row_ == accrow_) {
-                    return this->parent->extract_primary(i, buffer, this->block_start, this->block_length, this->core);
+                    return this->parent->extract_primary(i, buffer, this->block_start, this->block_length, *(this->core));
                 } else {
-                    return this->parent->extract_secondary(i, buffer, this->block_start, this->block_length, this->core);
+                    return this->parent->extract_secondary(i, buffer, this->block_start, this->block_length, *(this->core));
                 }
             } else {
                 if constexpr(row_ == accrow_) {
-                    return this->parent->extract_primary(i, buffer, this->indices, this->core);
+                    return this->parent->extract_primary(i, buffer, this->indices, *(this->core));
                 } else {
-                    return this->parent->extract_secondary(i, buffer, this->indices, this->core);
+                    return this->parent->extract_secondary(i, buffer, this->indices, *(this->core));
                 }
             }
         }
@@ -1074,25 +1110,25 @@ private:
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 if constexpr(row_ == accrow_) {
                     if (needs_index || needs_value) {
-                        return this->parent->extract_primary(i, vbuffer, ibuffer, 0, this->full_length, this->core, needs_value, needs_index);
+                        return this->parent->extract_primary(i, vbuffer, ibuffer, 0, this->full_length, *(this->core), needs_value, needs_index);
                     } else {
                         // Quick return is possible if we don't need any indices or values.
                         return tatami::SparseRange<Value_, Index_>(this->parent->pointers[i+1] - this->parent->pointers[i], NULL, NULL);
                     }
                 } else {
-                    return this->parent->extract_secondary(i, vbuffer, ibuffer, 0, this->full_length, this->core, needs_value, needs_index);
+                    return this->parent->extract_secondary(i, vbuffer, ibuffer, 0, this->full_length, *(this->core), needs_value, needs_index);
                 }
             } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 if constexpr(row_ == accrow_) {
-                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->block_start, this->block_length, this->core, needs_value, needs_index);
+                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index);
                 } else {
-                    return this->parent->extract_secondary(i, vbuffer, ibuffer, this->block_start, this->block_length, this->core, needs_value, needs_index);
+                    return this->parent->extract_secondary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index);
                 }
             } else {
                 if constexpr(row_ == accrow_) {
-                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->indices, this->core, needs_value, needs_index);
+                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->indices, *(this->core), needs_value, needs_index);
                 } else {
-                    return this->parent->extract_secondary(i, vbuffer, ibuffer, this->indices, this->core, needs_value, needs_index);
+                    return this->parent->extract_secondary(i, vbuffer, ibuffer, this->indices, *(this->core), needs_value, needs_index);
                 }
             }
         }
@@ -1106,24 +1142,11 @@ private:
     std::unique_ptr<tatami::Extractor<selection_, sparse_, Value_, Index_> > populate(const tatami::Options& opt, Args_&&... args) const {
         std::unique_ptr<tatami::Extractor<selection_, sparse_, Value_, Index_> > output;
 
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
-#else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
         if constexpr(sparse_) {
             output.reset(new SparseHdf5SparseExtractor<accrow_, selection_>(this, opt, std::forward<Args_>(args)...));
         } else {
             output.reset(new DenseHdf5SparseExtractor<accrow_, selection_>(this, opt, std::forward<Args_>(args)...));
         }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        }
-#else
-        });
-#endif
 
         return output;
     }

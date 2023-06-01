@@ -441,13 +441,41 @@ private:
             }
         }
 
+        ~Hdf5Extractor() {
+            // Destructor also needs to be made thread-safe;
+            // this is why the workspace is a pointer.
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            #pragma omp critical
+            {
+#else
+            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+#endif
+
+            base.reset();
+
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            }
+#else
+            });
+#endif
+        }
+
     protected:
         const Hdf5DenseMatrix* parent;
-        Workspace<accrow_> base;
+        std::unique_ptr<Workspace<accrow_> > base;
         typename std::conditional<selection_ == tatami::DimensionSelectionType::INDEX, std::vector<Index_>, bool>::type indices;
 
     private:
         void initialize_workspace(Index_ other_dim) {
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            #pragma omp critical
+            {
+#else
+            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+#endif
+
+            base.reset(new Workspace<accrow_>());
+
             // Turn off HDF5's caching, as we'll be handling that. This allows us
             // to parallelize extractions without locking when the data has already
             // been loaded into memory; if we just used HDF5's cache, we would have
@@ -455,21 +483,27 @@ private:
             H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
             fapl.setCache(0, 0, 0, 0);
 
-            base.file.openFile(parent->file_name, H5F_ACC_RDONLY, fapl);
-            base.dataset = base.file.openDataSet(parent->dataset_name);
-            base.dataspace = base.dataset.getSpace();
+            base->file.openFile(parent->file_name, H5F_ACC_RDONLY, fapl);
+            base->dataset = base->file.openDataSet(parent->dataset_name);
+            base->dataspace = base->dataset.getSpace();
+
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            }
+#else
+            });
+#endif
 
             auto chunk_dim = (accrow_ != transpose_ ? parent->chunk_firstdim : parent->chunk_seconddim);
-            base.chunk_size_in_elements = static_cast<size_t>(chunk_dim) * static_cast<size_t>(other_dim);
-            base.num_chunks_in_cache = static_cast<double>(parent->cache_size_in_elements) / base.chunk_size_in_elements;
+            base->chunk_size_in_elements = static_cast<size_t>(chunk_dim) * static_cast<size_t>(other_dim);
+            base->num_chunks_in_cache = static_cast<double>(parent->cache_size_in_elements) / base->chunk_size_in_elements;
 
-            if (parent->require_minimum_cache && base.num_chunks_in_cache == 0) {
-                base.num_chunks_in_cache = 1;
+            if (parent->require_minimum_cache && base->num_chunks_in_cache == 0) {
+                base->num_chunks_in_cache = 1;
             }
 
             // If we're not caching any chunks, then don't bother to set up the LRU cache.
-            if (base.num_chunks_in_cache > 0) {
-                base.historian.reset(new LruCache(base.num_chunks_in_cache));
+            if (base->num_chunks_in_cache > 0) {
+                base->historian.reset(new LruCache(base->num_chunks_in_cache));
             }
         }
 
@@ -484,11 +518,11 @@ private:
 
         const Value_* fetch(Index_ i, Value_* buffer) {
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
-                return parent->extract<accrow_>(i, buffer, 0, this->full_length, this->base);
+                return parent->extract<accrow_>(i, buffer, 0, this->full_length, *base);
             } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
-                return parent->extract<accrow_>(i, buffer, this->block_start, this->block_length, this->base);
+                return parent->extract<accrow_>(i, buffer, this->block_start, this->block_length, *base);
             } else {
-                return parent->extract<accrow_>(i, buffer, this->indices, this->index_length, this->base);
+                return parent->extract<accrow_>(i, buffer, this->indices, this->index_length, *base);
             }
         }
 
@@ -496,35 +530,18 @@ private:
             // If the number of chunks is not greater than 1, we might as well
             // just let the LRU do its job; oracles are only useful if we can
             // store multiple chunks corresponding to future predictions.
-            if (base.num_chunks_in_cache > 1) {
+            if (base->num_chunks_in_cache > 1) {
                 auto chunk_mydim = parent->get_target_chunk_dim<accrow_>();
-                size_t max_predictions = static_cast<size_t>(base.num_chunks_in_cache) * chunk_mydim * 2; // double the cache size, basically.
-                base.futurist.reset(new OracleCache<accrow_>(std::move(o), max_predictions, base.num_chunks_in_cache));
-                base.historian.reset();
+                size_t max_predictions = static_cast<size_t>(base->num_chunks_in_cache) * chunk_mydim * 2; // double the cache size, basically.
+                base->futurist.reset(new OracleCache<accrow_>(std::move(o), max_predictions, base->num_chunks_in_cache));
+                base->historian.reset();
             }
         }
     };
 
     template<bool accrow_, tatami::DimensionSelectionType selection_, typename ... Args_>
     std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > populate(const tatami::Options& opt, Args_&&... args) const {
-        std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > output;
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
-#else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-        output.reset(new Hdf5Extractor<accrow_, selection_>(this, std::forward<Args_>(args)...));
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        }
-#else
-        });
-#endif
-
-        return output;
+        return std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> >(new Hdf5Extractor<accrow_, selection_>(this, std::forward<Args_>(args)...));
     }
 
 public:
