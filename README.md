@@ -68,7 +68,7 @@ If you're using CMake, you just need to add something like this to your `CMakeLi
 include(FetchContent)
 
 FetchContent_Declare(
-  tatami
+  tatami_hdf5
   GIT_REPOSITORY https://github.com/tatami-inc/tatami_hdf5
   GIT_TAG master # or any version of interest 
 )
