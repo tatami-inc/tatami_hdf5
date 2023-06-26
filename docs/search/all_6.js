@@ -4,6 +4,5 @@ var searchData=
   ['hdf5compressedsparsematrix_2ehpp_1',['Hdf5CompressedSparseMatrix.hpp',['../Hdf5CompressedSparseMatrix_8hpp.html',1,'']]],
   ['hdf5densematrix_2',['Hdf5DenseMatrix',['../classtatami__hdf5_1_1Hdf5DenseMatrix.html#ad7615b97a6358cba07d061b29a85dfcf',1,'tatami_hdf5::Hdf5DenseMatrix::Hdf5DenseMatrix(std::string file, std::string name, const Hdf5Options &amp;options)'],['../classtatami__hdf5_1_1Hdf5DenseMatrix.html#ae57c4a2e0004c2bdb85b543ce06bc15a',1,'tatami_hdf5::Hdf5DenseMatrix::Hdf5DenseMatrix(std::string file, std::string name)'],['../classtatami__hdf5_1_1Hdf5DenseMatrix.html',1,'tatami_hdf5::Hdf5DenseMatrix&lt; Value_, Index_, transpose_, CachedValue_ &gt;']]],
   ['hdf5densematrix_2ehpp_3',['Hdf5DenseMatrix.hpp',['../Hdf5DenseMatrix_8hpp.html',1,'']]],
-  ['hdf5options_4',['Hdf5Options',['../structtatami__hdf5_1_1Hdf5Options.html',1,'tatami_hdf5']]],
-  ['headerdetails_5',['HeaderDetails',['https://tatami-inc.github.io/tatami/structtatami_1_1MatrixMarket_1_1HeaderDetails.html',1,'tatami::MatrixMarket']]]
+  ['hdf5options_4',['Hdf5Options',['../structtatami__hdf5_1_1Hdf5Options.html',1,'tatami_hdf5']]]
 ];

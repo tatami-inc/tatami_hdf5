@@ -1,7 +1,5 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="Node000000" href="/github/workspace/docs/tatami.tag$classtatami_1_1Matrix.html" title=" " alt="" coords="5,13,185,54"/>
-<area shape="rect" id="Node000001" href="/github/workspace/docs/tatami.tag$classtatami_1_1VirtualDenseMatrix.html" title=" " alt="" coords="233,13,405,54"/>
-<area shape="poly" id="edge1_Node000000_Node000001" title=" " alt="" coords="199,31,232,31,232,36,199,36"/>
-<area shape="rect" id="Node000002" href="$classtatami__hdf5_1_1Hdf5DenseMatrix.html" title="Dense matrix backed by a DataSet in a HDF5 file." alt="" coords="453,5,648,61"/>
-<area shape="poly" id="edge2_Node000001_Node000002" title=" " alt="" coords="420,31,452,31,452,36,420,36"/>
+<area shape="rect" id="node1" href="/github/workspace/docs/tatami.tag$classtatami_1_1Matrix.html" title=" " alt="" coords="5,13,185,53"/>
+<area shape="rect" id="node2" href="/github/workspace/docs/tatami.tag$classtatami_1_1VirtualDenseMatrix.html" title=" " alt="" coords="233,13,407,53"/>
+<area shape="rect" id="node3" href="$classtatami__hdf5_1_1Hdf5DenseMatrix.html" title="Dense matrix backed by a DataSet in a HDF5 file." alt="" coords="455,5,651,60"/>
 </map>

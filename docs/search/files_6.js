@@ -1,7 +1,5 @@
 var searchData=
 [
-  ['layered_2ehpp_0',['layered.hpp',['https://tatami-inc.github.io/tatami/layered_8hpp.html',1,'(Global Namespace)'],['https://tatami-inc.github.io/tatami/MatrixMarket_2layered_8hpp.html',1,'(Global Namespace)']]],
-  ['layeredmatrixdata_2ehpp_1',['LayeredMatrixData.hpp',['https://tatami-inc.github.io/tatami/LayeredMatrixData_8hpp.html',1,'']]],
-  ['load_5fhdf5_5fmatrix_2ehpp_2',['load_hdf5_matrix.hpp',['../load__hdf5__matrix_8hpp.html',1,'']]],
-  ['lruchunkcache_2ehpp_3',['LruChunkCache.hpp',['https://tatami-inc.github.io/tatami/LruChunkCache_8hpp.html',1,'']]]
+  ['hdf5compressedsparsematrix_2ehpp_0',['Hdf5CompressedSparseMatrix.hpp',['../Hdf5CompressedSparseMatrix_8hpp.html',1,'']]],
+  ['hdf5densematrix_2ehpp_1',['Hdf5DenseMatrix.hpp',['../Hdf5DenseMatrix_8hpp.html',1,'']]]
 ];

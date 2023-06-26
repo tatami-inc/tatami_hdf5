@@ -5,8 +5,12 @@ var searchData=
   ['find_5fchunk_2',['find_chunk',['https://tatami-inc.github.io/tatami/classtatami_1_1LruChunkCache.html#a17636ac967438f3ca1579a33af523e03',1,'tatami::LruChunkCache']]],
   ['fixedoracle_3',['FixedOracle',['https://tatami-inc.github.io/tatami/structtatami_1_1FixedOracle.html#ac04dcf58c95882cf83bc5204b1944776',1,'tatami::FixedOracle::FixedOracle()'],['https://tatami-inc.github.io/tatami/structtatami_1_1FixedOracle.html',1,'tatami::FixedOracle&lt; typename Index_ &gt;']]],
   ['force_5finteger_4',['force_integer',['../structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html#a842ef78fe623a54f98c578287975a17b',1,'tatami_hdf5::WriteSparseMatrixToHdf5Parameters']]],
-  ['full_5flength_5',['full_length',['https://tatami-inc.github.io/tatami/structtatami_1_1FullExtractor.html#a9dea647495eb0edbed7b77502ca528e3',1,'tatami::FullExtractor']]],
-  ['fulldenseextractor_6',['FullDenseExtractor',['https://tatami-inc.github.io/tatami/namespacetatami.html#a6008dbced6de41e5619156b5335f5762',1,'tatami']]],
-  ['fullextractor_7',['FullExtractor',['https://tatami-inc.github.io/tatami/structtatami_1_1FullExtractor.html',1,'tatami']]],
-  ['fullsparseextractor_8',['FullSparseExtractor',['https://tatami-inc.github.io/tatami/namespacetatami.html#a0fbb0624c8e1913a87e8fb5c975400e1',1,'tatami']]]
+  ['fragmentedsparsecolumnmatrix_5',['FragmentedSparseColumnMatrix',['https://tatami-inc.github.io/tatami/namespacetatami.html#a6b9735bdc6e0a2856cd4747efbbf9f3c',1,'tatami']]],
+  ['fragmentedsparsematrix_6',['FragmentedSparseMatrix',['https://tatami-inc.github.io/tatami/classtatami_1_1FragmentedSparseMatrix.html#a75a66fd646bab027ff762cd824e52fb0',1,'tatami::FragmentedSparseMatrix::FragmentedSparseMatrix()'],['https://tatami-inc.github.io/tatami/classtatami_1_1FragmentedSparseMatrix.html',1,'tatami::FragmentedSparseMatrix&lt; bool row_, typename Value_, typename Index_, class ValueVectorStorage_, class IndexVectorStorage_ &gt;']]],
+  ['fragmentedsparsematrix_2ehpp_7',['FragmentedSparseMatrix.hpp',['https://tatami-inc.github.io/tatami/FragmentedSparseMatrix_8hpp.html',1,'']]],
+  ['fragmentedsparserowmatrix_8',['FragmentedSparseRowMatrix',['https://tatami-inc.github.io/tatami/namespacetatami.html#a3d97fc9bd75052a79bb643d0fb5a0b98',1,'tatami']]],
+  ['full_5flength_9',['full_length',['https://tatami-inc.github.io/tatami/structtatami_1_1FullExtractor.html#a9dea647495eb0edbed7b77502ca528e3',1,'tatami::FullExtractor']]],
+  ['fulldenseextractor_10',['FullDenseExtractor',['https://tatami-inc.github.io/tatami/namespacetatami.html#a6008dbced6de41e5619156b5335f5762',1,'tatami']]],
+  ['fullextractor_11',['FullExtractor',['https://tatami-inc.github.io/tatami/structtatami_1_1FullExtractor.html',1,'tatami']]],
+  ['fullsparseextractor_12',['FullSparseExtractor',['https://tatami-inc.github.io/tatami/namespacetatami.html#a0fbb0624c8e1913a87e8fb5c975400e1',1,'tatami']]]
 ];

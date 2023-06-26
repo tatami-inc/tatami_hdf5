@@ -1,22 +1,22 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
-<tagfile doxygen_version="1.9.7">
+<tagfile doxygen_version="1.9.5">
   <compound kind="file">
     <name>Hdf5CompressedSparseMatrix.hpp</name>
-    <path>tatami_hdf5/</path>
+    <path>/github/workspace/include/tatami_hdf5/</path>
     <filename>Hdf5CompressedSparseMatrix_8hpp.html</filename>
     <class kind="class">tatami_hdf5::Hdf5CompressedSparseMatrix</class>
     <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>Hdf5DenseMatrix.hpp</name>
-    <path>tatami_hdf5/</path>
+    <path>/github/workspace/include/tatami_hdf5/</path>
     <filename>Hdf5DenseMatrix_8hpp.html</filename>
     <class kind="class">tatami_hdf5::Hdf5DenseMatrix</class>
     <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>load_hdf5_matrix.hpp</name>
-    <path>tatami_hdf5/</path>
+    <path>/github/workspace/include/tatami_hdf5/</path>
     <filename>load__hdf5__matrix_8hpp.html</filename>
     <namespace>tatami_hdf5</namespace>
     <member kind="function">
@@ -36,20 +36,20 @@
   </compound>
   <compound kind="file">
     <name>tatami_hdf5.hpp</name>
-    <path>tatami_hdf5/</path>
+    <path>/github/workspace/include/tatami_hdf5/</path>
     <filename>tatami__hdf5_8hpp.html</filename>
     <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>utils.hpp</name>
-    <path>tatami_hdf5/</path>
+    <path>/github/workspace/include/tatami_hdf5/</path>
     <filename>utils_8hpp.html</filename>
     <class kind="struct">tatami_hdf5::Hdf5Options</class>
     <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>write_sparse_matrix_to_hdf5.hpp</name>
-    <path>tatami_hdf5/</path>
+    <path>/github/workspace/include/tatami_hdf5/</path>
     <filename>write__sparse__matrix__to__hdf5_8hpp.html</filename>
     <class kind="struct">tatami_hdf5::WriteSparseMatrixToHdf5Parameters</class>
     <namespace>tatami_hdf5</namespace>
@@ -286,6 +286,6 @@
     <name>index</name>
     <title>tatami for HDF5 matrices</title>
     <filename>index.html</filename>
-    <docanchor file="index.html">md__2github_2workspace_2README</docanchor>
+    <docanchor file="index.html">md__github_workspace_README</docanchor>
   </compound>
 </tagfile>
