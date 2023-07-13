@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "utils.hpp"
+#include "tatami_chunked/tatami_chunked.hpp"
 
 /**
  * @file Hdf5DenseMatrix.hpp
@@ -171,16 +172,7 @@ public:
     using tatami::Matrix<Value_, Index_>::sparse_column;
 
 private:
-    template<bool accrow_>
-    struct OracleCache {
-        template<typename ... Args_>
-        OracleCache(Args_&& ... args) : cache(std::forward<Args_>(args)...) {}
-
-        tatami::OracleChunkCache<Index_, Index_, std::vector<CachedValue_> > cache;
-        typename std::conditional<accrow_ == transpose_, std::vector<std::pair<Index_, Index_> >, bool>::type cache_transpose_info;
-    };
-
-    typedef tatami::LruChunkCache<Index_, std::vector<CachedValue_> > LruCache;
+    typedef std::vector<CachedValue_> Slab;
 
     template<bool accrow_>
     struct Workspace {
@@ -191,15 +183,9 @@ private:
         H5::DataSpace memspace;
 
         // Caching members.
-        size_t chunk_size_in_elements;
-        Index_ num_chunks_in_cache;
         typename std::conditional<accrow_ == transpose_, std::vector<CachedValue_>, bool>::type transposition_buffer;
-
-        // Cache with an oracle.
-        std::unique_ptr<OracleCache<accrow_> > futurist;
-
-        // Cache without an oracle.
-        std::unique_ptr<LruCache> historian;
+        typename std::conditional<accrow_ == transpose_, std::vector<std::pair<Index_, Index_> >, bool>::type cache_transpose_info;
+        tatami_chunked::TypicalSlabCacheWorkspace<Index_, Slab> cache_workspace;
     };
 
 private:
@@ -264,118 +250,6 @@ private:
     }
 
 private:
-    template<bool accrow_, typename ExtractType_>
-    const Value_* extract_without_cache(Index_ i, Value_* buffer, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
-#else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-            extract_base<accrow_>(i, 1, buffer, extract_value, extract_length, work);
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        }
-#else
-        });
-#endif
-
-        return buffer;
-    }
-
-    template<bool accrow_, typename ExtractType_>
-    const CachedValue_* extract_with_oracle(Index_ mydim, Index_ chunk_mydim, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
-        auto& to_transpose = work.futurist->cache_transpose_info;
-        auto info = work.futurist->cache.next_chunk(
-            /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
-                return std::pair<Index_, Index_>(current / chunk_mydim, current % chunk_mydim);
-            }, 
-            /* swap = */ [](std::vector<CachedValue_>& left, std::vector<CachedValue_>& right) -> void {
-                left.swap(right);
-            },
-            /* ready = */ [](const std::vector<CachedValue_>& x) -> bool {
-                return !x.empty();
-            },
-            /* allocate = */ [&](std::vector<CachedValue_>& x) -> void {
-                x.resize(work.chunk_size_in_elements);
-            },
-            /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<std::vector<CachedValue_> >& chunk_data) -> void {
-                if constexpr(accrow_ == transpose_) {
-                    to_transpose.clear();
-                }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                #pragma omp critical
-                {
-#else
-                TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-                for (const auto& c : chunks_in_need) {
-                    auto& cache_target = chunk_data[c.second];
-                    auto actual_dim = this->extract_chunk<accrow_>(c.first, mydim, chunk_mydim, cache_target.data(), extract_value, extract_length, work);
-                    if constexpr(accrow_ == transpose_) {
-                        to_transpose.emplace_back(c.second, actual_dim);
-                    }
-                }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                }
-#else
-                });
-#endif
-
-                // Applying transpositions to all cached buffers for easier retrieval, but only once the lock is released.
-                if constexpr(accrow_ == transpose_) {
-                    for (const auto& x : to_transpose) {
-                        transpose(chunk_data[x.first], work.transposition_buffer, x.second, extract_length);
-                    }
-                }
-            }
-        );
-
-        return info.first->data() + extract_length * info.second;
-    }
-
-    template<bool accrow_, typename ExtractType_>
-    const CachedValue_* extract_without_oracle(Index_ i, Index_ mydim, Index_ chunk_mydim, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
-        auto chunk = i / chunk_mydim;
-        auto index = i % chunk_mydim;
-
-        const auto& cache_target = work.historian->find_chunk(
-            chunk, 
-            /* create = */ [&]() -> std::vector<CachedValue_> {
-                return std::vector<CachedValue_>(work.chunk_size_in_elements);
-            },
-            /* populate = */ [&](Index_ id, std::vector<CachedValue_>& chunk_contents) -> void {
-                Index_ actual_dim;
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                #pragma omp critical
-                {
-#else
-                TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-                actual_dim = extract_chunk<accrow_>(chunk, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                }
-#else
-                });
-#endif
-
-                // Applying a transposition for easier retrieval, but only once the lock is released.
-                if constexpr(accrow_ == transpose_) {
-                    transpose(chunk_contents, work.transposition_buffer, actual_dim, extract_length);
-                }
-            }
-        );
-
-        return cache_target.data() + index * extract_length;
-    }
-
     template<bool accrow_>
     Index_ get_target_dim() const {
         if constexpr(accrow_ != transpose_) {
@@ -396,22 +270,121 @@ private:
 
     template<bool accrow_, typename ExtractType_>
     const Value_* extract(Index_ i, Value_* buffer, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
-        // If there isn't any space for caching, we just extract directly.
-        if (work.num_chunks_in_cache == 0) {
-            return extract_without_cache(i, buffer, extract_value, extract_length, work);
-        }
+        auto& cache_workspace = work.cache_workspace;
 
-        Index_ mydim = get_target_dim<accrow_>();
-        Index_ chunk_mydim = get_target_chunk_dim<accrow_>();
+        if (cache_workspace.num_slabs_in_cache == 0) {
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            #pragma omp critical
+            {
+#else
+            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+#endif
 
-        const CachedValue_* cache;
-        if (work.futurist) {
-            cache = extract_with_oracle(mydim, chunk_mydim, extract_value, extract_length, work);
+                extract_base<accrow_>(i, 1, buffer, extract_value, extract_length, work);
+
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+            }
+#else
+            });
+#endif
+
         } else {
-            cache = extract_without_oracle(i, mydim, chunk_mydim, extract_value, extract_length, work);
+            const CachedValue_* ptr;
+            Index_ mydim = get_target_dim<accrow_>();
+            Index_ chunk_mydim = get_target_chunk_dim<accrow_>();
+
+            if (cache_workspace.oracle_cache) {
+                auto& to_transpose = work.cache_transpose_info;
+                auto info = cache_workspace.oracle_cache->next(
+                    /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
+                        return std::pair<Index_, Index_>(current / chunk_mydim, current % chunk_mydim);
+                    }, 
+                    /* swap = */ [](Slab& left, Slab& right) -> void {
+                        left.swap(right);
+                    },
+                    /* ready = */ [](const Slab& x) -> bool {
+                        return !x.empty();
+                    },
+                    /* allocate = */ [&](Slab& x) -> void {
+                        x.resize(cache_workspace.slab_size_in_elements);
+                    },
+                    /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<Slab>& chunk_data) -> void {
+                        if constexpr(accrow_ == transpose_) {
+                            to_transpose.clear();
+                        }
+
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+                        #pragma omp critical
+                        {
+#else
+                        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+#endif
+
+                        for (const auto& c : chunks_in_need) {
+                            auto& cache_target = chunk_data[c.second];
+                            auto actual_dim = this->extract_chunk<accrow_>(c.first, mydim, chunk_mydim, cache_target.data(), extract_value, extract_length, work);
+                            if constexpr(accrow_ == transpose_) {
+                                to_transpose.emplace_back(c.second, actual_dim);
+                            }
+                        }
+
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+                        }
+#else
+                        });
+#endif
+
+                        // Applying transpositions to all cached buffers for easier retrieval, but only once the lock is released.
+                        if constexpr(accrow_ == transpose_) {
+                            for (const auto& x : to_transpose) {
+                                transpose(chunk_data[x.first], work.transposition_buffer, x.second, extract_length);
+                            }
+                        }
+                    }
+                );
+
+                ptr = info.first->data() + extract_length * info.second;
+
+            } else {
+                auto chunk = i / chunk_mydim;
+                auto index = i % chunk_mydim;
+
+                const auto& info = cache_workspace.lru_cache->find(
+                    chunk, 
+                    /* create = */ [&]() -> std::vector<CachedValue_> {
+                        return std::vector<CachedValue_>(cache_workspace.slab_size_in_elements);
+                    },
+                    /* populate = */ [&](Index_ id, std::vector<CachedValue_>& chunk_contents) -> void {
+                        Index_ actual_dim;
+
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+                        #pragma omp critical
+                        {
+#else
+                        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+#endif
+
+                        actual_dim = extract_chunk<accrow_>(chunk, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);
+
+#ifndef TATAMI_HDF5_PARALLEL_LOCK
+                        }
+#else
+                        });
+#endif
+
+                        // Applying a transposition for easier retrieval, but only once the lock is released.
+                        if constexpr(accrow_ == transpose_) {
+                            transpose(chunk_contents, work.transposition_buffer, actual_dim, extract_length);
+                        }
+                    }
+                );
+
+                ptr = info.data() + index * extract_length;
+            }
+
+            std::copy(ptr, ptr + extract_length, buffer);
         }
 
-        std::copy(cache, cache + extract_length, buffer);
         return buffer;
     }
 
@@ -493,18 +466,12 @@ private:
             });
 #endif
 
-            auto chunk_dim = (accrow_ != transpose_ ? parent->chunk_firstdim : parent->chunk_seconddim);
-            base->chunk_size_in_elements = static_cast<size_t>(chunk_dim) * static_cast<size_t>(other_dim);
-            base->num_chunks_in_cache = static_cast<double>(parent->cache_size_in_elements) / base->chunk_size_in_elements;
-
-            if (parent->require_minimum_cache && base->num_chunks_in_cache == 0) {
-                base->num_chunks_in_cache = 1;
-            }
-
-            // If we're not caching any chunks, then don't bother to set up the LRU cache.
-            if (base->num_chunks_in_cache > 0) {
-                base->historian.reset(new LruCache(base->num_chunks_in_cache));
-            }
+            base->cache_workspace = tatami_chunked::TypicalSlabCacheWorkspace<Index_, Slab>(
+                (accrow_ != transpose_ ? parent->chunk_firstdim : parent->chunk_seconddim),
+                other_dim,
+                parent->cache_size_in_elements,
+                parent->require_minimum_cache
+            );
         }
 
     public:
@@ -527,15 +494,7 @@ private:
         }
 
         void set_oracle(std::unique_ptr<tatami::Oracle<Index_> > o) {
-            // If the number of chunks is not greater than 1, we might as well
-            // just let the LRU do its job; oracles are only useful if we can
-            // store multiple chunks corresponding to future predictions.
-            if (base->num_chunks_in_cache > 1) {
-                auto chunk_mydim = parent->get_target_chunk_dim<accrow_>();
-                size_t max_predictions = static_cast<size_t>(base->num_chunks_in_cache) * chunk_mydim * 2; // double the cache size, basically.
-                base->futurist.reset(new OracleCache<accrow_>(std::move(o), max_predictions, base->num_chunks_in_cache));
-                base->historian.reset();
-            }
+            base->cache_workspace.set_oracle(std::move(o));
         }
     };
 
