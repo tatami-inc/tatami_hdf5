@@ -17,10 +17,7 @@ var searchData=
   ['options_14',['Options',['https://tatami-inc.github.io/tatami/structtatami_1_1Options.html',1,'tatami']]],
   ['options_2ehpp_15',['Options.hpp',['https://tatami-inc.github.io/tatami/Options_8hpp.html',1,'']]],
   ['oracle_16',['Oracle',['https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html',1,'tatami']]],
-  ['oraclechunkcache_17',['OracleChunkCache',['https://tatami-inc.github.io/tatami/classtatami_1_1OracleChunkCache.html#a0bd9bfcb80bcaa3c92ccde442c6c15a9',1,'tatami::OracleChunkCache::OracleChunkCache()'],['https://tatami-inc.github.io/tatami/classtatami_1_1OracleChunkCache.html',1,'tatami::OracleChunkCache&lt; typename Id_, typename Index_, class ChunkContents_ &gt;']]],
-  ['oraclechunkcache_2ehpp_18',['OracleChunkCache.hpp',['https://tatami-inc.github.io/tatami/OracleChunkCache_8hpp.html',1,'']]],
-  ['oraclechunkcache_3c_20index_5f_2c_20index_5f_2c_20std_3a_3avector_3c_20cachedvalue_5f_20_3e_20_3e_19',['OracleChunkCache&lt; Index_, Index_, std::vector&lt; CachedValue_ &gt; &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1OracleChunkCache.html',1,'tatami']]],
-  ['oracles_2ehpp_20',['Oracles.hpp',['https://tatami-inc.github.io/tatami/Oracles_8hpp.html',1,'']]],
-  ['oraclestream_21',['OracleStream',['https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html#a293c82567a7c94b9dc86e39110b30688',1,'tatami::OracleStream::OracleStream()=default'],['https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html#abac31a84479939fec89f7037a5dd8f06',1,'tatami::OracleStream::OracleStream(std::unique_ptr&lt; Oracle&lt; Index_ &gt; &gt; o)'],['https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html',1,'tatami::OracleStream&lt; typename Index_ &gt;']]],
-  ['oraclestream_3c_20index_5f_20_3e_22',['OracleStream&lt; Index_ &gt;',['https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html',1,'tatami']]]
+  ['oracles_2ehpp_17',['Oracles.hpp',['https://tatami-inc.github.io/tatami/Oracles_8hpp.html',1,'']]],
+  ['oraclestream_18',['OracleStream',['https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html#a293c82567a7c94b9dc86e39110b30688',1,'tatami::OracleStream::OracleStream()=default'],['https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html#abac31a84479939fec89f7037a5dd8f06',1,'tatami::OracleStream::OracleStream(std::unique_ptr&lt; Oracle&lt; Index_ &gt; &gt; o)'],['https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html',1,'tatami::OracleStream&lt; typename Index_ &gt;']]],
+  ['oraclestream_3c_20index_5f_20_3e_19',['OracleStream&lt; Index_ &gt;',['https://tatami-inc.github.io/tatami/structtatami_1_1OracleStream.html',1,'tatami']]]
 ];
