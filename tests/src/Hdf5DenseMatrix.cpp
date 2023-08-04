@@ -1,14 +1,9 @@
 #include <gtest/gtest.h>
-
-#ifdef TEST_CUSTOM_PARALLEL // make sure this is included before tatami::apply.
-#include "custom_parallel.h"
-#endif
+#include "custom_parallel.h" // make sure this is included before tatami libs.
 
 #include "H5Cpp.h"
-#include "tatami/base/dense/DenseMatrix.hpp"
-#include "tatami/base/other/DelayedTranspose.hpp"
+#include "tatami/tatami.hpp"
 #include "tatami_hdf5/Hdf5DenseMatrix.hpp"
-#include "tatami/stats/sums.hpp"
 
 #include "tatami_test/tatami_test.hpp"
 #include "tatami_test/temp_file_path.hpp"
