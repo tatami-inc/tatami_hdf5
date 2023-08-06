@@ -1,9 +1,5 @@
 #include <gtest/gtest.h>
-
-#ifdef TEST_CUSTOM_PARALLEL // make sure this is included before tatami::apply.
-#include "../../stats/custom_parallel.h"
-#include "hdf5_custom_lock.h"
-#endif
+#include "custom_parallel.h" // make sure this is included before tatami libs.
 
 #include "H5Cpp.h"
 #include "tatami_hdf5/load_hdf5_matrix.hpp"

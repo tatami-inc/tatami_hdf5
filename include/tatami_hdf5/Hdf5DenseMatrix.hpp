@@ -299,16 +299,10 @@ private:
                     /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
                         return std::pair<Index_, Index_>(current / chunk_mydim, current % chunk_mydim);
                     }, 
-                    /* swap = */ [](Slab& left, Slab& right) -> void {
-                        left.swap(right);
+                    /* create = */ [&]() -> Slab {
+                        return Slab(cache_workspace.slab_size_in_elements);
                     },
-                    /* ready = */ [](const Slab& x) -> bool {
-                        return !x.empty();
-                    },
-                    /* allocate = */ [&](Slab& x) -> void {
-                        x.resize(cache_workspace.slab_size_in_elements);
-                    },
-                    /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<Slab>& chunk_data) -> void {
+                    /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<Slab*>& chunk_data) -> void {
                         if constexpr(accrow_ == transpose_) {
                             to_transpose.clear();
                         }
@@ -321,7 +315,7 @@ private:
 #endif
 
                         for (const auto& c : chunks_in_need) {
-                            auto& cache_target = chunk_data[c.second];
+                            auto& cache_target = *(chunk_data[c.second]);
                             auto actual_dim = this->extract_chunk<accrow_>(c.first, mydim, chunk_mydim, cache_target.data(), extract_value, extract_length, work);
                             if constexpr(accrow_ == transpose_) {
                                 to_transpose.emplace_back(c.second, actual_dim);
@@ -337,7 +331,7 @@ private:
                         // Applying transpositions to all cached buffers for easier retrieval, but only once the lock is released.
                         if constexpr(accrow_ == transpose_) {
                             for (const auto& x : to_transpose) {
-                                transpose(chunk_data[x.first], work.transposition_buffer, x.second, extract_length);
+                                transpose(*(chunk_data[x.first]), work.transposition_buffer, x.second, extract_length);
                             }
                         }
                     }
