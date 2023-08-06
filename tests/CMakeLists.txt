@@ -6,11 +6,13 @@ FetchContent_Declare(
 
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+# Avoid installing GoogleTest when installing this project.
+option(INSTALL_GTEST "Enable installation of googletest." OFF)
+
 FetchContent_MakeAvailable(googletest)
 
 enable_testing()
-
-find_package(HDF5 COMPONENTS C CXX REQUIRED)
 
 include(CheckIncludeFiles)
 check_include_files(filesystem HAVE_CXX_FS)
@@ -29,7 +31,7 @@ macro(create_h5test target)
     )
     target_compile_definitions(${target} PRIVATE DEBUG=1)
 
-    target_link_libraries(${target} gtest_main tatami_hdf5 hdf5::hdf5 hdf5::hdf5_cpp)
+    target_link_libraries(${target} gtest_main tatami_hdf5)
 
     if (NOT HAVE_CXX_FS) 
         target_link_libraries(${target} stdc++fs) 
