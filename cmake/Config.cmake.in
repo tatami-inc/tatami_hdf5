@@ -1,6 +1,6 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-find_dependency(tatami_tatami CONFIG REQUIRED)
+find_dependency(tatami_tatami_chunked CONFIG REQUIRED)
 
 include("${CMAKE_CURRENT_LIST_DIR}/tatami_tatami_hdf5Targets.cmake")

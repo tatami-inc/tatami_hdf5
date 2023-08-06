@@ -16,11 +16,11 @@ jobs:
     - name: Get latest CMake
       uses: lukka/get-cmake@latest
 
-    - name: Install tatami
+    - name: Install tatami_chunked
       run: |
-        git clone https://github.com/tatami-inc/tatami dep-tatami --depth=1
-        cd dep-tatami
-        cmake -S . -B build -DTATAMI_TESTS=OFF
+        git clone https://github.com/tatami-inc/tatami_chunked dep-tatami_chunked --depth=1
+        cd dep-tatami_chunked
+        cmake -S . -B build -DTATAMI_CHUNKED_TESTS=OFF
         sudo cmake --install build
 
     - name: Configure the build
