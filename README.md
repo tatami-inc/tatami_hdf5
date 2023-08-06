@@ -86,15 +86,26 @@ target_link_libraries(myexe tatami_hdf5)
 target_link_libraries(mylib INTERFACE tatami_hdf5)
 ```
 
-You'll also need to link to the HDF5 library yourself (version 1.10 or higher).
-In CMake, this is typically done by discovering the system library as shown below.
-Specific frameworks may come with their own HDF5 binaries, e.g., [**Rhdf5lib**](https://bioconductor.org/packages/Rhdf5lib) - 
-**tatami_hdf5** does not put restrictions on any particular HDF5 installation.
+### CMake using `find_package()`
+
+You can install the library by cloning a suitable version of this repository and running the following commands:
+
+```sh
+mkdir build && cd build
+cmake .. -DTATAMI_HDF5_TESTS=OFF
+cmake --build . --target install
+```
+
+Then you can use `find_package()` as usual:
 
 ```cmake
-find_package(HDF5 COMPONENTS C CXX REQUIRED)
-target_link_libraries(myexe hdf5::hdf5 hdf5::hdf5_cpp)
+find_package(tatami_tatami_hdf5 CONFIG REQUIRED)
+target_link_libraries(mylib INTERFACE tatami::tatami_hdf5)
 ```
+
+### Manual
 
 If you're not using CMake, the simple approach is to just copy the files - either directly or with Git submodules - and include their path during compilation with, e.g., GCC's `-I`.
 This will also require the core [**tatami**](https://github.com/tatami-inc/tatami) library.
+You'll also need to link to the HDF5 library yourself (version 1.10 or higher).
+Specific frameworks may come with their own HDF5 binaries, e.g., [**Rhdf5lib**](https://bioconductor.org/packages/Rhdf5lib), [**h5wasm**](https://github.com/usnistgov/libhdf5-wasm).
