@@ -133,10 +133,16 @@ $(function() {
 <div class="line"> </div>
 <div class="line"># For libaries</div>
 <div class="line">target_link_libraries(mylib INTERFACE tatami_hdf5)</div>
-</div><!-- fragment --><p >You'll also need to link to the HDF5 library yourself (version 1.10 or higher). In CMake, this is typically done by discovering the system library as shown below. Specific frameworks may come with their own HDF5 binaries, e.g., <a href="https://bioconductor.org/packages/Rhdf5lib"><b>Rhdf5lib</b></a> - <b><a class="el" href="namespacetatami__hdf5.html" title="Representations for matrix data in HDF5 files.">tatami_hdf5</a></b> does not put restrictions on any particular HDF5 installation.</p>
-<div class="fragment"><div class="line">find_package(HDF5 COMPONENTS C CXX REQUIRED)</div>
-<div class="line">target_link_libraries(myexe hdf5::hdf5 hdf5::hdf5_cpp)</div>
-</div><!-- fragment --><p >If you're not using CMake, the simple approach is to just copy the files - either directly or with Git submodules - and include their path during compilation with, e.g., GCC's <code>-I</code>. This will also require the core <a href="https://github.com/tatami-inc/tatami"><b>tatami</b></a> library. </p>
+</div><!-- fragment --><h2>CMake using <code>find_package()</code></h2>
+<p >You can install the library by cloning a suitable version of this repository and running the following commands:</p>
+<div class="fragment"><div class="line">mkdir build &amp;&amp; cd build</div>
+<div class="line">cmake .. -DTATAMI_HDF5_TESTS=OFF</div>
+<div class="line">cmake --build . --target install</div>
+</div><!-- fragment --><p >Then you can use <code>find_package()</code> as usual:</p>
+<div class="fragment"><div class="line">find_package(tatami_tatami_hdf5 CONFIG REQUIRED)</div>
+<div class="line">target_link_libraries(mylib INTERFACE tatami::tatami_hdf5)</div>
+</div><!-- fragment --><h2>Manual</h2>
+<p >If you're not using CMake, the simple approach is to just copy the files - either directly or with Git submodules - and include their path during compilation with, e.g., GCC's <code>-I</code>. This will also require the core <a href="https://github.com/tatami-inc/tatami"><b>tatami</b></a> library. You'll also need to link to the HDF5 library yourself (version 1.10 or higher). Specific frameworks may come with their own HDF5 binaries, e.g., <a href="https://bioconductor.org/packages/Rhdf5lib"><b>Rhdf5lib</b></a>, <a href="https://github.com/usnistgov/libhdf5-wasm"><b>h5wasm</b></a>. </p>
 </div></div><!-- PageDoc -->
 </div><!-- contents -->
 <!-- start footer part -->
