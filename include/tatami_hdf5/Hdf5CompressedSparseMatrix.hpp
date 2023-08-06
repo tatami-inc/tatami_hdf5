@@ -3,15 +3,13 @@
 
 #include "H5Cpp.h"
 
-#include "utils.hpp"
-
 #include <string>
 #include <vector>
-#include <cstdint>
 #include <type_traits>
-#include <cmath>
-#include <list>
 #include <algorithm>
+
+#include "utils.hpp"
+#include "tatami_chunked/tatami_chunked.hpp"
 
 /**
  * @file Hdf5CompressedSparseMatrix.hpp
@@ -209,18 +207,12 @@ private:
         size_t max_cache_elements = -1;
     };
 
-    struct LruCache {
-        struct Element {
-            std::vector<CachedValue_> value;
-            std::vector<CachedIndex_> index;
-            Index_ length;
-            Index_ id;
-            bool bounded;
-        };
-
-        std::list<Element> cache_data;
-        std::unordered_map<Index_, typename std::list<Element>::iterator> cache_exists;
-        size_t max_cache_number = -1;
+    struct LruSlab {
+        LruSlab(size_t capacity, bool needs_value) : value(needs_value ? capacity : 0), index(capacity) {}
+        std::vector<CachedValue_> value;
+        std::vector<CachedIndex_> index;
+        Index_ length;
+        bool bounded;
     };
 
     struct PrimaryWorkspace {
@@ -234,17 +226,43 @@ private:
         std::unique_ptr<OracleCache> futurist;
 
         // Cache without an oracle.
-        std::unique_ptr<LruCache> historian;
+        std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> > historian;
 
         // Cache for re-use.
         std::vector<std::pair<size_t, size_t> > extraction_bounds;
     };
 
+    void initialize_lru_cache(std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> >& historian, bool needs_value) const {
+        size_t element_size = sizeof(CachedIndex_) + (needs_value ?  sizeof(CachedValue_) : 0);
+
+        // When we're defining the LRU cache, each slab element is set to the
+        // maximum number of non-zeros across all primary elements. This is
+        // because the capacity of each recycled vector may be much larger than
+        // the reported size of the chunk; this would cause us to overrun the
+        // cache_size_limit if we recycled the vector enough times such that
+        // each cache element had capacity equal to the maximum number of
+        // non-zero elements in any dimension element. By setting every slab
+        // element to its maximum, we avoid reallocation and buffer overruns.
+        //
+        // Alternatives would be to create a new Element on every recycling
+        // iteration, or to hope that shrink_to_fit() behaves. Both would allow
+        // us to store more cache elements but would involve reallocations,
+        // which degrades perf in the most common case where a dimension
+        // element is accessed no more than once during iteration.
+
+        size_t max_cache_number = cache_size_limit / (max_non_zeros * element_size);
+        if (max_cache_number == 0) {
+            max_cache_number = 1; // same effect as always setting 'require_minimum_cache = true'.
+        }
+
+        historian.reset(new tatami_chunked::LruSlabCache<Index_, LruSlab>(max_cache_number));
+    }
+
 private:
     struct Extracted {
         Extracted() = default;
 
-        Extracted(const typename LruCache::Element& cache) {
+        Extracted(const LruSlab& cache) {
             value = cache.value.data();
             index = cache.index.data();
             length = cache.length;
@@ -269,92 +287,54 @@ private:
     };
 
     Extracted extract_primary_without_oracle(Index_ i, PrimaryWorkspace& work, bool needs_value) const {
-        auto& historian = *(work.historian);
-        auto it = historian.cache_exists.find(i);
-        if (it != historian.cache_exists.end()) {
-            auto chosen = it->second;
-            historian.cache_data.splice(historian.cache_data.end(), historian.cache_data, chosen); // move to end.
-            return Extracted(*chosen);
-        }
+        const auto& chosen = work.historian->find(i,
+            /* create = */ [&]() -> LruSlab {
+                return LruSlab(max_non_zeros, needs_value);
+            },
+            /* populate = */ [&](Index_ i, LruSlab& current_cache) -> void {
+                // Check if bounds already exist from the reusable cache. If so,
+                // we can use them to reduce the amount of data I/O.
+                hsize_t extraction_start = pointers[i];
+                hsize_t extraction_len = pointers[i + 1] - pointers[i];
+                bool bounded = false;
 
-        // Check if bounds already exist from the reusable cache. If so,
-        // we can use them to reduce the amount of data I/O.
-        hsize_t extraction_start = pointers[i];
-        hsize_t extraction_len = pointers[i + 1] - pointers[i];
-        bool bounded = false;
+                if (work.extraction_bounds.size()) {
+                    const auto& current = work.extraction_bounds[i];
+                    if (current.first != -1) {
+                        bounded = true;
+                        extraction_start = current.first;
+                        extraction_len = current.second;
+                    }
+                }
 
-        if (work.extraction_bounds.size()) {
-            const auto& current = work.extraction_bounds[i];
-            if (current.first != -1) {
-                bounded = true;
-                extraction_start = current.first;
-                extraction_len = current.second;
-            }
-        }
-
-        // Need to use the max_cache_number as the capacity of each recycled
-        // vector may be much larger than the reported size of the chunk; this
-        // would cause us to overrun the cache_size_limit if we recycled the
-        // vector enough times such that each cache element had capacity equal
-        // to the maximum number of non-zero elements in any dimension element.
-        //
-        // Alternatives would be to create a new Element on every recycling
-        // iteration, or to hope that shrink_to_fit() behaves. Both would allow
-        // us to store more cache elements but would involve reallocations,
-        // which degrades perf in the most common case where a dimension
-        // element is accessed no more than once during iteration.
-        if (historian.max_cache_number == -1) {
-            historian.max_cache_number = cache_size_limit / (max_non_zeros * ((needs_value ? sizeof(CachedValue_) : 0) + sizeof(CachedIndex_)));
-            if (historian.max_cache_number == 0) {
-                historian.max_cache_number = 1; // same effect as always setting 'require_minimum_cache = true'.
-            }
-        }
-
-        // Adding a new last element, or recycling the front to the back.
-        // We initialize each element with the maximum number of non-zeros to avoid reallocations.
-        typename std::list<typename LruCache::Element>::iterator location;
-        if (historian.cache_data.size() < historian.max_cache_number) {
-            historian.cache_data.push_back(typename LruCache::Element());
-            location = std::prev(historian.cache_data.end());
-            location->index.resize(max_non_zeros);
-            if (needs_value) {
-                location->value.resize(max_non_zeros);
-            }
-        } else {
-            location = historian.cache_data.begin();
-            historian.cache_exists.erase(location->id);
-            historian.cache_data.splice(historian.cache_data.end(), historian.cache_data, location); // move to end.
-        }
-        historian.cache_exists[i] = location;
-
-        auto& current_cache = *location;
-        current_cache.id = i;
-        current_cache.length = extraction_len;
-        current_cache.bounded = bounded;
+                current_cache.length = extraction_len;
+                current_cache.bounded = bounded;
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
+                #pragma omp critical
+                {
 #else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
+                TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
 #endif
 
-        work.dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
-        work.memspace.setExtentSimple(1, &extraction_len);
-        work.memspace.selectAll();
-        work.index.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), work.memspace, work.dataspace);
+                work.dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
+                work.memspace.setExtentSimple(1, &extraction_len);
+                work.memspace.selectAll();
+                work.index.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), work.memspace, work.dataspace);
 
-        if (needs_value) {
-            work.data.read(current_cache.value.data(), define_mem_type<CachedValue_>(), work.memspace, work.dataspace);
-        }
+                if (needs_value) {
+                    work.data.read(current_cache.value.data(), define_mem_type<CachedValue_>(), work.memspace, work.dataspace);
+                }
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
-        }
+                }
 #else
-        });
+                });
 #endif
+            }
+        );
 
-        return Extracted(current_cache);
+        return Extracted(chosen);
     }
 
     template<class Function_>
@@ -1006,7 +986,6 @@ private:
 #endif
 
             if constexpr(row_ == accrow_) {
-                core->historian.reset(new LruCache);
                 if (opt.cache_for_reuse) {
                     auto extraction_cache_size = accrow_ ? p->nrows : p->ncols;
                     core->extraction_bounds.resize(extraction_cache_size, std::pair<size_t, size_t>(-1, 0));
@@ -1075,7 +1054,12 @@ private:
     struct DenseHdf5SparseExtractor : public Hdf5SparseExtractor<accrow_, selection_, false> {
         template<typename... Args_>
         DenseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, Args_&&... args) : 
-            Hdf5SparseExtractor<accrow_, selection_, false>(p, opt, std::forward<Args_>(args)...) {}
+            Hdf5SparseExtractor<accrow_, selection_, false>(p, opt, std::forward<Args_>(args)...)
+        {
+            if constexpr(row_ == accrow_) {
+                this->parent->initialize_lru_cache(this->core->historian, true);
+            }
+        }
 
         const Value_* fetch(Index_ i, Value_* buffer) {
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
@@ -1104,7 +1088,12 @@ private:
     struct SparseHdf5SparseExtractor : public Hdf5SparseExtractor<accrow_, selection_, true> {
         template<typename... Args_>
         SparseHdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt, Args_&&... args) : 
-            Hdf5SparseExtractor<accrow_, selection_, true>(p, opt, std::forward<Args_>(args)...), needs_value(opt.sparse_extract_value), needs_index(opt.sparse_extract_index) {}
+            Hdf5SparseExtractor<accrow_, selection_, true>(p, opt, std::forward<Args_>(args)...), needs_value(opt.sparse_extract_value), needs_index(opt.sparse_extract_index) 
+        {
+            if constexpr(row_ == accrow_) {
+                this->parent->initialize_lru_cache(this->core->historian, needs_value);
+            }
+        }
 
         tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
