@@ -61,11 +61,10 @@ var searchData=
   ['make_5fdelayedtranspose_58',['make_DelayedTranspose',['https://tatami-inc.github.io/tatami/namespacetatami.html#afa35d8e9fe286967f327ec0eb6bd5005',1,'tatami']]],
   ['make_5fdelayedunaryisometricop_59',['make_DelayedUnaryIsometricOp',['https://tatami-inc.github.io/tatami/namespacetatami.html#a07b072944c766d85dc4ce4dc734e0b75',1,'tatami']]],
   ['math_5fhelpers_2ehpp_60',['math_helpers.hpp',['https://tatami-inc.github.io/tatami/math__helpers_8hpp.html',1,'']]],
-  ['matrix_61',['matrix',['https://tatami-inc.github.io/tatami/structtatami_1_1LayeredMatrixData.html#a117e250097c0219902fad9160e5d389c',1,'tatami::LayeredMatrixData']]],
-  ['matrix_62',['Matrix',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
-  ['matrix_2ehpp_63',['Matrix.hpp',['https://tatami-inc.github.io/tatami/Matrix_8hpp.html',1,'']]],
-  ['matrix_3c_20value_5f_2c_20index_5f_20_3e_64',['Matrix&lt; Value_, Index_ &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
-  ['matrix_3c_20value_5fout_5f_2c_20index_5fout_5f_20_3e_65',['Matrix&lt; Value_out_, Index_out_ &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
-  ['maximum_5fcache_5fsize_66',['maximum_cache_size',['../structtatami__hdf5_1_1Hdf5Options.html#ad72096e3a430f73a05a6c2e7a6a5d3a3',1,'tatami_hdf5::Hdf5Options']]],
-  ['medians_2ehpp_67',['medians.hpp',['https://tatami-inc.github.io/tatami/medians_8hpp.html',1,'']]]
+  ['matrix_61',['Matrix',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
+  ['matrix_2ehpp_62',['Matrix.hpp',['https://tatami-inc.github.io/tatami/Matrix_8hpp.html',1,'']]],
+  ['matrix_3c_20value_5f_2c_20index_5f_20_3e_63',['Matrix&lt; Value_, Index_ &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
+  ['matrix_3c_20value_5fout_5f_2c_20index_5fout_5f_20_3e_64',['Matrix&lt; Value_out_, Index_out_ &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
+  ['maximum_5fcache_5fsize_65',['maximum_cache_size',['../structtatami__hdf5_1_1Hdf5Options.html#ad72096e3a430f73a05a6c2e7a6a5d3a3',1,'tatami_hdf5::Hdf5Options']]],
+  ['medians_2ehpp_66',['medians.hpp',['https://tatami-inc.github.io/tatami/medians_8hpp.html',1,'']]]
 ];
