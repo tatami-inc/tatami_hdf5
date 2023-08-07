@@ -29,6 +29,7 @@ endif()
 
 # Switch between include directories depending on whether the downstream is
 # using the build directly or is using the installed package.
+include(GNUInstallDirs)
 target_include_directories(tatami_hdf5 
     INTERFACE 
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
