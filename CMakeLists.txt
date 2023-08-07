@@ -14,7 +14,7 @@ option(TATAMI_HDF5_FETCH_EXTERN "Automatically fetch tatami_hdf5's external depe
 if(TATAMI_HDF5_FETCH_EXTERN)
     add_subdirectory(extern)
 else()
-    find_package(tatami_chunked CONFIG REQUIRED)
+    find_package(tatami_tatami_chunked CONFIG REQUIRED)
 endif()
 
 target_link_libraries(tatami_hdf5 INTERFACE tatami::tatami_chunked)
