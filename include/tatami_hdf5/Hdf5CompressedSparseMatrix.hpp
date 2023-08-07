@@ -234,16 +234,13 @@ private:
         static constexpr size_t no_extraction_bound = -1;
     };
 
-    static size_t size_of_element(bool needs_value, bool needs_cached_index) {
-        size_t out = (needs_cached_index ? sizeof(CachedIndex_) : 0) + (needs_value ? sizeof(CachedValue_) : 0);
-        if (out == 0) {
-            return 1; // avoid divide-by-zero problems when neither the value or index needs to be cached.
-        } else {
-            return out;
-        }
+    static size_t size_of_cached_element(bool needs_value, bool needs_cached_index) {
+        return (needs_cached_index ? sizeof(CachedIndex_) : 0) + (needs_value ? sizeof(CachedValue_) : 0);
     }
 
     void initialize_lru_cache(std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> >& historian, bool needs_value, bool needs_cached_index) const {
+        size_t element_size = size_of_cached_element(needs_value, needs_cached_index);
+
         // When we're defining the LRU cache, each slab element is set to the
         // maximum number of non-zeros across all primary elements. This is
         // because the capacity of each recycled vector may be much larger than
@@ -259,7 +256,6 @@ private:
         // which degrades perf in the most common case where a dimension
         // element is accessed no more than once during iteration.
 
-        size_t element_size = size_of_element(needs_value, needs_cached_index);
         size_t max_cache_number = cache_size_limit / (max_non_zeros * element_size);
         if (max_cache_number == 0) {
             max_cache_number = 1; // same effect as always setting 'require_minimum_cache = true'.
@@ -395,17 +391,20 @@ private:
         // reads, but that works out to be no more than one extra copy per
         // fetch() call, which is tolerable. I suppose we could do better
         // by defragmenting within this buffer but that's probably overkill.
+
         if (pred.max_cache_elements == static_cast<size_t>(-1)) {
-            size_t element_size = size_of_element(needs_value, needs_cached_index);
+            size_t element_size = size_of_cached_element(needs_value, needs_cached_index);
             pred.max_cache_elements = cache_size_limit / element_size;
             if (pred.max_cache_elements < static_cast<size_t>(max_non_zeros)) {
                 pred.max_cache_elements = max_non_zeros; // make sure we have enough space to store the largest possible primary dimension element.
             }
+
             pred.cache_index.resize(pred.max_cache_elements);
             if (needs_value) {
                 pred.cache_value.resize(pred.max_cache_elements);
             }
         }
+
         size_t filled_elements = 0;
 
         for (size_t p = 0; p < max_predictions; ++p) {
@@ -652,7 +651,7 @@ private:
         PrimaryWorkspace& work, 
         bool needs_value, 
         bool needs_index, 
-        bool needs_cached_index) 
+        bool must_cache_index) 
     const {
         Index_ counter = 0;
 
@@ -676,7 +675,7 @@ private:
                 start, 
                 work,
                 needs_value,
-                needs_cached_index // should always be true if needs_index = true.
+                needs_index || must_cache_index
             );
         }
 
@@ -1134,11 +1133,20 @@ private:
             Hdf5SparseExtractor<accrow_, selection_, true>(p, opt, std::forward<Args_>(args)...), needs_value(opt.sparse_extract_value), needs_index(opt.sparse_extract_index) 
         {
             if constexpr(row_ == accrow_) {
-                bool needs_cached_index = true;
                 if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
-                    needs_cached_index = needs_index;
+                    if (needs_value || needs_index) {
+                        // If the index isn't requested, we don't need to cache it, because
+                        // we can just load the entire set of values for the primary dimension.
+                        this->parent->initialize_lru_cache(this->core->historian, needs_value, /* needs_cached_index = */ needs_index);
+                    } else {
+                        // Otherwise the LRU cache is not needed by fetch(), so
+                        // we skip its initialization to avoid divide by zero
+                        // problems inside initialize_lru_cache when each
+                        // non-zero cache element takes up zero bytes.
+                    }
+                } else {
+                    this->parent->initialize_lru_cache(this->core->historian, needs_value, true);
                 }
-                this->parent->initialize_lru_cache(this->core->historian, needs_value, needs_cached_index);
             }
         }
 
@@ -1149,7 +1157,7 @@ private:
                         // If we aren't asked to report the index, and we don't need it to slice the
                         // secondary dimension (because we're extracting the entirety of the dimension),
                         // then we don't need to load and cache the indices either.
-                        return this->parent->extract_primary(i, vbuffer, ibuffer, 0, this->full_length, *(this->core), needs_value, needs_index, /* needs_cached_indices = */ needs_index);
+                        return this->parent->extract_primary(i, vbuffer, ibuffer, 0, this->full_length, *(this->core), needs_value, needs_index, /* must_cache_index = */ false);
                     } else {
                         // Quick return is possible if we don't need any indices or values.
                         return tatami::SparseRange<Value_, Index_>(this->parent->pointers[i+1] - this->parent->pointers[i], NULL, NULL);
@@ -1159,7 +1167,8 @@ private:
                 }
             } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 if constexpr(row_ == accrow_) {
-                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index, /* needs_cached_indices = */ true);
+                    // Unlike in the FULL case, we have to load and cache the indices in order to identify the start/end of each block.
+                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index, /* must_cache_index = */ true);
                 } else {
                     return this->parent->extract_secondary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index);
                 }

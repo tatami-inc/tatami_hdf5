@@ -404,17 +404,35 @@ TEST_P(Hdf5SparseBasicCacheTest, SimpleOracle) {
         tatami_test::test_oracle_row_access<tatami::NumericMatrix>(&mat, &ref, true); // randomized
         tatami_test::test_oracle_row_access<tatami::NumericMatrix>(&mat, &ref, true, 0.2 * NR, 0.6 * NR); // randomized with bounds
 
-        // Oracle-based extraction still works if we turn off value extraction.
+        // Oracle-based extraction still works if we turn off value or index extraction.
         tatami::Options opt;
+        
         opt.sparse_extract_value = false;
-        auto mwork = mat.sparse_row(opt);
-        mwork->set_oracle(std::make_unique<tatami::ConsecutiveOracle<int> >(0, NR));
+        auto iwork = mat.sparse_row(opt);
+        iwork->set_oracle(std::make_unique<tatami::ConsecutiveOracle<int> >(0, NR));
+
+        opt.sparse_extract_index = false;
+        auto bwork = mat.sparse_row(opt);
+        bwork->set_oracle(std::make_unique<tatami::ConsecutiveOracle<int> >(0, NR));
+
+        opt.sparse_extract_value = true;
+        auto vwork = mat.sparse_row(opt);
+        vwork->set_oracle(std::make_unique<tatami::ConsecutiveOracle<int> >(0, NR));
+
         auto rwork = ref.sparse_row(opt);
         for (size_t r = 0; r < NR; ++r) {
-            auto mout = mwork->fetch(r);
             auto rout = rwork->fetch(r);
-            EXPECT_EQ(mout.index, rout.index);
-            EXPECT_EQ(mout.value.size(), 0);
+
+            auto iout = iwork->fetch(r);
+            EXPECT_EQ(iout.index, rout.index);
+            EXPECT_EQ(iout.value.size(), 0);
+
+            auto vout = vwork->fetch(r);
+            EXPECT_EQ(vout.value, rout.value);
+            EXPECT_EQ(vout.index.size(), 0);
+
+            auto bout = bwork->fetch(r, NULL, NULL);
+            EXPECT_EQ(bout.number, rout.value.size());
         }
     }
 
