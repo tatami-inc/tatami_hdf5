@@ -177,7 +177,7 @@ TEST_P(Hdf5DenseAccessUncachedTest, ForcedCache) {
     tatami_test::test_simple_row_access(&mat, &ref, FORWARD, JUMP);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
     Hdf5DenseAccessUncachedTest,
     ::testing::Combine(
@@ -222,7 +222,7 @@ TEST_P(Hdf5DenseAccessTest, Transposed) {
     tatami_test::test_simple_row_access(&mat, &ref, FORWARD, JUMP);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
     Hdf5DenseAccessTest,
     ::testing::Combine(
@@ -301,7 +301,7 @@ TEST_P(Hdf5DenseAccessMiscTest, Oracle) {
     tatami_test::test_oracle_column_access<tatami::NumericMatrix>(&mat, &ref, true);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
     Hdf5DenseAccessMiscTest,
     ::testing::Combine(
@@ -368,7 +368,7 @@ TEST_P(Hdf5DenseSlicedTest, Transposed) {
     }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
     Hdf5DenseSlicedTest,
     ::testing::Combine(
@@ -439,7 +439,7 @@ TEST_P(Hdf5DenseIndexedTest, Transposed) {
     }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
     Hdf5DenseIndexedTest,
     ::testing::Combine(

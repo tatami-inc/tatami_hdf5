@@ -220,7 +220,7 @@ TEST_P(WriteSparseMatrixToHdf5BasicTest, DenseRow) {
     }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     WriteSparseMatrixToHdf5,
     WriteSparseMatrixToHdf5BasicTest,
     ::testing::Values(1, 3) // Number of threads
@@ -317,7 +317,7 @@ TEST_P(WriteSparseMatrixToHdf5UnsignedDataTypeTest, Check) {
     }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     WriteSparseMatrixToHdf5,
     WriteSparseMatrixToHdf5UnsignedDataTypeTest,
     ::testing::Combine(

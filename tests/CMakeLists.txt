@@ -49,7 +49,7 @@ endmacro()
 
 create_h5test(libtest)
 
-find_package(OpenMP REQUIRED)
+find_package(OpenMP)
 if(OpenMP_FOUND)
     create_h5test(omptest)
     target_link_libraries(omptest OpenMP::OpenMP_CXX)

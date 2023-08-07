@@ -191,7 +191,7 @@ TEST_P(Hdf5SparseAccessTest, Secondary) {
     }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5SparseMatrix,
     Hdf5SparseAccessTest,
     ::testing::Combine(
@@ -259,7 +259,7 @@ TEST_P(Hdf5SparseSlicedTest, Secondary) {
     }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5SparseMatrix,
     Hdf5SparseSlicedTest,
     ::testing::Combine(
@@ -332,7 +332,7 @@ TEST_P(Hdf5SparseIndexedTest, Secondary) {
     }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5SparseMatrix,
     Hdf5SparseIndexedTest,
     ::testing::Combine(
@@ -476,7 +476,7 @@ TEST_P(Hdf5SparseBasicCacheTest, Repeated) {
     }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5SparseMatrix,
     Hdf5SparseBasicCacheTest,
     ::testing::Values(0, 0.001, 0.01, 0.1) 
@@ -573,7 +573,7 @@ TEST_P(Hdf5SparseReuseCacheTest, SlicedBounds) {
     }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5SparseMatrix,
     Hdf5SparseReuseCacheTest,
     ::testing::Combine(
@@ -603,7 +603,7 @@ TEST_P(Hdf5SparseApplyTest, Basic) {
     EXPECT_EQ(tatami::column_sums(&mat), tatami::column_sums(&ref));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Hdf5SparseMatrix,
     Hdf5SparseApplyTest,
     ::testing::Values(0, 0.001, 0.01, 0.1) // cache size multiplier
