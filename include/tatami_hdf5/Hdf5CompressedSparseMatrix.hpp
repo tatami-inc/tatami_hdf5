@@ -234,9 +234,16 @@ private:
         static constexpr size_t no_extraction_bound = -1;
     };
 
-    void initialize_lru_cache(std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> >& historian, bool needs_value) const {
-        size_t element_size = sizeof(CachedIndex_) + (needs_value ?  sizeof(CachedValue_) : 0);
+    static size_t size_of_element(bool needs_value, bool needs_cached_index) {
+        size_t out = (needs_cached_index ? sizeof(CachedIndex_) : 0) + (needs_value ? sizeof(CachedValue_) : 0);
+        if (out == 0) {
+            return 1; // avoid divide-by-zero problems when neither the value or index needs to be cached.
+        } else {
+            return out;
+        }
+    }
 
+    void initialize_lru_cache(std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> >& historian, bool needs_value, bool needs_cached_index) const {
         // When we're defining the LRU cache, each slab element is set to the
         // maximum number of non-zeros across all primary elements. This is
         // because the capacity of each recycled vector may be much larger than
@@ -252,6 +259,7 @@ private:
         // which degrades perf in the most common case where a dimension
         // element is accessed no more than once during iteration.
 
+        size_t element_size = size_of_element(needs_value, needs_cached_index);
         size_t max_cache_number = cache_size_limit / (max_non_zeros * element_size);
         if (max_cache_number == 0) {
             max_cache_number = 1; // same effect as always setting 'require_minimum_cache = true'.
@@ -271,24 +279,26 @@ private:
             bounded = cache.bounded;
         }
 
-        Extracted(const OracleCache& cache, Index_ i, bool needs_value) {
+        Extracted(const OracleCache& cache, Index_ i, bool needs_value, bool needs_cached_index) {
             const auto& element = cache.cache_data[i];
             auto offset = element.mem_offset;
             if (needs_value) {
                 value = cache.cache_value.data() + offset;
             }
-            index = cache.cache_index.data() + offset;
+            if (needs_cached_index) {
+                index = cache.cache_index.data() + offset;
+            }
             length = element.length;
             bounded = element.bounded;
         }
 
-        const CachedValue_* value;
-        const CachedIndex_* index;
-        Index_ length;
-        bool bounded;
+        const CachedValue_* value = NULL;
+        const CachedIndex_* index = NULL;
+        Index_ length = 0;
+        bool bounded = false;
     };
 
-    Extracted extract_primary_without_oracle(Index_ i, PrimaryWorkspace& work, bool needs_value) const {
+    Extracted extract_primary_without_oracle(Index_ i, PrimaryWorkspace& work, bool needs_value, bool needs_cached_index) const {
         const auto& chosen = work.historian->find(i,
             /* create = */ [&]() -> LruSlab {
                 return LruSlab(max_non_zeros, needs_value);
@@ -322,8 +332,9 @@ private:
                 work.dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
                 work.memspace.setExtentSimple(1, &extraction_len);
                 work.memspace.selectAll();
-                work.index.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), work.memspace, work.dataspace);
-
+                if (needs_cached_index) {
+                    work.index.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), work.memspace, work.dataspace);
+                }
                 if (needs_value) {
                     work.data.read(current_cache.value.data(), define_mem_type<CachedValue_>(), work.memspace, work.dataspace);
                 }
@@ -349,11 +360,11 @@ private:
         }
     }
 
-    Extracted extract_primary_with_oracle(PrimaryWorkspace& work, bool needs_value) const {
+    Extracted extract_primary_with_oracle(PrimaryWorkspace& work, bool needs_value, bool needs_cached_index) const {
         auto& pred = *work.futurist;
         if (pred.predictions_made.size() > pred.predictions_fulfilled) {
             auto chosen = pred.predictions_made[pred.predictions_fulfilled++];
-            return Extracted(pred, chosen, needs_value);
+            return Extracted(pred, chosen, needs_value, needs_cached_index);
         }
 
         // Grow the number of predictions over time, until we get to a point
@@ -385,7 +396,8 @@ private:
         // fetch() call, which is tolerable. I suppose we could do better
         // by defragmenting within this buffer but that's probably overkill.
         if (pred.max_cache_elements == static_cast<size_t>(-1)) {
-            pred.max_cache_elements = cache_size_limit / ((needs_value ? sizeof(CachedValue_) : 0) + sizeof(CachedIndex_));
+            size_t element_size = size_of_element(needs_value, needs_cached_index);
+            pred.max_cache_elements = cache_size_limit / element_size;
             if (pred.max_cache_elements < static_cast<size_t>(max_non_zeros)) {
                 pred.max_cache_elements = max_non_zeros; // make sure we have enough space to store the largest possible primary dimension element.
             }
@@ -528,7 +540,9 @@ private:
 
             work.memspace.setExtentSimple(1, &combined_len);
             work.memspace.selectAll();
-            work.index.read(pred.cache_index.data() + dest_offset, define_mem_type<Index_>(), work.memspace, work.dataspace);
+            if (needs_cached_index) {
+                work.index.read(pred.cache_index.data() + dest_offset, define_mem_type<Index_>(), work.memspace, work.dataspace);
+            }
             if (needs_value) {
                 work.data.read(pred.cache_value.data() + dest_offset, define_mem_type<Value_>(), work.memspace, work.dataspace);
             }
@@ -543,7 +557,7 @@ private:
         pred.cache_data.swap(pred.next_cache_data);
         pred.cache_exists.swap(pred.next_cache_exists);
         pred.predictions_fulfilled = 1; // using the first one now.
-        return Extracted(pred, pred.predictions_made.front(), needs_value);
+        return Extracted(pred, pred.predictions_made.front(), needs_value, needs_cached_index);
     }
 
     /********************************************
@@ -551,46 +565,53 @@ private:
      ********************************************/
 private:
     template<class Function_>
-    void extract_primary_raw(size_t i, Function_ fill, Index_ start, PrimaryWorkspace& work, bool needs_value) const {
+    void extract_primary_raw(size_t i, Function_ fill, Index_ start, PrimaryWorkspace& work, bool needs_value, bool needs_cached_index) const {
         Extracted details;
         if (work.futurist) {
-            details = extract_primary_with_oracle(work, needs_value);
+            details = extract_primary_with_oracle(work, needs_value, needs_cached_index);
         } else {
-            details = extract_primary_without_oracle(i, work, needs_value);
+            details = extract_primary_without_oracle(i, work, needs_value, needs_cached_index);
         }
 
-        auto istart = details.index;
-        auto iend = details.index + details.length;
+        auto istart = details.index; // possibly NULL, if needs_cached_index = false.
         size_t offset = 0;
+        size_t len = details.length;
 
-        // If we used the extraction_bounds during extraction, there's no need
-        // to do another search. Similarly, if we didn't use the extraction_bounds
-        // (e.g., it was already cached) but we have extraction_bounds available,
-        // we can again skip the binary search.
-        if (!details.bounded && start) {
-            bool hit = false;
-            if (work.extraction_bounds.size()) {
-                auto& target = work.extraction_bounds[i];
-                if (target.first != PrimaryWorkspace::no_extraction_bound) {
-                    hit = true;
-                    offset = target.first - pointers[i];
-                    istart += offset;
+        if (needs_cached_index) {
+            // If we used the extraction_bounds during extraction, there's no need
+            // to do another search. Similarly, if we didn't use the extraction_bounds
+            // (e.g., it was already cached) but we have extraction_bounds available,
+            // we can again skip the binary search.
+            if (!details.bounded && start) {
+                bool hit = false;
+                if (work.extraction_bounds.size()) {
+                    auto& target = work.extraction_bounds[i];
+                    if (target.first != PrimaryWorkspace::no_extraction_bound) {
+                        hit = true;
+                        offset = target.first - pointers[i];
+                        istart += offset;
+                    }
+                } 
+
+                if (!hit) {
+                    auto iend = details.index + details.length;
+                    istart = std::lower_bound(details.index, iend, start);
+                    offset = istart - details.index;
                 }
-            } 
 
-            if (!hit) {
-                istart = std::lower_bound(details.index, iend, start);
-                offset = istart - details.index;
+                len -= offset;
             }
         }
 
-        size_t iterated = fill(istart, iend, (needs_value ? details.value + offset : NULL));
+        size_t iterated = fill(len, istart, (needs_value ? details.value + offset : NULL));
 
-        if (work.extraction_bounds.size()) {
-            auto& target = work.extraction_bounds[i];
-            if (target.first == PrimaryWorkspace::no_extraction_bound) {
-                target.first = pointers[i] + offset;
-                target.second = iterated;
+        if (needs_cached_index) {
+            if (work.extraction_bounds.size()) {
+                auto& target = work.extraction_bounds[i];
+                if (target.first == PrimaryWorkspace::no_extraction_bound) {
+                    target.first = pointers[i] + offset;
+                    target.second = iterated;
+                }
             }
         }
 
@@ -598,15 +619,15 @@ private:
     }
 
     const Value_* extract_primary(size_t i, Value_* buffer, Index_ start, Index_ length, PrimaryWorkspace& work) const {
-        std::fill(buffer, buffer + length, 0);
-
         if (length) {
+            std::fill(buffer, buffer + length, 0);
+
             extract_primary_raw(i, 
 
-                [&](const CachedIndex_* is, const CachedIndex_* ie, const CachedValue_* vs) -> size_t {
+                [&](size_t num, const CachedIndex_* is, const CachedValue_* vs) -> size_t {
                     auto ioriginal = is;
                     Index_ end = start + length;
-                    for (; is != ie && *is < end; ++is, ++vs) {
+                    for (size_t i = 0; i < num && *is < end; ++i, ++is, ++vs) {
                         buffer[*is - start] = *vs;
                     }
                     return is - ioriginal;
@@ -614,28 +635,36 @@ private:
 
                 start, 
                 work,
-                true
+                /* needs_value = */ true,
+                /* needs_cached_index = */ true
             );
         }
 
         return buffer;
     }
 
-    tatami::SparseRange<Value_, Index_> extract_primary(size_t i, Value_* dbuffer, Index_* ibuffer, Index_ start, Index_ length, PrimaryWorkspace& work, bool needs_value, bool needs_index) const {
+    tatami::SparseRange<Value_, Index_> extract_primary(
+        size_t i, 
+        Value_* dbuffer, 
+        Index_* ibuffer, 
+        Index_ start, 
+        Index_ length, 
+        PrimaryWorkspace& work, 
+        bool needs_value, 
+        bool needs_index, 
+        bool needs_cached_index) 
+    const {
         Index_ counter = 0;
 
         if (length) {
             extract_primary_raw(i, 
 
-                [&](const CachedIndex_* is, const CachedIndex_* ie, const CachedValue_* vs) -> Index_ {
-                    auto ioriginal = is;
+                [&](size_t num, const CachedIndex_* is, const CachedValue_* vs) -> Index_ {
                     Index_ end = start + length;
-                    for (; is != ie && *is < end; ++is) {
-                        ++counter;                        
-                    }
+                    counter = std::lower_bound(is, is + num, static_cast<CachedIndex_>(end)) - is;
 
                     if (needs_index) {
-                        std::copy(ioriginal, ioriginal + counter, ibuffer);
+                        std::copy(is, is + counter, ibuffer);
                     }
                     if (needs_value) {
                         std::copy(vs, vs + counter, dbuffer);
@@ -646,7 +675,8 @@ private:
 
                 start, 
                 work,
-                needs_value
+                needs_value,
+                needs_cached_index // should always be true if needs_index = true.
             );
         }
 
@@ -708,8 +738,8 @@ private:
         if (indices.size()) {
             extract_primary_raw(i, 
 
-                [&](const CachedIndex_* is, const CachedIndex_* ie, const CachedValue_* vs) -> size_t {
-                    return indexed_extraction(is, ie, vs, true, indices, 
+                [&](size_t num, const CachedIndex_* is, const CachedValue_* vs) -> size_t {
+                    return indexed_extraction(is, is + num, vs, true, indices, 
                         [&](CachedIndex_, CachedValue_ value) -> void {
                             *buffer = value;
                             ++buffer;
@@ -722,7 +752,8 @@ private:
 
                 indices.front(),
                 work,
-                true
+                /* needs_value = */ true,
+                /* needs_cached_index = */ true
             );
         }
 
@@ -735,8 +766,8 @@ private:
         if (indices.size()) {
             extract_primary_raw(i, 
 
-                [&](const CachedIndex_* is, const CachedIndex_* ie, const CachedValue_* vs) -> size_t {
-                    return indexed_extraction(is, ie, vs, needs_value, indices,
+                [&](size_t num, const CachedIndex_* is, const CachedValue_* vs) -> size_t {
+                    return indexed_extraction(is, is + num, vs, needs_value, indices,
                         [&](CachedIndex_ pos, CachedValue_ value) -> void {
                             if (needs_value) {
                                 dbuffer[counter] = value;
@@ -752,7 +783,8 @@ private:
 
                 indices.front(),
                 work,
-                needs_value
+                needs_value,
+                /* needs_cached_index = */ true
             );
         }
 
@@ -956,13 +988,22 @@ private:
      ************ Public overrides ************
      ******************************************/
 private:
+    template<bool accrow_>
+    Index_ full_secondary_length() const {
+        if constexpr(accrow_) {
+            return ncols;
+        } else {
+            return nrows;
+        }
+    }
+
     template<bool accrow_, tatami::DimensionSelectionType selection_, bool sparse_>
     struct Hdf5SparseExtractor : public tatami::Extractor<selection_, sparse_, Value_, Index_> {
         typedef typename std::conditional<row_ == accrow_, PrimaryWorkspace, SecondaryWorkspace>::type CoreWorkspace;
 
         Hdf5SparseExtractor(const Hdf5CompressedSparseMatrix* p, const tatami::Options& opt) : parent(p) {
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
-                this->full_length = (accrow_ ? parent->ncols : parent->nrows);
+                this->full_length = parent->template full_secondary_length<accrow_>();
             }
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
@@ -1059,7 +1100,7 @@ private:
             Hdf5SparseExtractor<accrow_, selection_, false>(p, opt, std::forward<Args_>(args)...)
         {
             if constexpr(row_ == accrow_) {
-                this->parent->initialize_lru_cache(this->core->historian, true);
+                this->parent->initialize_lru_cache(this->core->historian, true, true);
             }
         }
 
@@ -1093,7 +1134,11 @@ private:
             Hdf5SparseExtractor<accrow_, selection_, true>(p, opt, std::forward<Args_>(args)...), needs_value(opt.sparse_extract_value), needs_index(opt.sparse_extract_index) 
         {
             if constexpr(row_ == accrow_) {
-                this->parent->initialize_lru_cache(this->core->historian, needs_value);
+                bool needs_cached_index = true;
+                if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
+                    needs_cached_index = needs_index;
+                }
+                this->parent->initialize_lru_cache(this->core->historian, needs_value, needs_cached_index);
             }
         }
 
@@ -1101,7 +1146,10 @@ private:
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 if constexpr(row_ == accrow_) {
                     if (needs_index || needs_value) {
-                        return this->parent->extract_primary(i, vbuffer, ibuffer, 0, this->full_length, *(this->core), needs_value, needs_index);
+                        // If we aren't asked to report the index, and we don't need it to slice the
+                        // secondary dimension (because we're extracting the entirety of the dimension),
+                        // then we don't need to load and cache the indices either.
+                        return this->parent->extract_primary(i, vbuffer, ibuffer, 0, this->full_length, *(this->core), needs_value, needs_index, /* needs_cached_indices = */ needs_index);
                     } else {
                         // Quick return is possible if we don't need any indices or values.
                         return tatami::SparseRange<Value_, Index_>(this->parent->pointers[i+1] - this->parent->pointers[i], NULL, NULL);
@@ -1111,7 +1159,7 @@ private:
                 }
             } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 if constexpr(row_ == accrow_) {
-                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index);
+                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index, /* needs_cached_indices = */ true);
                 } else {
                     return this->parent->extract_secondary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index);
                 }
