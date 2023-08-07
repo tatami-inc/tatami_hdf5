@@ -387,7 +387,7 @@ $(function() {
 <div class="line"><a id="l00358" name="l00358"></a><span class="lineno">  358</span>                        TATAMI_HDF5_PARALLEL_LOCK([&amp;]() -&gt; <span class="keywordtype">void</span> {</div>
 <div class="line"><a id="l00359" name="l00359"></a><span class="lineno">  359</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00360" name="l00360"></a><span class="lineno">  360</span> </div>
-<div class="line"><a id="l00361" name="l00361"></a><span class="lineno">  361</span>                        actual_dim = extract_chunk&lt;accrow_&gt;(chunk, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);</div>
+<div class="line"><a id="l00361" name="l00361"></a><span class="lineno">  361</span>                        actual_dim = extract_chunk&lt;accrow_&gt;(<span class="keywordtype">id</span>, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);</div>
 <div class="line"><a id="l00362" name="l00362"></a><span class="lineno">  362</span> </div>
 <div class="line"><a id="l00363" name="l00363"></a><span class="lineno">  363</span><span class="preprocessor">#ifndef TATAMI_HDF5_PARALLEL_LOCK</span></div>
 <div class="line"><a id="l00364" name="l00364"></a><span class="lineno">  364</span>                        }</div>
@@ -522,7 +522,7 @@ $(function() {
 <div class="line"><a id="l00493" name="l00493"></a><span class="lineno">  493</span>    };</div>
 <div class="line"><a id="l00494" name="l00494"></a><span class="lineno">  494</span> </div>
 <div class="line"><a id="l00495" name="l00495"></a><span class="lineno">  495</span>    <span class="keyword">template</span>&lt;<span class="keywordtype">bool</span> accrow_, <a class="code hl_enumerationRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a0a2ecaf58e2b69bb4a808e814aeb16a1">tatami::DimensionSelectionType</a> selection_, <span class="keyword">typename</span> ... Args_&gt;</div>
-<div class="line"><a id="l00496" name="l00496"></a><span class="lineno">  496</span>    std::unique_ptr&lt;tatami::Extractor&lt;selection_, false, Value_, Index_&gt; &gt; populate(<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt, Args_&amp;&amp;... args)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00496" name="l00496"></a><span class="lineno">  496</span>    std::unique_ptr&lt;tatami::Extractor&lt;selection_, false, Value_, Index_&gt; &gt; populate(<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp;, Args_&amp;&amp;... args)<span class="keyword"> const </span>{</div>
 <div class="line"><a id="l00497" name="l00497"></a><span class="lineno">  497</span>        <span class="keywordflow">return</span> std::unique_ptr&lt;tatami::Extractor&lt;selection_, false, Value_, Index_&gt; &gt;(<span class="keyword">new</span> Hdf5Extractor&lt;accrow_, selection_&gt;(<span class="keyword">this</span>, std::forward&lt;Args_&gt;(args)...));</div>
 <div class="line"><a id="l00498" name="l00498"></a><span class="lineno">  498</span>    }</div>
 <div class="line"><a id="l00499" name="l00499"></a><span class="lineno">  499</span> </div>
