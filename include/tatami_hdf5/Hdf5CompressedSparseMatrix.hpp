@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <algorithm>
 
+#include "serialize.hpp"
 #include "utils.hpp"
 #include "tatami_chunked/tatami_chunked.hpp"
 
@@ -36,9 +37,7 @@ namespace tatami_hdf5 {
  * as the access pattern on disk for the non-preferred dimension is very suboptimal.
  *
  * As the HDF5 library is not generally thread-safe, the HDF5-related operations should only be run in a single thread.
- * For OpenMP, this is handled automatically by putting all HDF5 operations in a critical region.
- * For other parallelization schemes, callers should define the `TATAMI_HDF5_PARALLEL_LOCK` macro;
- * this should be a function that accepts and executes a no-argument lambda within an appropriate serial region (e.g., based on a global mutex).
+ * This is normally handled automatically but developers can check out `serialize()` to customize the locking scheme.
  *
  * @tparam row_ Whether the matrix is stored in compressed sparse row format.
  * @tparam Value_ Type of the matrix values.
@@ -75,44 +74,33 @@ public:
     Hdf5CompressedSparseMatrix(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, const Hdf5Options& options) :
         nrows(nr), ncols(nc), file_name(file), data_name(std::move(vals)), index_name(std::move(idx)), cache_size_limit(options.maximum_cache_size)
     {
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
-#else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
+        serialize([&]() -> void {
+            H5::H5File file_handle(file_name, H5F_ACC_RDONLY);
+            auto dhandle = open_and_check_dataset<false>(file_handle, data_name);
+            hsize_t nonzeros = get_array_dimensions<1>(dhandle, "vals")[0];
 
-        H5::H5File file_handle(file_name, H5F_ACC_RDONLY);
-        auto dhandle = open_and_check_dataset<false>(file_handle, data_name);
-        hsize_t nonzeros = get_array_dimensions<1>(dhandle, "vals")[0];
+            auto ihandle = open_and_check_dataset<true>(file_handle, index_name);
+            if (get_array_dimensions<1>(ihandle, "idx")[0] != nonzeros) {
+                throw std::runtime_error("number of non-zero elements is not consistent between 'data' and 'idx'");
+            }
 
-        auto ihandle = open_and_check_dataset<true>(file_handle, index_name);
-        if (get_array_dimensions<1>(ihandle, "idx")[0] != nonzeros) {
-            throw std::runtime_error("number of non-zero elements is not consistent between 'data' and 'idx'");
-        }
+            auto phandle = open_and_check_dataset<true>(file_handle, ptr);
+            size_t ptr_size = get_array_dimensions<1>(phandle, "ptr")[0];
+            size_t dim_p1 = static_cast<size_t>(row_ ? nrows : ncols) + 1;
+            if (ptr_size != dim_p1) {
+                throw std::runtime_error("'ptr' dataset should have length equal to the number of " + (row_ ? std::string("rows") : std::string("columns")) + " plus 1");
+            }
 
-        auto phandle = open_and_check_dataset<true>(file_handle, ptr);
-        size_t ptr_size = get_array_dimensions<1>(phandle, "ptr")[0];
-        size_t dim_p1 = static_cast<size_t>(row_ ? nrows : ncols) + 1;
-        if (ptr_size != dim_p1) {
-            throw std::runtime_error("'ptr' dataset should have length equal to the number of " + (row_ ? std::string("rows") : std::string("columns")) + " plus 1");
-        }
-
-        // Checking the contents of the index pointers.
-        pointers.resize(dim_p1);
-        phandle.read(pointers.data(), H5::PredType::NATIVE_HSIZE);
-        if (pointers[0] != 0) {
-            throw std::runtime_error("first index pointer should be zero");
-        }
-        if (pointers.back() != nonzeros) {
-            throw std::runtime_error("last index pointer should be equal to the number of non-zero elements");
-        }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        }
-#else
+            // Checking the contents of the index pointers.
+            pointers.resize(dim_p1);
+            phandle.read(pointers.data(), H5::PredType::NATIVE_HSIZE);
+            if (pointers[0] != 0) {
+                throw std::runtime_error("first index pointer should be zero");
+            }
+            if (pointers.back() != nonzeros) {
+                throw std::runtime_error("last index pointer should be equal to the number of non-zero elements");
+            }
         });
-#endif
 
         max_non_zeros = 0;
         for (size_t i = 1; i < pointers.size(); ++i) {
@@ -320,28 +308,17 @@ private:
                 current_cache.length = extraction_len;
                 current_cache.bounded = bounded;
 
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                #pragma omp critical
-                {
-#else
-                TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-                work.dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
-                work.memspace.setExtentSimple(1, &extraction_len);
-                work.memspace.selectAll();
-                if (needs_cached_index) {
-                    work.index.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), work.memspace, work.dataspace);
-                }
-                if (needs_value) {
-                    work.data.read(current_cache.value.data(), define_mem_type<CachedValue_>(), work.memspace, work.dataspace);
-                }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                }
-#else
+                serialize([&]() -> void {
+                    work.dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
+                    work.memspace.setExtentSimple(1, &extraction_len);
+                    work.memspace.selectAll();
+                    if (needs_cached_index) {
+                        work.index.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), work.memspace, work.dataspace);
+                    }
+                    if (needs_value) {
+                        work.data.read(current_cache.value.data(), define_mem_type<CachedValue_>(), work.memspace, work.dataspace);
+                    }
                 });
-#endif
             }
         );
 
@@ -513,52 +490,41 @@ private:
             // This should improve re-use of partially read chunks inside the HDF5 call.
             sort_by_field(pred.needed, [&pred](size_t i) -> size_t { return pred.next_cache_data[i].data_offset; });
 
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            #pragma omp critical
-            {
-#else
-            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
+            serialize([&]() -> void {
+                size_t sofar = 0;
+                hsize_t combined_len = 0;
+                work.dataspace.selectNone();
 
-            size_t sofar = 0;
-            hsize_t combined_len = 0;
-            work.dataspace.selectNone();
+                while (sofar < pred.needed.size()) {
+                    auto& first = pred.next_cache_data[pred.needed[sofar]];
+                    first.mem_offset = dest_offset + combined_len;
+                    hsize_t src_offset = first.data_offset;
+                    hsize_t len = first.length;
+                    ++sofar;
 
-            while (sofar < pred.needed.size()) {
-                auto& first = pred.next_cache_data[pred.needed[sofar]];
-                first.mem_offset = dest_offset + combined_len;
-                hsize_t src_offset = first.data_offset;
-                hsize_t len = first.length;
-                ++sofar;
-
-                // Finding the stretch of consecutive extractions, and bundling them into a single hyperslab.
-                for (; sofar < pred.needed.size(); ++sofar) {
-                    auto& next = pred.next_cache_data[pred.needed[sofar]];
-                    if (src_offset + len < next.data_offset) {
-                        break;
+                    // Finding the stretch of consecutive extractions, and bundling them into a single hyperslab.
+                    for (; sofar < pred.needed.size(); ++sofar) {
+                        auto& next = pred.next_cache_data[pred.needed[sofar]];
+                        if (src_offset + len < next.data_offset) {
+                            break;
+                        }
+                        next.mem_offset = first.mem_offset + len;
+                        len += next.length;
                     }
-                    next.mem_offset = first.mem_offset + len;
-                    len += next.length;
+
+                    work.dataspace.selectHyperslab(H5S_SELECT_OR, &len, &src_offset);
+                    combined_len += len;
                 }
 
-                work.dataspace.selectHyperslab(H5S_SELECT_OR, &len, &src_offset);
-                combined_len += len;
-            }
-
-            work.memspace.setExtentSimple(1, &combined_len);
-            work.memspace.selectAll();
-            if (needs_cached_index) {
-                work.index.read(pred.cache_index.data() + dest_offset, define_mem_type<Index_>(), work.memspace, work.dataspace);
-            }
-            if (needs_value) {
-                work.data.read(pred.cache_value.data() + dest_offset, define_mem_type<Value_>(), work.memspace, work.dataspace);
-            }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            }
-#else
+                work.memspace.setExtentSimple(1, &combined_len);
+                work.memspace.selectAll();
+                if (needs_cached_index) {
+                    work.index.read(pred.cache_index.data() + dest_offset, define_mem_type<Index_>(), work.memspace, work.dataspace);
+                }
+                if (needs_value) {
+                    work.data.read(pred.cache_value.data() + dest_offset, define_mem_type<Value_>(), work.memspace, work.dataspace);
+                }
             });
-#endif
         }
 
         pred.cache_data.swap(pred.next_cache_data);
@@ -863,23 +829,12 @@ private:
 
     template<class Function_>
     void extract_secondary_raw_loop(size_t i, Function_ fill, Index_ start, Index_ length, SecondaryWorkspace& core, bool needs_value) const {
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
-#else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-        Index_ end = start + length;
-        for (Index_ j = start; j < end; ++j) {
-            extract_secondary_raw(j, i, fill, core, needs_value);
-        }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK 
-        }
-#else
+        serialize([&]() -> void {
+            Index_ end = start + length;
+            for (Index_ j = start; j < end; ++j) {
+                extract_secondary_raw(j, i, fill, core, needs_value);
+            }
         });
-#endif
     }
 
     const Value_* extract_secondary(size_t i, Value_* buffer, Index_ start, Index_ length, SecondaryWorkspace& core) const {
@@ -929,24 +884,13 @@ private:
 
     template<class Function_, class Skip_>
     void extract_secondary_raw_loop(size_t i, Function_ fill, Skip_ skip, const std::vector<Index_>& indices, SecondaryWorkspace& core, bool needs_value) const {
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
-#else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-        for (auto j : indices) {
-            if (!extract_secondary_raw(j, i, fill, core, needs_value)) {
-                skip();
+        serialize([&]() -> void {
+            for (auto j : indices) {
+                if (!extract_secondary_raw(j, i, fill, core, needs_value)) {
+                    skip();
+                }
             }
-        }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK 
-        }
-#else
         });
-#endif
     }
 
     const Value_* extract_secondary(size_t i, Value_* buffer, const std::vector<Index_>& indices, SecondaryWorkspace& core) const {
@@ -1018,27 +962,16 @@ private:
                 this->full_length = parent->template full_secondary_length<accrow_>();
             }
 
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            #pragma omp critical
-            {
-#else
-            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
+            serialize([&]() -> void {
+                core.reset(new CoreWorkspace);
 
-            core.reset(new CoreWorkspace);
-
-            // TODO: set more suitable chunk cache values here, to avoid re-reading
-            // chunks that are only partially consumed.
-            core->file.openFile(parent->file_name, H5F_ACC_RDONLY);
-            core->data = core->file.openDataSet(parent->data_name);
-            core->index = core->file.openDataSet(parent->index_name);
-            core->dataspace = core->data.getSpace();
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            }
-#else
+                // TODO: set more suitable chunk cache values here, to avoid re-reading
+                // chunks that are only partially consumed.
+                core->file.openFile(parent->file_name, H5F_ACC_RDONLY);
+                core->data = core->file.openDataSet(parent->data_name);
+                core->index = core->file.openDataSet(parent->index_name);
+                core->dataspace = core->data.getSpace();
             });
-#endif
 
             if constexpr(row_ == accrow_) {
                 if (opt.cache_for_reuse) {
@@ -1065,20 +998,9 @@ private:
         ~Hdf5SparseExtractor() {
             // Destructor also needs to be made thread-safe;
             // this is why the workspace is a pointer.
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            #pragma omp critical
-            {
-#else
-            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-            core.reset();
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            }
-#else
+            serialize([&]() -> void {
+                core.reset();
             });
-#endif
         }
 
     protected:
