@@ -10,6 +10,7 @@
 #include <list>
 #include <vector>
 
+#include "default_lock.hpp"
 #include "utils.hpp"
 #include "tatami_chunked/tatami_chunked.hpp"
 
@@ -37,9 +38,7 @@ namespace tatami_hdf5 {
  * If they do not, the access pattern on disk may be slightly to highly suboptimal, depending on the chunk dimensions.
  *
  * As the HDF5 library is not generally thread-safe, the HDF5-related operations should only be run in a single thread.
- * For OpenMP, this is handled automatically by putting all HDF5 operations in a critical region.
- * For other parallelization schemes, callers should define the `TATAMI_HDF5_PARALLEL_LOCK` macro;
- * this should be a function that accepts and executes a no-argument lambda within an appropriate serial region (e.g., based on a global mutex).
+ * This is normally handled automatically but developers can check out `serialize()` to customize the locking scheme.
  *
  * @tparam Value_ Type of the matrix values.
  * @tparam Index_ Type of the row/column indices.
@@ -71,36 +70,25 @@ public:
         cache_size_in_elements(static_cast<double>(options.maximum_cache_size) / sizeof(CachedValue_)),
         require_minimum_cache(options.require_minimum_cache)
     {
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        #pragma omp critical
-        {
-#else
-        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
+        serialize([&]() -> void {
+            H5::H5File fhandle(file_name, H5F_ACC_RDONLY);
+            auto dhandle = open_and_check_dataset<false>(fhandle, dataset_name);
+            auto dims = get_array_dimensions<2>(dhandle, dataset_name);
+            firstdim = dims[0];
+            seconddim = dims[1];
 
-        H5::H5File fhandle(file_name, H5F_ACC_RDONLY);
-        auto dhandle = open_and_check_dataset<false>(fhandle, dataset_name);
-        auto dims = get_array_dimensions<2>(dhandle, dataset_name);
-        firstdim = dims[0];
-        seconddim = dims[1];
-
-        auto dparms = dhandle.getCreatePlist();
-        if (dparms.getLayout() != H5D_CHUNKED) {
-            // If contiguous, each firstdim is treated as a chunk.
-            chunk_firstdim = 1;
-            chunk_seconddim = seconddim;
-        } else {
-            hsize_t chunk_dims[2];
-            dparms.getChunk(2, chunk_dims);
-            chunk_firstdim = chunk_dims[0];
-            chunk_seconddim = chunk_dims[1];
-        }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-        }
-#else
+            auto dparms = dhandle.getCreatePlist();
+            if (dparms.getLayout() != H5D_CHUNKED) {
+                // If contiguous, each firstdim is treated as a chunk.
+                chunk_firstdim = 1;
+                chunk_seconddim = seconddim;
+            } else {
+                hsize_t chunk_dims[2];
+                dparms.getChunk(2, chunk_dims);
+                chunk_firstdim = chunk_dims[0];
+                chunk_seconddim = chunk_dims[1];
+            }
         });
-#endif
 
         // Favoring extraction on the dimension that involves pulling out fewer chunks per dimension element.
         double chunks_per_firstdim = static_cast<double>(seconddim)/static_cast<double>(chunk_seconddim);
@@ -273,20 +261,9 @@ private:
         auto& cache_workspace = work.cache_workspace;
 
         if (cache_workspace.num_slabs_in_cache == 0) {
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            #pragma omp critical
-            {
-#else
-            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
+            serialize([&]() -> void {
                 extract_base<accrow_>(i, 1, buffer, extract_value, extract_length, work);
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            }
-#else
             });
-#endif
 
         } else {
             const CachedValue_* ptr;
@@ -307,26 +284,15 @@ private:
                             to_transpose.clear();
                         }
 
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                        #pragma omp critical
-                        {
-#else
-                        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-                        for (const auto& c : chunks_in_need) {
-                            auto& cache_target = *(chunk_data[c.second]);
-                            auto actual_dim = this->extract_chunk<accrow_>(c.first, mydim, chunk_mydim, cache_target.data(), extract_value, extract_length, work);
-                            if constexpr(accrow_ == transpose_) {
-                                to_transpose.emplace_back(c.second, actual_dim);
+                        serialize([&]() -> void {
+                            for (const auto& c : chunks_in_need) {
+                                auto& cache_target = *(chunk_data[c.second]);
+                                auto actual_dim = this->extract_chunk<accrow_>(c.first, mydim, chunk_mydim, cache_target.data(), extract_value, extract_length, work);
+                                if constexpr(accrow_ == transpose_) {
+                                    to_transpose.emplace_back(c.second, actual_dim);
+                                }
                             }
-                        }
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                        }
-#else
                         });
-#endif
 
                         // Applying transpositions to all cached buffers for easier retrieval, but only once the lock is released.
                         if constexpr(accrow_ == transpose_) {
@@ -350,21 +316,9 @@ private:
                     },
                     /* populate = */ [&](Index_ id, std::vector<CachedValue_>& chunk_contents) -> void {
                         Index_ actual_dim;
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                        #pragma omp critical
-                        {
-#else
-                        TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-                        actual_dim = extract_chunk<accrow_>(id, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-                        }
-#else
+                        serialize([&]() -> void {
+                            actual_dim = extract_chunk<accrow_>(id, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);
                         });
-#endif
 
                         // Applying a transposition for easier retrieval, but only once the lock is released.
                         if constexpr(accrow_ == transpose_) {
@@ -411,20 +365,9 @@ private:
         ~Hdf5Extractor() {
             // Destructor also needs to be made thread-safe;
             // this is why the workspace is a pointer.
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            #pragma omp critical
-            {
-#else
-            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
-
-            base.reset();
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            }
-#else
+            serialize([&]() -> void {
+                base.reset();
             });
-#endif
         }
 
     protected:
@@ -434,31 +377,20 @@ private:
 
     private:
         void initialize_workspace(Index_ other_dim) {
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            #pragma omp critical
-            {
-#else
-            TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
-#endif
+            serialize([&]() -> void {
+                base.reset(new Workspace<accrow_>());
 
-            base.reset(new Workspace<accrow_>());
+                // Turn off HDF5's caching, as we'll be handling that. This allows us
+                // to parallelize extractions without locking when the data has already
+                // been loaded into memory; if we just used HDF5's cache, we would have
+                // to lock on every extraction, given the lack of thread safety.
+                H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
+                fapl.setCache(0, 0, 0, 0);
 
-            // Turn off HDF5's caching, as we'll be handling that. This allows us
-            // to parallelize extractions without locking when the data has already
-            // been loaded into memory; if we just used HDF5's cache, we would have
-            // to lock on every extraction, given the lack of thread safety.
-            H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
-            fapl.setCache(0, 0, 0, 0);
-
-            base->file.openFile(parent->file_name, H5F_ACC_RDONLY, fapl);
-            base->dataset = base->file.openDataSet(parent->dataset_name);
-            base->dataspace = base->dataset.getSpace();
-
-#ifndef TATAMI_HDF5_PARALLEL_LOCK
-            }
-#else
+                base->file.openFile(parent->file_name, H5F_ACC_RDONLY, fapl);
+                base->dataset = base->file.openDataSet(parent->dataset_name);
+                base->dataspace = base->dataset.getSpace();
             });
-#endif
 
             base->cache_workspace = tatami_chunked::TypicalSlabCacheWorkspace<Index_, Slab>(
                 (accrow_ != transpose_ ? parent->chunk_firstdim : parent->chunk_seconddim),
