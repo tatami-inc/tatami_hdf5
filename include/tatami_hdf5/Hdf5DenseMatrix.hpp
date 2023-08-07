@@ -358,7 +358,7 @@ private:
                         TATAMI_HDF5_PARALLEL_LOCK([&]() -> void {
 #endif
 
-                        actual_dim = extract_chunk<accrow_>(chunk, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);
+                        actual_dim = extract_chunk<accrow_>(id, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);
 
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
                         }
@@ -493,7 +493,7 @@ private:
     };
 
     template<bool accrow_, tatami::DimensionSelectionType selection_, typename ... Args_>
-    std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > populate(const tatami::Options& opt, Args_&&... args) const {
+    std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > populate(const tatami::Options&, Args_&&... args) const {
         return std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> >(new Hdf5Extractor<accrow_, selection_>(this, std::forward<Args_>(args)...));
     }
 

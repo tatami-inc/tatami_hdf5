@@ -31,6 +31,8 @@ macro(create_h5test target)
     )
     target_compile_definitions(${target} PRIVATE DEBUG=1)
 
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+
     target_link_libraries(${target} gtest_main tatami_hdf5)
 
     if (NOT HAVE_CXX_FS) 

@@ -204,17 +204,17 @@ void update_hdf5_stats(const tatami::SparseRange<Value_, Index_>& extracted, Wri
     output.non_zeros += extracted.number;
 
     if (infer_value) {
-        for (size_t i = 0; i < extracted.number; ++i) {
+        for (Index_ i = 0; i < extracted.number; ++i) {
             output.add_value(extracted.value[i]);
         }
     }
 
     if (infer_index) {
-        for (size_t i = 0; i < extracted.number; ++i) {
+        for (Index_ i = 0; i < extracted.number; ++i) {
             output.add_index(extracted.index[i]);
         }
     }
-};
+}
 
 template<typename Value_, typename Index_>
 void update_hdf5_stats(const Value_* extracted, Index_ n, WriteSparseHdf5Statistics<Value_, Index_>& output) {
@@ -227,7 +227,7 @@ void update_hdf5_stats(const Value_* extracted, Index_ n, WriteSparseHdf5Statist
         output.add_value(val);
         output.add_index(i);
     }
-};
+}
 
 template<typename Value_, typename Index_>
 WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tatami::Matrix<Value_, Index_>* mat, bool infer_value, bool infer_index, int nthreads) {
