@@ -84,7 +84,7 @@ public:
 
         H5::H5File file_handle(file_name, H5F_ACC_RDONLY);
         auto dhandle = open_and_check_dataset<false>(file_handle, data_name);
-        const Index_ nonzeros = get_array_dimensions<1>(dhandle, "vals")[0];
+        hsize_t nonzeros = get_array_dimensions<1>(dhandle, "vals")[0];
 
         auto ihandle = open_and_check_dataset<true>(file_handle, index_name);
         if (get_array_dimensions<1>(ihandle, "idx")[0] != nonzeros) {
@@ -92,8 +92,8 @@ public:
         }
 
         auto phandle = open_and_check_dataset<true>(file_handle, ptr);
-        const Index_ ptr_size = get_array_dimensions<1>(phandle, "ptr")[0];
-        auto dim_p1 = static_cast<size_t>(row_ ? nrows : ncols) + 1;
+        size_t ptr_size = get_array_dimensions<1>(phandle, "ptr")[0];
+        size_t dim_p1 = static_cast<size_t>(row_ ? nrows : ncols) + 1;
         if (ptr_size != dim_p1) {
             throw std::runtime_error("'ptr' dataset should have length equal to the number of " + (row_ ? std::string("rows") : std::string("columns")) + " plus 1");
         }
@@ -230,6 +230,8 @@ private:
 
         // Cache for re-use.
         std::vector<std::pair<size_t, size_t> > extraction_bounds;
+
+        static constexpr size_t no_extraction_bound = -1;
     };
 
     void initialize_lru_cache(std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> >& historian, bool needs_value) const {
@@ -300,7 +302,7 @@ private:
 
                 if (work.extraction_bounds.size()) {
                     const auto& current = work.extraction_bounds[i];
-                    if (current.first != -1) {
+                    if (current.first != PrimaryWorkspace::no_extraction_bound) {
                         bounded = true;
                         extraction_start = current.first;
                         extraction_len = current.second;
@@ -382,9 +384,9 @@ private:
         // reads, but that works out to be no more than one extra copy per
         // fetch() call, which is tolerable. I suppose we could do better
         // by defragmenting within this buffer but that's probably overkill.
-        if (pred.max_cache_elements == -1) {
+        if (pred.max_cache_elements == static_cast<size_t>(-1)) {
             pred.max_cache_elements = cache_size_limit / ((needs_value ? sizeof(CachedValue_) : 0) + sizeof(CachedIndex_));
-            if (pred.max_cache_elements < max_non_zeros) {
+            if (pred.max_cache_elements < static_cast<size_t>(max_non_zeros)) {
                 pred.max_cache_elements = max_non_zeros; // make sure we have enough space to store the largest possible primary dimension element.
             }
             pred.cache_index.resize(pred.max_cache_elements);
@@ -432,7 +434,7 @@ private:
 
             if (work.extraction_bounds.size()) {
                 const auto& bounds = work.extraction_bounds[current];
-                if (bounds.first != -1) {
+                if (bounds.first != PrimaryWorkspace::no_extraction_bound) {
                     bounded = true;
                     extraction_start = bounds.first;
                     extraction_len = bounds.second;
@@ -569,7 +571,7 @@ private:
             bool hit = false;
             if (work.extraction_bounds.size()) {
                 auto& target = work.extraction_bounds[i];
-                if (target.first != -1) {
+                if (target.first != PrimaryWorkspace::no_extraction_bound) {
                     hit = true;
                     offset = target.first - pointers[i];
                     istart += offset;
@@ -586,7 +588,7 @@ private:
 
         if (work.extraction_bounds.size()) {
             auto& target = work.extraction_bounds[i];
-            if (target.first == -1) {
+            if (target.first == PrimaryWorkspace::no_extraction_bound) {
                 target.first = pointers[i] + offset;
                 target.second = iterated;
             }
@@ -825,7 +827,7 @@ private:
 #endif
 
         Index_ end = start + length;
-        for (size_t j = start; j < end; ++j) {
+        for (Index_ j = start; j < end; ++j) {
             extract_secondary_raw(j, i, fill, core, needs_value);
         }
 
@@ -907,7 +909,7 @@ private:
         std::fill(buffer, buffer + indices.size(), 0);
         auto original = buffer;
         extract_secondary_raw_loop(i, 
-            [&](Index_ pos, Value_ value) -> void {
+            [&](Index_, Value_ value) -> void {
                 *buffer = value;
                 ++buffer;
             }, 
