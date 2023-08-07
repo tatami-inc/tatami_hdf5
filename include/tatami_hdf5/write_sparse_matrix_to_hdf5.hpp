@@ -163,7 +163,13 @@ bool fits_lower_limit(int64_t min) {
     int64_t limit = std::numeric_limits<Native>::min();
     return limit <= min;
 }
+/**
+ * @endcond
+ */
 
+/**
+ * @cond
+ */
 template<typename Value_, typename Index_>
 struct WriteSparseHdf5Statistics {
     Value_ lower_data = 0;
@@ -171,6 +177,26 @@ struct WriteSparseHdf5Statistics {
     Index_ upper_index = 0;
     hsize_t non_zeros = 0;
     bool non_integer = false;
+
+    void add_value(Value_ val) {
+        if constexpr(!std::is_integral<Value_>::value) {
+            if (std::trunc(val) != val || !std::isfinite(val)) {
+                non_integer = true;
+            }
+        }
+
+        if (val < lower_data) {
+            lower_data = val;
+        } else if (val > upper_data) {
+            upper_data = val;
+        }
+    }
+
+    void add_index(Index_ idx) {
+        if (idx > upper_index) {
+            upper_index = idx;
+        }
+    }
 };
 
 template<typename Value_, typename Index_>
@@ -179,29 +205,27 @@ void update_hdf5_stats(const tatami::SparseRange<Value_, Index_>& extracted, Wri
 
     if (infer_value) {
         for (size_t i = 0; i < extracted.number; ++i) {
-            auto val = extracted.value[i];
-
-            if constexpr(!std::is_integral<Value_>::value) {
-                if (std::trunc(val) != val || std::isinf(val)) {
-                    output.non_integer = true;
-                }
-            }
-
-            if (val < output.lower_data) {
-                output.lower_data = val;
-            } else if (val > output.upper_data) {
-                output.upper_data = val;
-            }
+            output.add_value(extracted.value[i]);
         }
     }
 
     if (infer_index) {
         for (size_t i = 0; i < extracted.number; ++i) {
-            auto idx = extracted.index[i];
-            if (idx > output.upper_index) {
-                output.upper_index = idx;
-            }
+            output.add_index(extracted.index[i]);
         }
+    }
+};
+
+template<typename Value_, typename Index_>
+void update_hdf5_stats(const Value_* extracted, Index_ n, WriteSparseHdf5Statistics<Value_, Index_>& output) {
+    for (Index_ i = 0; i < n; ++i) {
+        auto val = extracted[i];
+        if (val == 0) {
+            continue;
+        }
+        ++output.non_zeros;
+        output.add_value(val);
+        output.add_index(i);
     }
 };
 
@@ -210,31 +234,55 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
     auto NR = mat->nrow(), NC = mat->ncol();
     std::vector<WriteSparseHdf5Statistics<Value_, Index_> > collected(nthreads);
 
-    tatami::Options opt;
-    opt.sparse_extract_index = infer_index;
-    opt.sparse_extract_value = infer_value;
+    if (mat->sparse()) {
+        tatami::Options opt;
+        opt.sparse_extract_index = infer_index;
+        opt.sparse_extract_value = infer_value;
 
-    if (mat->prefer_rows()) {
-        tatami::parallelize([&](size_t t, Index_ start, Index_ len) -> void {
-            auto wrk = tatami::consecutive_extractor<true, true>(mat, start, len, opt);
-            std::vector<Value_> xbuffer(NC);
-            std::vector<Index_> ibuffer(NC);
-            for (size_t r = start, end = start + len; r < end; ++r) {
-                auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
-                update_hdf5_stats(extracted, collected[t], infer_value, infer_index);
-            }
-        }, NR, nthreads);
+        if (mat->prefer_rows()) {
+            tatami::parallelize([&](size_t t, Index_ start, Index_ len) -> void {
+                auto wrk = tatami::consecutive_extractor<true, true>(mat, start, len, opt);
+                std::vector<Value_> xbuffer(NC);
+                std::vector<Index_> ibuffer(NC);
+                for (size_t r = start, end = start + len; r < end; ++r) {
+                    auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
+                    update_hdf5_stats(extracted, collected[t], infer_value, infer_index);
+                }
+            }, NR, nthreads);
+
+        } else {
+            tatami::parallelize([&](size_t t, Index_ start, Index_ len) -> void {
+                auto wrk = tatami::consecutive_extractor<false, true>(mat, start, len, opt);
+                std::vector<Value_> xbuffer(NR);
+                std::vector<Index_> ibuffer(NR);
+                for (size_t c = start, end = start + len; c < end; ++c) {
+                    auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
+                    update_hdf5_stats(extracted, collected[t], infer_value, infer_index);
+                }
+            }, NC, nthreads);
+        }
 
     } else {
-        tatami::parallelize([&](size_t t, Index_ start, Index_ len) -> void {
-            auto wrk = tatami::consecutive_extractor<false, true>(mat, start, len, opt);
-            std::vector<Value_> xbuffer(NR);
-            std::vector<Index_> ibuffer(NR);
-            for (size_t c = start, end = start + len; c < end; ++c) {
-                auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
-                update_hdf5_stats(extracted, collected[t], infer_value, infer_index);
-            }
-        }, NC, nthreads);
+        if (mat->prefer_rows()) {
+            tatami::parallelize([&](size_t t, Index_ start, Index_ len) -> void {
+                auto wrk = tatami::consecutive_extractor<true, false>(mat, start, len);
+                std::vector<Value_> xbuffer(NC);
+                for (size_t r = start, end = start + len; r < end; ++r) {
+                    auto extracted = wrk->fetch(r, xbuffer.data());
+                    update_hdf5_stats(extracted, NC, collected[t]);
+                }
+            }, NR, nthreads);
+
+        } else {
+            tatami::parallelize([&](size_t t, Index_ start, Index_ len) -> void {
+                auto wrk = tatami::consecutive_extractor<false, false>(mat, start, len);
+                std::vector<Value_> xbuffer(NR);
+                for (size_t c = start, end = start + len; c < end; ++c) {
+                    auto extracted = wrk->fetch(c, xbuffer.data());
+                    update_hdf5_stats(extracted, NR, collected[t]);
+                }
+            }, NC, nthreads);
+        }
     }
 
     auto& first = collected.front();
@@ -262,6 +310,7 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
  * @tparam Index_ Type of the row/column indices.
  *
  * @param mat Pointer to the (presumably sparse) matrix to be written.
+ * If a dense matrix is supplied, only the non-zero elements will be saved.
  * @param location Handle to a HDF5 group in which to write the matrix contents.
  * @param params Parameters to use when writing the matrix.
  */
@@ -311,27 +360,7 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::
         }
     }
 
-    // And then saving it. This time we have no choice but to iterate by the desired dimension.
-    auto non_zeros = stats.non_zeros;
-    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, params.data_name, non_zeros, params.deflate_level, params.chunk_size);
-    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, params.index_name, non_zeros, params.deflate_level, params.chunk_size);
-    hsize_t count = 0, offset = 0;
-    H5::DataSpace inspace(1, &non_zeros);
-    H5::DataSpace outspace(1, &non_zeros);
-    const auto& dstype = define_mem_type<Value_>();
-    const auto& ixtype = define_mem_type<Index_>();
-
-    auto fill_datasets = [&](const tatami::SparseRange<Value_, Index_>& extracted) -> void {
-        count = extracted.number;
-        if (count) {
-            inspace.setExtentSimple(1, &count);
-            outspace.selectHyperslab(H5S_SELECT_SET, &count, &offset);
-            data_ds.write(extracted.value, dstype, inspace, outspace);
-            index_ds.write(extracted.index, ixtype, inspace, outspace);
-            offset += count;
-        }
-    };
-
+    // Choosing the layout.
     auto layout = params.columnar;
     if (layout == WriteSparseMatrixToHdf5Parameters::StorageLayout::AUTOMATIC) {
         if (mat->prefer_rows()) {
@@ -341,27 +370,92 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::
         }
     }
 
+    // And then saving it. This time we have no choice but to iterate by the desired dimension.
+    auto non_zeros = stats.non_zeros;
+    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, params.data_name, non_zeros, params.deflate_level, params.chunk_size);
+    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, params.index_name, non_zeros, params.deflate_level, params.chunk_size);
+    hsize_t offset = 0;
+    H5::DataSpace inspace(1, &non_zeros);
+    H5::DataSpace outspace(1, &non_zeros);
+    const auto& dstype = define_mem_type<Value_>();
+    const auto& ixtype = define_mem_type<Index_>();
+
     size_t NR = mat->nrow(), NC = mat->ncol(); // use size_t to avoid overflow on +1.
     std::vector<hsize_t> ptrs;
-    if (layout == WriteSparseMatrixToHdf5Parameters::StorageLayout::ROW) {
-        ptrs.resize(NR + 1);
-        auto wrk = mat->sparse_row();
-        std::vector<Value_> xbuffer(NC);
-        std::vector<Index_> ibuffer(NC);
-        for (size_t r = 0; r < NR; ++r) {
-            auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
-            fill_datasets(extracted);
-            ptrs[r+1] = ptrs[r] + extracted.number;
+
+    auto fill_datasets = [&](const Value_* vptr, const Index_* iptr, hsize_t count) -> void {
+        if (count) {
+            inspace.setExtentSimple(1, &count);
+            outspace.selectHyperslab(H5S_SELECT_SET, &count, &offset);
+            data_ds.write(vptr, dstype, inspace, outspace);
+            index_ds.write(iptr, ixtype, inspace, outspace);
+            offset += count;
         }
+    };
+
+    if (mat->sparse()) {
+        if (layout == WriteSparseMatrixToHdf5Parameters::StorageLayout::ROW) {
+            ptrs.resize(NR + 1);
+            std::vector<Value_> xbuffer(NC);
+            std::vector<Index_> ibuffer(NC);
+
+            auto wrk = tatami::consecutive_extractor<true, true>(mat, static_cast<Index_>(0), static_cast<Index_>(NR));
+            for (size_t r = 0; r < NR; ++r) {
+                auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
+                fill_datasets(extracted.value, extracted.index, extracted.number);
+                ptrs[r+1] = ptrs[r] + extracted.number;
+            }
+
+        } else {
+            ptrs.resize(NC + 1);
+            std::vector<Value_> xbuffer(NR);
+            std::vector<Index_> ibuffer(NR);
+
+            auto wrk = tatami::consecutive_extractor<false, true>(mat, static_cast<Index_>(0), static_cast<Index_>(NC));
+            for (size_t c = 0; c < NC; ++c) {
+                auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
+                fill_datasets(extracted.value, extracted.index, extracted.number);
+                ptrs[c+1] = ptrs[c] + extracted.number;
+            }
+        }
+
     } else {
-        ptrs.resize(NC + 1);
-        auto wrk = mat->sparse_column();
-        std::vector<Value_> xbuffer(NR);
-        std::vector<Index_> ibuffer(NR);
-        for (size_t c = 0; c < NC; ++c) {
-            auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
-            fill_datasets(extracted);
-            ptrs[c+1] = ptrs[c] + extracted.number;
+        std::vector<Value_> sparse_xbuffer;
+        std::vector<Index_> sparse_ibuffer;
+        auto fill_datasets_from_dense = [&](const Value_* extracted, Index_ n) -> hsize_t {
+            sparse_xbuffer.clear();
+            sparse_ibuffer.clear();
+            for (Index_ i = 0; i < n; ++i) {
+                if (extracted[i]) {
+                    sparse_xbuffer.push_back(extracted[i]);
+                    sparse_ibuffer.push_back(i);
+                }
+            }
+
+            hsize_t count = sparse_xbuffer.size();
+            fill_datasets(sparse_xbuffer.data(), sparse_ibuffer.data(), count);
+            return count;
+        };
+
+        if (layout == WriteSparseMatrixToHdf5Parameters::StorageLayout::ROW) {
+            ptrs.resize(NR + 1);
+            std::vector<Value_> dbuffer(NC);
+            auto wrk = tatami::consecutive_extractor<true, false>(mat, static_cast<Index_>(0), static_cast<Index_>(NR));
+            for (size_t r = 0; r < NR; ++r) {
+                auto extracted = wrk->fetch(r, dbuffer.data());
+                auto count = fill_datasets_from_dense(extracted, NC);
+                ptrs[r+1] = ptrs[r] + count;
+            }
+
+        } else {
+            ptrs.resize(NC + 1);
+            std::vector<Value_> dbuffer(NR);
+            auto wrk = tatami::consecutive_extractor<false, false>(mat, static_cast<Index_>(0), static_cast<Index_>(NC));
+            for (size_t c = 0; c < NC; ++c) {
+                auto extracted = wrk->fetch(c, dbuffer.data());
+                auto count = fill_datasets_from_dense(extracted, NR);
+                ptrs[c+1] = ptrs[c] + count;
+            }
         }
     }
 

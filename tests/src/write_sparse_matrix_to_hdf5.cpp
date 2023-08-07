@@ -160,6 +160,66 @@ TEST_P(WriteSparseMatrixToHdf5BasicTest, SparseRow) {
     }
 }
 
+TEST_P(WriteSparseMatrixToHdf5BasicTest, DenseColumn) {
+    const size_t NR = 190, NC = 210;
+    auto vec = tatami_test::simulate_sparse_vector<double>(NR * NC, 0.05, 0, 100);
+    tatami::DenseColumnMatrix<double, int> mat(NR, NC, std::move(vec));
+
+    tatami_hdf5::WriteSparseMatrixToHdf5Parameters param_core;
+    param_core.num_threads = GetParam();
+
+    // Dumping it.
+    auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
+        auto mhandle = fhandle.createGroup("matrix");
+        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, param_core);
+    }
+
+    // Roundtripping.
+    {
+        auto reloaded = tatami_hdf5::load_hdf5_compressed_sparse_matrix<false, double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr");
+
+        auto mwrk = mat.dense_row();
+        auto rwrk = reloaded.dense_row();
+        for (size_t r = 0; r < NR; ++r) {
+            auto matrow = mwrk->fetch(r);
+            auto relrow = rwrk->fetch(r);
+            EXPECT_EQ(matrow, relrow);
+        }
+    }
+}
+
+TEST_P(WriteSparseMatrixToHdf5BasicTest, DenseRow) {
+    const size_t NR = 90, NC = 300;
+    auto vec = tatami_test::simulate_sparse_vector<double>(NR * NC, 0.05, 0, 100);
+    tatami::DenseRowMatrix<double, int> mat(NR, NC, std::move(vec));
+
+    tatami_hdf5::WriteSparseMatrixToHdf5Parameters param_core;
+    param_core.num_threads = GetParam();
+
+    // Dumping it.
+    auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
+        auto mhandle = fhandle.createGroup("matrix");
+        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, param_core);
+    }
+
+    // Roundtripping.
+    {
+        auto reloaded = tatami_hdf5::load_hdf5_compressed_sparse_matrix<true, double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr");
+
+        auto mwrk = mat.dense_row();
+        auto rwrk = reloaded.dense_row();
+        for (size_t r = 0; r < NR; ++r) {
+            auto matrow = mwrk->fetch(r);
+            auto relrow = rwrk->fetch(r);
+            EXPECT_EQ(matrow, relrow);
+        }
+    }
+}
+
 INSTANTIATE_TEST_CASE_P(
     WriteSparseMatrixToHdf5,
     WriteSparseMatrixToHdf5BasicTest,
