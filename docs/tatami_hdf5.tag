@@ -35,6 +35,19 @@
     </member>
   </compound>
   <compound kind="file">
+    <name>serialize.hpp</name>
+    <path>/github/workspace/include/tatami_hdf5/</path>
+    <filename>serialize_8hpp.html</filename>
+    <namespace>tatami_hdf5</namespace>
+    <member kind="function">
+      <type>void</type>
+      <name>serialize</name>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>a7e77c93d845d11169165ed14249970fd</anchor>
+      <arglist>(Function_ f)</arglist>
+    </member>
+  </compound>
+  <compound kind="file">
     <name>tatami_hdf5.hpp</name>
     <path>/github/workspace/include/tatami_hdf5/</path>
     <filename>tatami__hdf5_8hpp.html</filename>
@@ -273,6 +286,13 @@
       <anchorfile>namespacetatami__hdf5.html</anchorfile>
       <anchor>a9c60ce93385d89902f042f3c43fae5bb</anchor>
       <arglist>(const std::string &amp;file, const std::string &amp;name)</arglist>
+    </member>
+    <member kind="function">
+      <type>void</type>
+      <name>serialize</name>
+      <anchorfile>namespacetatami__hdf5.html</anchorfile>
+      <anchor>a7e77c93d845d11169165ed14249970fd</anchor>
+      <arglist>(Function_ f)</arglist>
     </member>
     <member kind="function">
       <type>void</type>

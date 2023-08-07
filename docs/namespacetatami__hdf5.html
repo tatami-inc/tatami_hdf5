@@ -104,6 +104,9 @@ Functions</h2></td></tr>
 <tr class="memitem:a9c60ce93385d89902f042f3c43fae5bb"><td class="memTemplParams" colspan="2">template&lt;typename Value_ , typename Index_  = int, class ValueStorage_  = std::vector&lt;Value_&gt;, bool transpose_ = false&gt; </td></tr>
 <tr class="memitem:a9c60ce93385d89902f042f3c43fae5bb"><td class="memTemplItemLeft" align="right" valign="top"><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1DenseMatrix.html">tatami::DenseMatrix</a>&lt;!transpose_, Value_, Index_, ValueStorage_ &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespacetatami__hdf5.html#a9c60ce93385d89902f042f3c43fae5bb">load_hdf5_dense_matrix</a> (const std::string &amp;file, const std::string &amp;name)</td></tr>
 <tr class="separator:a9c60ce93385d89902f042f3c43fae5bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7e77c93d845d11169165ed14249970fd"><td class="memTemplParams" colspan="2">template&lt;class Function_ &gt; </td></tr>
+<tr class="memitem:a7e77c93d845d11169165ed14249970fd"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespacetatami__hdf5.html#a7e77c93d845d11169165ed14249970fd">serialize</a> (Function_ f)</td></tr>
+<tr class="separator:a7e77c93d845d11169165ed14249970fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9a0cf7882b3882b88773db1b4a50e4bf"><td class="memTemplParams" colspan="2">template&lt;typename Value_ , typename Index_ &gt; </td></tr>
 <tr class="memitem:a9a0cf7882b3882b88773db1b4a50e4bf"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespacetatami__hdf5.html#a9a0cf7882b3882b88773db1b4a50e4bf">write_sparse_matrix_to_hdf5</a> (const <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a>&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location, const <a class="el" href="structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html">WriteSparseMatrixToHdf5Parameters</a> &amp;params)</td></tr>
 <tr class="separator:a9a0cf7882b3882b88773db1b4a50e4bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -237,6 +240,36 @@ template&lt;typename Value_ , typename Index_  = int, class ValueStorage_  = std
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>A <code>DenseMatrix</code> where all values are in memory. This differs from a <code><a class="el" href="classtatami__hdf5_1_1Hdf5DenseMatrix.html" title="Dense matrix backed by a DataSet in a HDF5 file.">Hdf5DenseMatrix</a></code>, where the loading of data is deferred until requested. </dd></dl>
+
+</div>
+</div>
+<a id="a7e77c93d845d11169165ed14249970fd" name="a7e77c93d845d11169165ed14249970fd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7e77c93d845d11169165ed14249970fd">&#9670;&#160;</a></span>serialize()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;class Function_ &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void tatami_hdf5::serialize </td>
+          <td>(</td>
+          <td class="paramtype">Function_&#160;</td>
+          <td class="paramname"><em>f</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p >Serialize a function's execution to avoid simultaneous calls to the (non-thread-safe) HDF5 library.</p>
+<p >If the <code>TATAMI_HDF5_PARALLEL_LOCK</code> macro is defined, it should be a function-like macro that accepts <code>f</code> and executes it in a serial section.</p>
+<p >If OpenMP is available, serialization is achieved by running <code>f</code> inside OpenMP critical regions named <code>"hdf5"</code>.</p>
+<p >Otherwise, we use a mutex from the standard <code>&lt;thread&gt;</code> library to guard the execution of <code>f</code>.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">f</td><td>Function to be run in a serial section. This accepts no arguments and returns no outputs. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
