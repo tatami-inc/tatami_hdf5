@@ -239,6 +239,8 @@ private:
     }
 
     void initialize_lru_cache(std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> >& historian, bool needs_value, bool needs_cached_index) const {
+        // This function should only be called if at least one of needs_value or needs_cached_index
+        // is true, otherwise element_size == 0 and we end up with divide-by-zero errors below.
         size_t element_size = size_of_cached_element(needs_value, needs_cached_index);
 
         // When we're defining the LRU cache, each slab element is set to the
@@ -393,13 +395,16 @@ private:
         // by defragmenting within this buffer but that's probably overkill.
 
         if (pred.max_cache_elements == static_cast<size_t>(-1)) {
-            size_t element_size = size_of_cached_element(needs_value, needs_cached_index);
+            size_t element_size = size_of_cached_element(needs_value, needs_cached_index); // should be non-zero by the time we get inside this function.
+
             pred.max_cache_elements = cache_size_limit / element_size;
             if (pred.max_cache_elements < static_cast<size_t>(max_non_zeros)) {
                 pred.max_cache_elements = max_non_zeros; // make sure we have enough space to store the largest possible primary dimension element.
             }
 
-            pred.cache_index.resize(pred.max_cache_elements);
+            if (needs_cached_index) {
+                pred.cache_index.resize(pred.max_cache_elements);
+            }
             if (needs_value) {
                 pred.cache_value.resize(pred.max_cache_elements);
             }
@@ -483,7 +488,6 @@ private:
 
                 for (const auto& p : pred.present) {
                     auto& info = pred.next_cache_data[p];
-                    auto isrc = pred.cache_index.begin() + info.mem_offset;
 
 #ifdef DEBUG
                     if (info.mem_offset < dest_offset) {
@@ -491,11 +495,15 @@ private:
                     }
 #endif
 
-                    std::copy(isrc, isrc + info.length, pred.cache_index.begin() + dest_offset);
+                    if (needs_cached_index) {
+                        auto isrc = pred.cache_index.begin() + info.mem_offset;
+                        std::copy(isrc, isrc + info.length, pred.cache_index.begin() + dest_offset);
+                    }
                     if (needs_value) {
                         auto vsrc = pred.cache_value.begin() + info.mem_offset;
                         std::copy(vsrc, vsrc + info.length, pred.cache_value.begin() + dest_offset); 
                     }
+
                     info.mem_offset = dest_offset;
                     dest_offset += info.length;
                 }
@@ -651,16 +659,21 @@ private:
         PrimaryWorkspace& work, 
         bool needs_value, 
         bool needs_index, 
-        bool must_cache_index) 
+        Index_ full_length) 
     const {
         Index_ counter = 0;
+        bool full_extraction = (start == 0 && length == full_length);
 
         if (length) {
             extract_primary_raw(i, 
 
                 [&](size_t num, const CachedIndex_* is, const CachedValue_* vs) -> Index_ {
-                    Index_ end = start + length;
-                    counter = std::lower_bound(is, is + num, static_cast<CachedIndex_>(end)) - is;
+                    if (full_extraction) {
+                        counter = num;
+                    } else {
+                        CachedIndex_ end = start + length;
+                        counter = std::lower_bound(is, is + num, end) - is;
+                    }
 
                     if (needs_index) {
                         std::copy(is, is + counter, ibuffer);
@@ -675,7 +688,7 @@ private:
                 start, 
                 work,
                 needs_value,
-                needs_index || must_cache_index
+                needs_index || !full_extraction
             );
         }
 
@@ -1154,10 +1167,8 @@ private:
             if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
                 if constexpr(row_ == accrow_) {
                     if (needs_index || needs_value) {
-                        // If we aren't asked to report the index, and we don't need it to slice the
-                        // secondary dimension (because we're extracting the entirety of the dimension),
-                        // then we don't need to load and cache the indices either.
-                        return this->parent->extract_primary(i, vbuffer, ibuffer, 0, this->full_length, *(this->core), needs_value, needs_index, /* must_cache_index = */ false);
+                        auto flen = this->parent->template full_secondary_length<accrow_>();
+                        return this->parent->extract_primary(i, vbuffer, ibuffer, 0, this->full_length, *(this->core), needs_value, needs_index, flen);
                     } else {
                         // Quick return is possible if we don't need any indices or values.
                         return tatami::SparseRange<Value_, Index_>(this->parent->pointers[i+1] - this->parent->pointers[i], NULL, NULL);
@@ -1165,13 +1176,15 @@ private:
                 } else {
                     return this->parent->extract_secondary(i, vbuffer, ibuffer, 0, this->full_length, *(this->core), needs_value, needs_index);
                 }
+
             } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
                 if constexpr(row_ == accrow_) {
-                    // Unlike in the FULL case, we have to load and cache the indices in order to identify the start/end of each block.
-                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index, /* must_cache_index = */ true);
+                    auto flen = this->parent->template full_secondary_length<accrow_>();
+                    return this->parent->extract_primary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index, flen);
                 } else {
                     return this->parent->extract_secondary(i, vbuffer, ibuffer, this->block_start, this->block_length, *(this->core), needs_value, needs_index);
                 }
+
             } else {
                 if constexpr(row_ == accrow_) {
                     return this->parent->extract_primary(i, vbuffer, ibuffer, this->indices, *(this->core), needs_value, needs_index);

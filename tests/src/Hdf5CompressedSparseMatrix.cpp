@@ -405,8 +405,9 @@ TEST_P(Hdf5SparseBasicCacheTest, SimpleOracle) {
         tatami_test::test_oracle_row_access<tatami::NumericMatrix>(&mat, &ref, true, 0.2 * NR, 0.6 * NR); // randomized with bounds
 
         // Oracle-based extraction still works if we turn off value or index extraction.
+        auto rwork = ref.sparse_row();
+
         tatami::Options opt;
-        
         opt.sparse_extract_value = false;
         auto iwork = mat.sparse_row(opt);
         iwork->set_oracle(std::make_unique<tatami::ConsecutiveOracle<int> >(0, NR));
@@ -419,7 +420,6 @@ TEST_P(Hdf5SparseBasicCacheTest, SimpleOracle) {
         auto vwork = mat.sparse_row(opt);
         vwork->set_oracle(std::make_unique<tatami::ConsecutiveOracle<int> >(0, NR));
 
-        auto rwork = ref.sparse_row(opt);
         for (size_t r = 0; r < NR; ++r) {
             auto rout = rwork->fetch(r);
 
