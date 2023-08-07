@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <algorithm>
 
-#include "default_lock.hpp"
+#include "serialize.hpp"
 #include "utils.hpp"
 #include "tatami_chunked/tatami_chunked.hpp"
 

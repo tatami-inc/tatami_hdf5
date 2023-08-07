@@ -10,7 +10,7 @@
 #include <list>
 #include <vector>
 
-#include "default_lock.hpp"
+#include "serialize.hpp"
 #include "utils.hpp"
 #include "tatami_chunked/tatami_chunked.hpp"
 
