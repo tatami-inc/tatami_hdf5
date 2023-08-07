@@ -230,6 +230,8 @@ private:
 
         // Cache for re-use.
         std::vector<std::pair<size_t, size_t> > extraction_bounds;
+
+        static constexpr size_t no_extraction_bound = -1;
     };
 
     void initialize_lru_cache(std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> >& historian, bool needs_value) const {
@@ -300,7 +302,7 @@ private:
 
                 if (work.extraction_bounds.size()) {
                     const auto& current = work.extraction_bounds[i];
-                    if (current.first != -1) {
+                    if (current.first != PrimaryWorkspace::no_extraction_bound) {
                         bounded = true;
                         extraction_start = current.first;
                         extraction_len = current.second;
@@ -432,7 +434,7 @@ private:
 
             if (work.extraction_bounds.size()) {
                 const auto& bounds = work.extraction_bounds[current];
-                if (bounds.first != static_cast<size_t>(-1)) {
+                if (bounds.first != PrimaryWorkspce::no_extraction_bound) {
                     bounded = true;
                     extraction_start = bounds.first;
                     extraction_len = bounds.second;
@@ -569,7 +571,7 @@ private:
             bool hit = false;
             if (work.extraction_bounds.size()) {
                 auto& target = work.extraction_bounds[i];
-                if (target.first != static_cast<size_t>(-1)) {
+                if (target.first != PrimaryWorkspace::no_extraction_bound) {
                     hit = true;
                     offset = target.first - pointers[i];
                     istart += offset;
@@ -586,7 +588,7 @@ private:
 
         if (work.extraction_bounds.size()) {
             auto& target = work.extraction_bounds[i];
-            if (target.first == static_cast<size_t>(-1)) {
+            if (target.first == PrimaryWorkspace::no_extraction_bound) {
                 target.first = pointers[i] + offset;
                 target.second = iterated;
             }
