@@ -129,6 +129,8 @@ Public Attributes</h2></td></tr>
 <tr class="separator:acbb4a8f5a508f7aa0372f0c326d410f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab826ad41c914cc2b92f08dceac019ba3"><td class="memItemLeft" align="right" valign="top">size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html#ab826ad41c914cc2b92f08dceac019ba3">chunk_size</a> = 100000</td></tr>
 <tr class="separator:ab826ad41c914cc2b92f08dceac019ba3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa3c2490aaca094b0ff9c6c6d9a10bbe7"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html#aa3c2490aaca094b0ff9c6c6d9a10bbe7">num_threads</a> = 1</td></tr>
+<tr class="separator:aa3c2490aaca094b0ff9c6c6d9a10bbe7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p >Parameters for <code><a class="el" href="namespacetatami__hdf5.html#a9a0cf7882b3882b88773db1b4a50e4bf">write_sparse_matrix_to_hdf5()</a></code>. </p>
@@ -312,6 +314,21 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p >Size of the chunks used for compression. </p>
+
+</div>
+</div>
+<a id="aa3c2490aaca094b0ff9c6c6d9a10bbe7" name="aa3c2490aaca094b0ff9c6c6d9a10bbe7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa3c2490aaca094b0ff9c6c6d9a10bbe7">&#9670;&#160;</a></span>num_threads</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int tatami_hdf5::WriteSparseMatrixToHdf5Parameters::num_threads = 1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p >Number of threads to use for the first pass through the input matrix. This is only used to determine the number of non-zero elements (and infer an appropriate storage type, if an <code>AUTOMATIC</code> selection is requested). </p>
 
 </div>
 </div>

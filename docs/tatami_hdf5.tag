@@ -245,6 +245,13 @@
       <anchor>ab826ad41c914cc2b92f08dceac019ba3</anchor>
       <arglist></arglist>
     </member>
+    <member kind="variable">
+      <type>int</type>
+      <name>num_threads</name>
+      <anchorfile>structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html</anchorfile>
+      <anchor>aa3c2490aaca094b0ff9c6c6d9a10bbe7</anchor>
+      <arglist></arglist>
+    </member>
   </compound>
   <compound kind="namespace">
     <name>tatami_hdf5</name>

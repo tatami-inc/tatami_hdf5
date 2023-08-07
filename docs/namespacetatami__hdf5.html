@@ -283,7 +283,7 @@ template&lt;typename Value_ , typename Index_ &gt; </div>
 </dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">mat</td><td>Pointer to the (presumably sparse) matrix to be written. </td></tr>
+    <tr><td class="paramname">mat</td><td>Pointer to the (presumably sparse) matrix to be written. If a dense matrix is supplied, only the non-zero elements will be saved. </td></tr>
     <tr><td class="paramname">location</td><td>Handle to a HDF5 group in which to write the matrix contents. </td></tr>
     <tr><td class="paramname">params</td><td>Parameters to use when writing the matrix. </td></tr>
   </table>
