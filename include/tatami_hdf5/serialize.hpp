@@ -45,7 +45,7 @@ void serialize(Function_ f) {
     TATAMI_HDF5_PARALLEL_LOCK(f);
 #else
 #ifdef _OPENMP
-    #pragma omp critical hdf5
+    #pragma omp critical(hdf5)
     {
         f();
     }
