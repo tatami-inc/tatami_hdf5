@@ -439,7 +439,6 @@ TEST_P(Hdf5SparseBasicCacheTest, Repeated) {
     // Check that we re-use the cache effectively when no new elements are
     // requested; no additional extractions from file should occur.
     std::vector<int> predictions;
-    int counter = 0;
     for (size_t i = 0; i < NR * 10; ++i) {
         predictions.push_back(i % 2);
     }
