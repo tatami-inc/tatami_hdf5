@@ -434,7 +434,7 @@ private:
 
             if (work.extraction_bounds.size()) {
                 const auto& bounds = work.extraction_bounds[current];
-                if (bounds.first != PrimaryWorkspce::no_extraction_bound) {
+                if (bounds.first != PrimaryWorkspace::no_extraction_bound) {
                     bounded = true;
                     extraction_start = bounds.first;
                     extraction_len = bounds.second;
