@@ -909,7 +909,7 @@ private:
         std::fill(buffer, buffer + indices.size(), 0);
         auto original = buffer;
         extract_secondary_raw_loop(i, 
-            [&](Index_ pos, Value_ value) -> void {
+            [&](Index_, Value_ value) -> void {
                 *buffer = value;
                 ++buffer;
             }, 
