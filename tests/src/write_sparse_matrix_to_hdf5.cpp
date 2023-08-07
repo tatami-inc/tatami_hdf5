@@ -15,17 +15,22 @@
 /*****************************************
  *****************************************/
 
-TEST(WriteSparseMatrixToHdf5Test, SparseColumn) {
+class WriteSparseMatrixToHdf5BasicTest : public ::testing::TestWithParam<int> {};
+
+TEST_P(WriteSparseMatrixToHdf5BasicTest, SparseColumn) {
     const size_t NR = 200, NC = 100;
     auto triplets = tatami_test::simulate_sparse_compressed<double>(NC, NR, 0.05, 0, 100);
     tatami::CompressedSparseMatrix<false, double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+
+    tatami_hdf5::WriteSparseMatrixToHdf5Parameters param_core;
+    param_core.num_threads = GetParam();
 
     // Dumping it.
     auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle);
+        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, param_core);
     }
 
     // Checking the dumped contents.
@@ -58,9 +63,8 @@ TEST(WriteSparseMatrixToHdf5Test, SparseColumn) {
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters params;
+        auto params = param_core;
         params.force_integer = true;
-        params.columnar = tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageLayout::COLUMN;
         tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, params);
     }
 
@@ -86,17 +90,20 @@ TEST(WriteSparseMatrixToHdf5Test, SparseColumn) {
     }
 }
 
-TEST(WriteSparseMatrixToHdf5Test, SparseRow) {
+TEST_P(WriteSparseMatrixToHdf5BasicTest, SparseRow) {
     const size_t NR = 200, NC = 100;
     auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.05, 0, 100);
     tatami::CompressedSparseMatrix<true, double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+
+    tatami_hdf5::WriteSparseMatrixToHdf5Parameters param_core;
+    param_core.num_threads = GetParam();
 
     // Dumping it.
     auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle);
+        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, param_core);
     }
 
     // Checking the dumped contents.
@@ -126,7 +133,7 @@ TEST(WriteSparseMatrixToHdf5Test, SparseRow) {
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters params;
+        auto params = param_core;
         params.columnar = tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageLayout::COLUMN;
         tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, params);
     }
@@ -153,15 +160,23 @@ TEST(WriteSparseMatrixToHdf5Test, SparseRow) {
     }
 }
 
+INSTANTIATE_TEST_CASE_P(
+    WriteSparseMatrixToHdf5,
+    WriteSparseMatrixToHdf5BasicTest,
+    ::testing::Values(1, 3) // Number of threads
+);
+
 /*****************************************
  *****************************************/
 
-class WriteSparseMatrixToHdf5UnsignedDataTypeTest : public ::testing::TestWithParam<tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType> {};
+class WriteSparseMatrixToHdf5UnsignedDataTypeTest : public ::testing::TestWithParam<std::tuple<tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType, int> > {};
 
 TEST_P(WriteSparseMatrixToHdf5UnsignedDataTypeTest, Check) {
-    const size_t NR = 200, NC = 100;
-    auto type = GetParam();
+    auto params = GetParam();
+    auto type = std::get<0>(params);
+    auto nthreads = std::get<1>(params);
 
+    const size_t NR = 200, NC = 100;
     auto triplets = tatami_test::simulate_sparse_compressed<double>(NC, NR, 0.05, 0, 100);
     for (auto& x : triplets.value) {
         x = std::round(x);
@@ -173,12 +188,15 @@ TEST_P(WriteSparseMatrixToHdf5UnsignedDataTypeTest, Check) {
     }
     tatami::CompressedSparseMatrix<false, double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
 
+    tatami_hdf5::WriteSparseMatrixToHdf5Parameters param_core;
+    param_core.num_threads = nthreads;
+
     // Dumping it.
     auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle);
+        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, param_core);
     }
 
     // Checking the dumped contents.
@@ -215,7 +233,7 @@ TEST_P(WriteSparseMatrixToHdf5UnsignedDataTypeTest, Check) {
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters params;
+        auto params = param_core;
         params.data_type = tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::DOUBLE;
         tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, params);
     }
@@ -242,22 +260,27 @@ TEST_P(WriteSparseMatrixToHdf5UnsignedDataTypeTest, Check) {
 INSTANTIATE_TEST_CASE_P(
     WriteSparseMatrixToHdf5,
     WriteSparseMatrixToHdf5UnsignedDataTypeTest,
-    ::testing::Values(
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT8,
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT16,
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT32
+    ::testing::Combine(
+        ::testing::Values(
+            tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT8,
+            tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT16,
+            tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT32
+        ),
+        ::testing::Values(1, 3)
     )
 );
 
 /*****************************************
  *****************************************/
 
-class WriteSparseMatrixToHdf5SignedDataTypeTest : public ::testing::TestWithParam<tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType> {};
+class WriteSparseMatrixToHdf5SignedDataTypeTest : public ::testing::TestWithParam<std::tuple<tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType, int> > {};
 
 TEST_P(WriteSparseMatrixToHdf5SignedDataTypeTest, Check) {
-    const size_t NR = 200, NC = 100;
-    auto type = GetParam();
+    auto params = GetParam();
+    auto type = std::get<0>(params);
+    auto nthreads = std::get<1>(params);
 
+    const size_t NR = 200, NC = 100;
     auto triplets = tatami_test::simulate_sparse_compressed<double>(NC, NR, 0.05, -100, 100);
     for (auto& x : triplets.value) {
         x = std::round(x);
@@ -274,7 +297,9 @@ TEST_P(WriteSparseMatrixToHdf5SignedDataTypeTest, Check) {
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle);
+        tatami_hdf5::WriteSparseMatrixToHdf5Parameters params;
+        params.num_threads = nthreads;
+        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, params);
     }
 
     // Checking the dumped contents.
@@ -309,22 +334,27 @@ TEST_P(WriteSparseMatrixToHdf5SignedDataTypeTest, Check) {
 INSTANTIATE_TEST_SUITE_P(
     WriteSparseMatrixToHdf5,
     WriteSparseMatrixToHdf5SignedDataTypeTest,
-    ::testing::Values(
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::INT8,
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::INT16,
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::INT32
+    ::testing::Combine(
+        ::testing::Values(
+            tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::INT8,
+            tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::INT16,
+            tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::INT32
+        ),
+        ::testing::Values(1,3)
     )
 );
 
 /*****************************************
  *****************************************/
 
-class WriteSparseMatrixToHdf5IndexTypeTest : public ::testing::TestWithParam<tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType> {};
+class WriteSparseMatrixToHdf5IndexTypeTest : public ::testing::TestWithParam<std::tuple<tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType, int> > {};
 
 TEST_P(WriteSparseMatrixToHdf5IndexTypeTest, Check) {
-    const size_t NC = 10;
-    auto type = GetParam();
+    auto params = GetParam();
+    auto type = std::get<0>(params);
+    auto nthreads = std::get<1>(params);
 
+    const size_t NC = 10;
     size_t NR = 200;
     if (type == tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT16) {
         NR = 2000;
@@ -340,7 +370,9 @@ TEST_P(WriteSparseMatrixToHdf5IndexTypeTest, Check) {
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle);
+        tatami_hdf5::WriteSparseMatrixToHdf5Parameters params;
+        params.num_threads = nthreads;
+        tatami_hdf5::write_sparse_matrix_to_hdf5(&mat, mhandle, params);
     }
 
     // Checking the dumped contents.
@@ -375,9 +407,12 @@ TEST_P(WriteSparseMatrixToHdf5IndexTypeTest, Check) {
 INSTANTIATE_TEST_SUITE_P(
     WriteSparseMatrixToHdf5,
     WriteSparseMatrixToHdf5IndexTypeTest,
-    ::testing::Values(
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT8,
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT16,
-        tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT32
+    ::testing::Combine(
+        ::testing::Values(
+            tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT8,
+            tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT16,
+            tatami_hdf5::WriteSparseMatrixToHdf5Parameters::StorageType::UINT32
+        ),
+        ::testing::Values(1,3)
     )
 );
