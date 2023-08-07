@@ -662,13 +662,13 @@ private:
         Index_ full_length) 
     const {
         Index_ counter = 0;
-        bool full_extraction = (start == 0 && length == full_length);
+        bool extract_full = (start == 0 && length == full_length);
 
         if (length) {
             extract_primary_raw(i, 
 
                 [&](size_t num, const CachedIndex_* is, const CachedValue_* vs) -> Index_ {
-                    if (full_extraction) {
+                    if (extract_full) {
                         counter = num;
                     } else {
                         CachedIndex_ end = start + length;
@@ -688,7 +688,7 @@ private:
                 start, 
                 work,
                 needs_value,
-                needs_index || !full_extraction
+                needs_index || !extract_full // if we don't need the indices, we still need to load them if we're taking a block instead of the full dimension.
             );
         }
 
