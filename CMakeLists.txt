@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(tatami_hdf5
-    VERSION 1.0.1
+    VERSION 1.0.2
     DESCRIPTION "tatami bindings for HDF5"
     LANGUAGES CXX)
 
@@ -10,11 +10,11 @@ set(CMAKE_CXX_STANDARD 17)
 add_library(tatami_hdf5 INTERFACE)
 add_library(tatami::tatami_hdf5 ALIAS tatami_hdf5)
 
-option(TATAMI_CHUNKED_FETCH_EXTERN "Automatically fetch tatami_hdf5's external dependencies." ON)
-if(TATAMI_CHUNKED_FETCH_EXTERN)
+option(TATAMI_HDF5_FETCH_EXTERN "Automatically fetch tatami_hdf5's external dependencies." ON)
+if(TATAMI_HDF5_FETCH_EXTERN)
     add_subdirectory(extern)
 else()
-    find_package(tatami_chunked CONFIG REQUIRED)
+    find_package(tatami_tatami_chunked CONFIG REQUIRED)
 endif()
 
 target_link_libraries(tatami_hdf5 INTERFACE tatami::tatami_chunked)
@@ -29,6 +29,7 @@ endif()
 
 # Switch between include directories depending on whether the downstream is
 # using the build directly or is using the installed package.
+include(GNUInstallDirs)
 target_include_directories(tatami_hdf5 
     INTERFACE 
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -37,12 +38,12 @@ target_include_directories(tatami_hdf5
 
 # Building the test-related machinery, if we are compiling this library directly.
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    option(TATAMI_HDF5 "Build tatami_hdf5's test suite." ON)
+    option(TATAMI_HDF5_TESTS "Build tatami_hdf5's test suite." ON)
 else()
-    option(TATAMI_HDF5 "Build tatami_hdf5's test suite." OFF)
+    option(TATAMI_HDF5_TESTS "Build tatami_hdf5's test suite." OFF)
 endif()
 
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+if(TATAMI_HDF5_TESTS)
     include(CTest)
     if(BUILD_TESTING)
         add_subdirectory(tests)

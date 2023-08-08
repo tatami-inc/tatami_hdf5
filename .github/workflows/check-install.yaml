@@ -23,6 +23,9 @@ jobs:
         cmake -S . -B build -DTATAMI_CHUNKED_TESTS=OFF
         sudo cmake --install build
 
+    - name: Install HDF5
+      run: sudo apt-get install libhdf5-dev
+
     - name: Configure the build
       run: cmake -S . -B build -DTATAMI_HDF5_FETCH_EXTERN=OFF -DTATAMI_HDF5_TESTS=OFF
 
