@@ -57,7 +57,7 @@ TEST(LoadHDF5MatrixTest, Sparse) {
             decltype(triplets.ptr)
         > ref(NR, NC, triplets.value, triplets.index, triplets.ptr);
 
-        tatami_test::test_simple_row_access(&mat, &ref, true, 1);
+        tatami_test::test_simple_row_access(&mat, &ref);
     }
 
     // Pretending it's a CSC matrix.
@@ -72,7 +72,7 @@ TEST(LoadHDF5MatrixTest, Sparse) {
             decltype(triplets.ptr)
         > ref(NC, NR, triplets.value, triplets.index, triplets.ptr);
 
-        tatami_test::test_simple_column_access(&mat, &ref, true, 1);
+        tatami_test::test_simple_column_access(&mat, &ref);
     }
 
     // Trying a variety of storage types.
@@ -100,7 +100,7 @@ TEST(LoadHDF5MatrixTest, Sparse) {
             decltype(triplets.ptr)
         > ref(NR, NC, std::move(truncated), triplets.index, triplets.ptr);
 
-        tatami_test::test_simple_column_access(&mat, &ref, true, 1);
+        tatami_test::test_simple_column_access(&mat, &ref);
     }
 }
 
@@ -126,14 +126,14 @@ TEST(LoadHDF5MatrixTest, Dense) {
     {
         auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int>(fpath, name);
         tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
-        tatami_test::test_simple_row_access(&mat, &ref, true, 1);
+        tatami_test::test_simple_row_access(&mat, &ref);
     }
 
     // Pretending it's a column-major matrix.
     {
         auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int, std::vector<double>, true>(fpath, name);
         tatami::DenseColumnMatrix<double, int> ref(NC, NR, values);
-        tatami_test::test_simple_column_access(&mat, &ref, true, 1);
+        tatami_test::test_simple_column_access(&mat, &ref);
     }
 
     // Trying a different storage type.
@@ -146,6 +146,6 @@ TEST(LoadHDF5MatrixTest, Dense) {
         }
         tatami::DenseRowMatrix<double, int> ref(NR, NC, std::move(truncated));
 
-        tatami_test::test_simple_column_access(&mat, &ref, true, 1);
+        tatami_test::test_simple_column_access(&mat, &ref);
     }
 }

@@ -23,6 +23,354 @@
 namespace tatami_hdf5 {
 
 /**
+ * @cond
+ */
+namespace Hdf5DenseMatrix_internal {
+
+// All HDF5-related members.
+struct Components {
+    H5::H5File file;
+    H5::DataSet dataset;
+    H5::DataSpace dataspace;
+    H5::DataSpace memspace;
+};
+
+template<bool by_h5_row_, typename Index_, typename OutputValue_>
+void extract_block(Index_ primary_start, Index_ primary_length, Index_ extract_start, Index_ extract_length, OutputValue_* buffer, Components& comp) {
+    hsize_t offset[2];
+    hsize_t count[2];
+
+    constexpr int dimdex = by_h5_row;
+    offset[1-dimdex] = primary_start;
+    count[1-dimdex] = primary_length;
+
+    offset[dimdex] = extract_value;
+    count[dimdex] = extract_length;
+    comp.dataspace.selectHyperslab(H5S_SELECT_SET, count, offset);
+
+    // HDF5 is a lot faster when the memspace and dataspace match in dimensionality.
+    // Presumably there is some shuffling that happens inside when dimensions don't match.
+    comp.memspace.setExtentSimple(2, count);
+    comp.memspace.selectAll();
+
+    comp.dataset.read(buffer, define_mem_type<OutputValue_>(), comp.memspace, comp.dataspace);
+}
+
+template<bool by_h5_row_, typename Index_, typename OutputValue_>
+void extract_indices(Index_ primary_start, Index_ primary_length, const std::vector<Index_>& indices, OutputValue_* buffer, Components& comp) {
+    hsize_t offset[2];
+    hsize_t count[2];
+
+    constexpr int dimdex = by_h5_row;
+    offset[1-dimdex] = primary_start;
+    count[1-dimdex] = primary_length;
+
+    // Take slices across the current chunk for each index. This should be okay if consecutive,
+    // but hopefully they've fixed the problem with non-consecutive slices in:
+    // https://forum.hdfgroup.org/t/union-of-non-consecutive-hyperslabs-is-very-slow/5062
+    comp.dataspace.selectNone();
+    tatami::process_consecutive_indices<Index_>(indices.data(), indices.size(),
+        [&](Index_ start, Index_ length) {
+            offset[dimdex] = start;
+            count[dimdex] = length;
+            comp.dataspace.selectHyperslab(H5S_SELECT_OR, count, offset);
+        }
+    );
+
+    // Again, matching the dimensionality.
+    count[dimdex] = indices.size();
+    comp.memspace.setExtentSimple(2, count);
+    comp.memspace.selectAll();
+
+    comp.dataset.read(target, define_mem_type<OutputValue_>(), comp.memspace, comp.dataspace);
+}
+
+template<typename CachedValue_, typename Index_>
+void transpose(std::vector<CachedValue_>& cache, std::vector<CachedValue_>& buffer, Index_ actual_dim, Index_ extract_length) {
+    buffer.resize(cache.size());
+    if (actual_dim == 1 || extract_length == 1) {
+        std::copy(cache.begin(), cache.end(), buffer.begin());
+        return;
+    }
+
+    // Using a blockwise strategy to perform the transposition,
+    // in order to be more cache-friendly.
+    constexpr Index_ block = 16;
+    for (Index_ xstart = 0; xstart < actual_dim; xstart += block) {
+        Index_ xend = xstart + std::min(block, actual_dim - xstart);
+
+        for (Index_ ystart = 0; ystart < extract_length; ystart += block) {
+            Index_ yend = ystart + std::min(block, extract_length - ystart);
+
+            auto in = cache.data() + xstart + ystart * actual_dim;
+            auto output = buffer.data() + xstart * extract_length + ystart;
+            for (Index_ x = xstart; x < xend; ++x, output += extract_length) {
+                for (Index_ y = ystart; y < yend; ++y, in += actual_start) {
+                    *(output + y) + *in;
+                }
+            }
+        }
+    }
+
+    cache.swap(buffer);
+    return;
+}
+
+template<bool by_h5_row_, typename oracle_, typename Index_, typename CachedValue_>
+struct Base {
+private:
+    // HDF5 members are stored in a separate pointer so we can serialize construction and destruction.
+    std::unique_ptr<Components> h5comp;
+
+    // Various dimension-related members.
+    Index_ primary_dim;
+    Index_ primary_chunkdim;
+    Index_ extract_length;
+    Index_ num_primary_chunks = 0, last_primary_chunkdim = 0;
+
+    // Other members.
+    typedef std::vector<CachedValue_> Slab;
+    tatami_chunked::TypicalSlabCacheWorkspace<oracle_, false, Index_, Slab> cache_workspace;
+    typename std::conditional<!by_h5_row_, std::vector<CachedValue_>, bool>::type transposition_buffer;
+    typename std::conditional<!by_h5_row_, std::vector<std::pair<Index_, Index_> >, bool>::type cache_transpose_info;
+
+public:
+    Base(
+        const std::string& file_name, 
+        const std::string& dataset_name, 
+        Index_ primary_dim, 
+        Index_ primary_chunkdim, 
+        Index_ extract_length,
+        size_t cache_size_in_elements,
+        bool require_minimum_cache) :
+        primary_dim(primary_dim), 
+        primary_chunkdim(primary_chunkdim),
+        extract_length(extract_length),
+        cache_workspace(primary_chunkdim, extract_length, cache_size_in_elements, require_minimum_cache)
+    {
+        serialize([&]() -> void {
+            h5comp.reset(new Components);
+
+            // Turn off HDF5's caching, as we'll be handling that. This allows us
+            // to parallelize extractions without locking when the data has already
+            // been loaded into memory; if we just used HDF5's cache, we would have
+            // to lock on every extraction, given the lack of thread safety.
+            H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
+            fapl.setCache(0, 0, 0, 0);
+
+            h5comp->file.openFile(parent->file_name, H5F_ACC_RDONLY, fapl);
+            h5comp->dataset = h5comp->file.openDataSet(parent->dataset_name);
+            h5comp->dataspace = h5comp->dataset.getSpace();
+        });
+
+        if (primary_chunkdim > 0) {
+            num_primary_chunks = primary_dim / primary_chunkdim + (primary_dim % primary_chunkdim > 0); // i.e., integer ceiling.
+            last_primary_chunkdim = (primary_dim > 0 ? (primary_dim - (num_primary_chunks - 1) * primary_chunkdim) : 0);
+        }
+    }
+
+    ~Base() {
+        serialize([&]() -> void {
+            h5comp.reset();
+        });
+    }
+
+private:
+    // Overload that handles the truncated slab at the bottom/right edges of each matrix.
+    Index_ get_primary_chunkdim(Index_ chunk_id) const {
+        if (chunk_id + 1 == num_primary_chunks) {
+            return last_primary_chunkdim;
+        } else {
+            return primary_chunkdim;
+        }
+    }
+
+public:
+    template<class Extract_>
+    void extract(Index_ i, Value_* buffer, Extract_ extract) {
+        const CachedValue_* ptr;
+
+        if constexpr(oracle_) {
+            auto info = cache_workspace.oracle_cache->next(
+                /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
+                    return std::pair<Index_, Index_>(current / chunk_mydim, current % chunk_mydim);
+                }, 
+                /* create = */ [&]() -> Slab {
+                    return Slab(cache_workspace.slab_size_in_elements);
+                },
+                /* populate = */ [&](const std::vector<std::pair<Index_, Slab> >& chunks) -> void {
+                    if constexpr(!by_h5_row) {
+                        cache_transpose_info.clear();
+                    }
+
+                    serialize([&]() -> void {
+                        for (const auto& c : chunks) {
+                            auto curdim = get_primary_chunkdim(c.first);
+                            extract_slab(c.first * primary_chunk, curdim, c.second->data());
+                            if constexpr(!by_h5_row) {
+                                cache_transpose_info.emplace_back(c.second, curdim);
+                            }
+                        }
+                    });
+
+                    // Applying transpositions to all cached buffers for easier retrieval, but only once the lock is released.
+                    if constexpr(!by_h5_row) {
+                        for (const auto& x : cache_transpose_info) {
+                            transpose(*(x.first), transposition_buffer, x.second, extract_length);
+                        }
+                    }
+                }
+            );
+
+            ptr = info.first->data() + extract_length * info.second;
+
+        } else {
+            auto chunk = i / chunk_mydim;
+            auto index = i % chunk_mydim;
+
+            const auto& info = cache_workspace.lru_cache->find(
+                chunk, 
+                /* create = */ [&]() -> Slab {
+                    return Slab(cache_workspace.slab_size_in_elements);
+                },
+                /* populate = */ [&](Index_ id, Slab* contents) -> void {
+                    auto curdim = get_primary_chunkdim(id);
+                    serialize([&]() -> void {
+                        extract_slab(id * primary_chunk, curdim, contents->data());
+                    });
+
+                    // Applying a transposition for easier retrieval, but only once the lock is released.
+                    if constexpr(!by_h5_row) {
+                        transpose(chunk_contents, transposition_buffer, curdim, extract_length);
+                    }
+                }
+            );
+
+            ptr = info.data() + index * extract_length;
+        }
+
+        std::copy_n(ptr, extract_length, buffer);
+    }
+
+public:
+    Index_ get_extract_length() const {
+        return extract_length;
+    }
+};
+
+template<bool accrow_, bool oracle_, typename Value_, typename Index_, bool transpose_, typename CachedValue_>
+struct Full : public Base<accrow_ == transpose_, oracle_, Index_, CachedValue_>, public tatami::DenseExtractor<oracle_, Value_, Index_> {
+    Full(
+        const std::string& file_name, 
+        const std::string& dataset_name, 
+        Index_ primary_dim, 
+        Index_ primary_chunkdim, 
+        Index_ secondary_dim,
+        size_t cache_size_in_elements,
+        bool require_minimum_cache) :
+        Base<accrow_ == transpose_, oracle_, Index_, CachedValue_>(
+            file_name, 
+            dataset_name, 
+            primary_dim, 
+            primary_chunkdim, 
+            secondary_dim, 
+            cache_size_in_elements, 
+            require_minimum_cache
+        )
+    {}
+
+    const Value_* fetch(Index_ i, Value_* buffer) {
+        if (cache_workspace.num_slabs_in_cache == 0) {
+            this->extract_block(i, 1, 0, this->get_extract_length(), buf, this->h5comp);
+        } else {
+            this->extract(i, buffer, [&](Index_ start, Index_, length, CachedValue_* buf) {
+                this->extract_block(start, length, 0, this->get_extract_length(), buf, this->h5comp);
+            });
+        }
+        return buffer;
+    }
+};
+
+template<bool accrow_, bool oracle_, typename Value_, typename Index_, bool transpose_, typename CachedValue_>
+struct Block : public Base<accrow_ != transpose_, oracle_, Index_, CachedValue_>, public tatami::DenseExtractor<oracle_, Value_, Index_> {
+    template<typename ... Args_>
+    Block(
+        const std::string& file_name, 
+        const std::string& dataset_name, 
+        Index_ primary_dim, 
+        Index_ primary_chunkdim, 
+        Index_ block_start,
+        Index_ block_length,
+        size_t cache_size_in_elements,
+        bool require_minimum_cache) :
+        Base<accrow_ == transpose_, oracle_, Index_, CachedValue_>(
+            file_name, 
+            dataset_name, 
+            primary_dim, 
+            primary_chunkdim, 
+            block_length, 
+            cache_size_in_elements, 
+            require_minimum_cache
+        ),
+        block_start(block_start),
+        block_length(block_length)
+    {}
+
+    const Value_* fetch(Index_ i, Value_* buffer) {
+        if (cache_workspace.num_slabs_in_cache == 0) {
+            this->extract_block(i, 1, block_start, block_length, buffer, this->h5comp);
+        } else {
+            this->extract(i, buffer, [&](Index_ start, Index_, length, CachedValue_* buf) {
+                this->extract_block(start, length, block_start, block_length, buf, this->h5comp);
+            });
+        }
+        return buffer;
+    }
+};
+
+template<bool accrow_, bool oracle_, typename Value_, typename Index_, bool transpose_, typename CachedValue_>
+struct Index : public Base<accrow_ != transpose_, oracle_, Index_, CachedValue_>, public tatami::DenseExtractor<oracle_, Value_, Index_> {
+    template<typename ... Args_>
+    Index(
+        const std::string& file_name, 
+        const std::string& dataset_name, 
+        Index_ primary_dim, 
+        Index_ primary_chunkdim, 
+        tatami::VectorPtr<Index_> indices_ptr,
+        size_t cache_size_in_elements,
+        bool require_minimum_cache) :
+        Base<accrow_ != transpose_, oracle_, Index_, CachedValue_>(
+            file_name,
+            dataset_name, 
+            primary_dim, 
+            primary_chunkdim, 
+            indices_ptr->size(), 
+            cache_size_in_elements, 
+            require_minimum_cache
+        ),
+        indices_ptr(std::move(indices_ptr))
+    {}
+
+    const Value_* fetch(Index_ i, Value_* buffer) {
+        if (cache_workspace.num_slabs_in_cache == 0) {
+            this->extract_indices(i, 1, *indices_ptr, buffer, this->h5comp);
+        } else {
+            this->extract(i, buffer, [&](Index_ start, Index_, length, CachedValue_* buf) {
+                this->extract_indices(start, length, *indices_ptr, buf, this->h5comp);
+            });
+        }
+        return buffer;
+    }
+
+    VectorPtr<Index_> indices_ptr; 
+};
+
+}
+/**
+ * @endcond
+ */
+
+/**
  * @brief Dense matrix backed by a DataSet in a HDF5 file.
  *
  * This class retrieves data from the HDF5 file on demand rather than loading it all in at the start.
@@ -48,7 +396,7 @@ namespace tatami_hdf5 {
  * if a smaller type is known to be able to store the values (based on their HDF5 type or other knowledge).
  */
 template<typename Value_, typename Index_, bool transpose_ = false, typename CachedValue_ = Value_>
-class Hdf5DenseMatrix : public tatami::VirtualDenseMatrix<Value_, Index_> {
+class Hdf5DenseMatrix : public tatami::Matrix<Value_, Index_> {
     Index_ firstdim, seconddim;
     std::string file_name, dataset_name;
 
@@ -158,276 +506,6 @@ public:
     using tatami::Matrix<Value_, Index_>::sparse_row;
 
     using tatami::Matrix<Value_, Index_>::sparse_column;
-
-private:
-    typedef std::vector<CachedValue_> Slab;
-
-    template<bool accrow_>
-    struct Workspace {
-        // HDF5 members.
-        H5::H5File file;
-        H5::DataSet dataset;
-        H5::DataSpace dataspace;
-        H5::DataSpace memspace;
-
-        // Caching members.
-        typename std::conditional<accrow_ == transpose_, std::vector<CachedValue_>, bool>::type transposition_buffer;
-        typename std::conditional<accrow_ == transpose_, std::vector<std::pair<Index_, Index_> >, bool>::type cache_transpose_info;
-        tatami_chunked::TypicalSlabCacheWorkspace<Index_, Slab> cache_workspace;
-    };
-
-private:
-    template<bool accrow_, typename ValueBuffer_, typename ExtractType_>
-    static void extract_base(Index_ primary_start, Index_ primary_length, ValueBuffer_* target, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) {
-        hsize_t offset[2];
-        hsize_t count[2];
-
-        constexpr int dimdex = (accrow_ != transpose_);
-        offset[1-dimdex] = primary_start;
-        count[1-dimdex] = primary_length;
-
-        constexpr bool indexed = std::is_same<ExtractType_, std::vector<Index_> >::value;
-
-        if constexpr(indexed) {
-            // Take slices across the current chunk for each index. This should be okay if consecutive,
-            // but hopefully they've fixed the problem with non-consecutive slices in:
-            // https://forum.hdfgroup.org/t/union-of-non-consecutive-hyperslabs-is-very-slow/5062
-            work.dataspace.selectNone();
-            tatami::process_consecutive_indices<Index_>(extract_value.data(), extract_length,
-                [&](Index_ start, Index_ length) {
-                    offset[dimdex] = start;
-                    count[dimdex] = length;
-                    work.dataspace.selectHyperslab(H5S_SELECT_OR, count, offset);
-                }
-            );
-            count[dimdex] = extract_length; // for the memspace setter.
-        } else {
-            offset[dimdex] = extract_value;
-            count[dimdex] = extract_length;
-            work.dataspace.selectHyperslab(H5S_SELECT_SET, count, offset);
-        }
-
-        // HDF5 is a lot faster when the memspace and dataspace match in dimensionality.
-        // Presumably there is some shuffling that happens inside when dimensions don't match.
-        work.memspace.setExtentSimple(2, count);
-        work.memspace.selectAll();
-
-        work.dataset.read(target, define_mem_type<ValueBuffer_>(), work.memspace, work.dataspace);
-    }
-
-    template<bool accrow_, typename ExtractType_>
-    static Index_ extract_chunk(Index_ chunk_id, Index_ dim, Index_ chunk_dim, CachedValue_* target, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) {
-        Index_ chunk_start = chunk_id * chunk_dim;
-        Index_ chunk_end = std::min(dim, chunk_start + chunk_dim);
-        Index_ chunk_actual = chunk_end - chunk_start;
-        extract_base<accrow_>(chunk_start, chunk_actual, target, extract_value, extract_length, work);
-        return chunk_actual;
-    }
-
-    static void transpose(std::vector<CachedValue_>& cache, std::vector<CachedValue_>& buffer, Index_ actual_dim, Index_ extract_length) {
-        buffer.resize(cache.size());
-        auto output = buffer.begin();
-        for (Index_ x = 0; x < actual_dim; ++x, output += extract_length) {
-            auto in = cache.begin() + x;
-            for (Index_ y = 0; y < extract_length; ++y, in += actual_dim) {
-                *(output + y) = *in;
-            }
-        }
-        cache.swap(buffer);
-        return;
-    }
-
-private:
-    template<bool accrow_>
-    Index_ get_target_dim() const {
-        if constexpr(accrow_ != transpose_) {
-            return firstdim;
-        } else {
-            return seconddim;
-        }
-    }
-
-    template<bool accrow_>
-    Index_ get_target_chunk_dim() const {
-        if constexpr(accrow_ != transpose_) {
-            return chunk_firstdim;
-        } else {
-            return chunk_seconddim;
-        }
-    }
-
-    template<bool accrow_, typename ExtractType_>
-    const Value_* extract(Index_ i, Value_* buffer, const ExtractType_& extract_value, Index_ extract_length, Workspace<accrow_>& work) const {
-        auto& cache_workspace = work.cache_workspace;
-
-        if (cache_workspace.num_slabs_in_cache == 0) {
-            serialize([&]() -> void {
-                extract_base<accrow_>(i, 1, buffer, extract_value, extract_length, work);
-            });
-
-        } else {
-            const CachedValue_* ptr;
-            Index_ mydim = get_target_dim<accrow_>();
-            Index_ chunk_mydim = get_target_chunk_dim<accrow_>();
-
-            if (cache_workspace.oracle_cache) {
-                auto& to_transpose = work.cache_transpose_info;
-                auto info = cache_workspace.oracle_cache->next(
-                    /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
-                        return std::pair<Index_, Index_>(current / chunk_mydim, current % chunk_mydim);
-                    }, 
-                    /* create = */ [&]() -> Slab {
-                        return Slab(cache_workspace.slab_size_in_elements);
-                    },
-                    /* populate = */ [&](const std::vector<std::pair<Index_, Index_> >& chunks_in_need, std::vector<Slab*>& chunk_data) -> void {
-                        if constexpr(accrow_ == transpose_) {
-                            to_transpose.clear();
-                        }
-
-                        serialize([&]() -> void {
-                            for (const auto& c : chunks_in_need) {
-                                auto& cache_target = *(chunk_data[c.second]);
-                                auto actual_dim = this->extract_chunk<accrow_>(c.first, mydim, chunk_mydim, cache_target.data(), extract_value, extract_length, work);
-                                if constexpr(accrow_ == transpose_) {
-                                    to_transpose.emplace_back(c.second, actual_dim);
-                                }
-                            }
-                        });
-
-                        // Applying transpositions to all cached buffers for easier retrieval, but only once the lock is released.
-                        if constexpr(accrow_ == transpose_) {
-                            for (const auto& x : to_transpose) {
-                                transpose(*(chunk_data[x.first]), work.transposition_buffer, x.second, extract_length);
-                            }
-                        }
-                    }
-                );
-
-                ptr = info.first->data() + extract_length * info.second;
-
-            } else {
-                auto chunk = i / chunk_mydim;
-                auto index = i % chunk_mydim;
-
-                const auto& info = cache_workspace.lru_cache->find(
-                    chunk, 
-                    /* create = */ [&]() -> std::vector<CachedValue_> {
-                        return std::vector<CachedValue_>(cache_workspace.slab_size_in_elements);
-                    },
-                    /* populate = */ [&](Index_ id, std::vector<CachedValue_>& chunk_contents) -> void {
-                        Index_ actual_dim;
-                        serialize([&]() -> void {
-                            actual_dim = extract_chunk<accrow_>(id, mydim, chunk_mydim, chunk_contents.data(), extract_value, extract_length, work);
-                        });
-
-                        // Applying a transposition for easier retrieval, but only once the lock is released.
-                        if constexpr(accrow_ == transpose_) {
-                            transpose(chunk_contents, work.transposition_buffer, actual_dim, extract_length);
-                        }
-                    }
-                );
-
-                ptr = info.data() + index * extract_length;
-            }
-
-            std::copy(ptr, ptr + extract_length, buffer);
-        }
-
-        return buffer;
-    }
-
-private:
-    template<bool accrow_, tatami::DimensionSelectionType selection_>
-    struct Hdf5Extractor : public tatami::Extractor<selection_, false, Value_, Index_> {
-        Hdf5Extractor(const Hdf5DenseMatrix* p) : parent(p) {
-            if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
-                this->full_length = (accrow_ ? parent->ncol() : parent->nrow());
-                initialize_workspace(this->full_length); 
-            }
-        }
-
-        Hdf5Extractor(const Hdf5DenseMatrix* p, Index_ start, Index_ length) : parent(p) {
-            if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
-                this->block_start = start;
-                this->block_length = length;
-                initialize_workspace(this->block_length); 
-            }
-        }
-
-        Hdf5Extractor(const Hdf5DenseMatrix* p, std::vector<Index_> idx) : parent(p) {
-            if constexpr(selection_ == tatami::DimensionSelectionType::INDEX) {
-                this->index_length = idx.size();
-                indices = std::move(idx);
-                initialize_workspace(this->index_length); 
-            }
-        }
-
-        ~Hdf5Extractor() {
-            // Destructor also needs to be made thread-safe;
-            // this is why the workspace is a pointer.
-            serialize([&]() -> void {
-                base.reset();
-            });
-        }
-
-    protected:
-        const Hdf5DenseMatrix* parent;
-        std::unique_ptr<Workspace<accrow_> > base;
-        typename std::conditional<selection_ == tatami::DimensionSelectionType::INDEX, std::vector<Index_>, bool>::type indices;
-
-    private:
-        void initialize_workspace(Index_ other_dim) {
-            serialize([&]() -> void {
-                base.reset(new Workspace<accrow_>());
-
-                // Turn off HDF5's caching, as we'll be handling that. This allows us
-                // to parallelize extractions without locking when the data has already
-                // been loaded into memory; if we just used HDF5's cache, we would have
-                // to lock on every extraction, given the lack of thread safety.
-                H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
-                fapl.setCache(0, 0, 0, 0);
-
-                base->file.openFile(parent->file_name, H5F_ACC_RDONLY, fapl);
-                base->dataset = base->file.openDataSet(parent->dataset_name);
-                base->dataspace = base->dataset.getSpace();
-            });
-
-            base->cache_workspace = tatami_chunked::TypicalSlabCacheWorkspace<Index_, Slab>(
-                (accrow_ != transpose_ ? parent->chunk_firstdim : parent->chunk_seconddim),
-                other_dim,
-                parent->cache_size_in_elements,
-                parent->require_minimum_cache
-            );
-        }
-
-    public:
-        const Index_* index_start() const {
-            if constexpr(selection_ == tatami::DimensionSelectionType::INDEX) {
-                return indices.data();
-            } else {
-                return NULL;
-            }
-        }
-
-        const Value_* fetch(Index_ i, Value_* buffer) {
-            if constexpr(selection_ == tatami::DimensionSelectionType::FULL) {
-                return parent->extract<accrow_>(i, buffer, 0, this->full_length, *base);
-            } else if constexpr(selection_ == tatami::DimensionSelectionType::BLOCK) {
-                return parent->extract<accrow_>(i, buffer, this->block_start, this->block_length, *base);
-            } else {
-                return parent->extract<accrow_>(i, buffer, this->indices, this->index_length, *base);
-            }
-        }
-
-        void set_oracle(std::unique_ptr<tatami::Oracle<Index_> > o) {
-            base->cache_workspace.set_oracle(std::move(o));
-        }
-    };
-
-    template<bool accrow_, tatami::DimensionSelectionType selection_, typename ... Args_>
-    std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> > populate(const tatami::Options&, Args_&&... args) const {
-        return std::unique_ptr<tatami::Extractor<selection_, false, Value_, Index_> >(new Hdf5Extractor<accrow_, selection_>(this, std::forward<Args_>(args)...));
-    }
 
 public:
     std::unique_ptr<tatami::FullDenseExtractor<Value_, Index_> > dense_row(const tatami::Options& opt) const {
