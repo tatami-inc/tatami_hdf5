@@ -21,6 +21,134 @@
 namespace tatami_hdf5 {
 
 /**
+ * @cond
+ */
+namespace Hdf5CompressedSparseMatrix_internal {
+
+// All HDF5-related members.
+struct PrimaryComponents {
+    H5::H5File file;
+    H5::DataSet data_dataset;
+    H5::DataSet index_dataset;
+    H5::DataSpace dataspace;
+    H5::DataSpace memspace;
+};
+
+class PrimaryBase {
+    PrimaryBase(const std::string& file_name, const std::string& data_name, const std::string& index_name, const std::vector<hsize_t>& ptrs) : pointers(ptrs) {
+        serialize([&]() -> void {
+           h5comp.reset(new PrimaryComponents);
+
+            // TODO: set more suitable chunk cache values here, to avoid re-reading
+            // chunks that are only partially consumed.
+            h5comp->file.openFile(file_name, H5F_ACC_RDONLY);
+            h5comp->data = h5comp->file.openDataSet(data_name);
+            h5comp->index = h5comp->file.openDataSet(index_name);
+            h5comp->dataspace = h5comp->data.getSpace();
+        });
+    }
+
+public:
+    const std::vector<hsize_t>& pointers;
+
+    // HDF5 members are stored in a separate pointer so we can serialize construction and destruction.
+    std::unique_ptr<PrimaryComponents> h5comp;
+};
+
+template<typename Index_, typename CachedValue_, typename CachedIndex_>
+class LruBase : public PrimaryBase {
+    struct Slab {
+        Slab(size_t capacity, bool needs_cached_value, bool needs_cached_index) : 
+            value(needs_cached_value ? capacity : 0), index(needs_cached_index ? capacity : 0) {}
+        std::vector<CachedValue_> value;
+        std::vector<CachedIndex_> index;
+        Index_ length;
+    };
+
+    tatami_chunked::LruSlabCache<Index_, Slab> cache;
+    size_t max_non_zeros;
+    bool needs_cached_value, needs_cached_index;
+
+public:
+    LruBase(
+        const std::string& file_name,
+        const std::string& data_name,
+        const std::string& index_name,
+        const std::vector<hsize_t>& ptrs,
+        size_t cache_size,
+        size_t max_non_zeros, 
+        bool needs_cached_value, 
+        bool needs_cached_index) : 
+        cache([&]() -> size_t {
+            // Always return at least one slab, so that cache.find() is valid.
+            if (max_non_zeros == 0) {
+                return 1;
+            }
+
+            auto elsize = size_of_element<CachedValue_, CachedIndex_>(needs_cached_value, needs_cached_index);
+            if elsize == 0 {
+                return 1;
+            }
+
+            auto num_slabs = cache_size / (max_non_zeros * elsize);
+            if (num_slabs == 0) {
+                return 1;
+            }
+
+            return num_slabs;
+        }()),
+        max_non_zeros(max_non_zeros),
+        needs_cached_value(needs_cached_value),
+        needs_cached_index(needs_cached_index)
+    {}
+
+public:
+    Chunk<Index_, CachedValue_, CachedIndex_> fetch(Index_ i) {
+        const auto& slab = cache.find(
+            i, 
+            /* create = */ [&]() -> LruSlab {
+                return Slab(max_non_zeros, needs_cached_value, needs_cached_index);
+            },
+            /* populate = */ [&](Index_ i, Slab& current_cache) -> void {
+                hsize_t extraction_start = this->pointers[i];
+                hsize_t extraction_len = this->pointers[i + 1] - pointers[i];
+                current_cache.length = extraction_len;
+
+                serialize([&]() -> void {
+                    this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
+                    this->h5comp->memspace.setExtentSimple(1, &extraction_len);
+                    this->h5comp->memspace.selectAll();
+                    if (needs_cached_index) {
+                        this->h5comp->index.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                    }
+                    if (needs_value) {
+                        this->h5comp->data.read(current_cache.value.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                    }
+                });
+            }
+        );
+
+        Chunk<Index_, CachedValue_, CachedIndex_> output;
+        output.length = slab.length;
+        if (needs_cached_value) {
+            output.value = slab.value.data();
+        }
+        if (needs_cached_index) {
+            output.index = slab.index.data();
+        }
+        return output;
+    }
+};
+
+
+
+
+}
+/**
+ * @endcond
+ */
+
+/**
  * @brief Compressed sparse matrix in a HDF5 file.
  *
  * This class retrieves sparse data from the HDF5 file on demand rather than loading it all in at the start.
@@ -173,58 +301,13 @@ public:
      ************ Primary extraction ************
      ********************************************/
 private:
-    struct OracleCache {
-        struct Element {
-            size_t data_offset;
-            size_t mem_offset;
-            Index_ length;
-            bool bounded;
-        };
-
-        std::vector<CachedValue_> cache_value;
-        std::vector<CachedIndex_> cache_index;
-        std::unordered_map<Index_, Index_> cache_exists, next_cache_exists;
-        std::vector<Element> cache_data, next_cache_data;
-
-        tatami::OracleStream<Index_> prediction_stream;
-        std::vector<Index_> predictions_made;
-        std::vector<Index_> needed;
-        std::vector<Index_> present;
-        size_t predictions_fulfilled = 0;
-
-        size_t max_cache_elements = -1;
-    };
-
-    struct LruSlab {
-        LruSlab(size_t capacity, bool needs_value) : value(needs_value ? capacity : 0), index(capacity) {}
-        std::vector<CachedValue_> value;
-        std::vector<CachedIndex_> index;
-        Index_ length;
-        bool bounded;
-    };
-
     struct PrimaryWorkspace {
         // HDF5 members.
         H5::H5File file;
         H5::DataSet data, index;
         H5::DataSpace dataspace;
         H5::DataSpace memspace;
-
-        // Cache with an oracle.
-        std::unique_ptr<OracleCache> futurist;
-
-        // Cache without an oracle.
-        std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> > historian;
-
-        // Cache for re-use.
-        std::vector<std::pair<size_t, size_t> > extraction_bounds;
-
-        static constexpr size_t no_extraction_bound = -1;
     };
-
-    static size_t size_of_cached_element(bool needs_value, bool needs_cached_index) {
-        return (needs_cached_index ? sizeof(CachedIndex_) : 0) + (needs_value ? sizeof(CachedValue_) : 0);
-    }
 
     void initialize_lru_cache(std::unique_ptr<tatami_chunked::LruSlabCache<Index_, LruSlab> >& historian, bool needs_value, bool needs_cached_index) const {
         // This function should only be called if at least one of needs_value or needs_cached_index
@@ -323,16 +406,6 @@ private:
         );
 
         return Extracted(chosen);
-    }
-
-    template<class Function_>
-    static void sort_by_field(std::vector<int>& indices, Function_ field) {
-        auto comp = [&field](size_t l, size_t r) -> bool {
-            return field(l) < field(r);
-        };
-        if (!std::is_sorted(indices.begin(), indices.end(), comp)) {
-            std::sort(indices.begin(), indices.end(), comp);
-        }
     }
 
     Extracted extract_primary_with_oracle(PrimaryWorkspace& work, bool needs_value, bool needs_cached_index) const {
