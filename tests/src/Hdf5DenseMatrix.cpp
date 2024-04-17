@@ -81,8 +81,8 @@ protected:
         opt.maximum_cache_size = sizeof(double) * cache_size;
         opt.require_minimum_cache = (cache_size > 0);
 
-        mat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int, false>(fpath, name));
-        tmat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int, true>(fpath, name));
+        mat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int, false>(fpath, name, opt));
+        tmat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int, true>(fpath, name, opt));
         return;
     }
 };
