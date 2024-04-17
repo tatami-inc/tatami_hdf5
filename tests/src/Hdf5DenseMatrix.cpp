@@ -16,7 +16,6 @@ class Hdf5DenseMatrixTestCore {
 public:
     static constexpr size_t NR = 200, NC = 100;
 
-protected:
     typedef std::tuple<std::pair<int, int>, int> SimulationParameters;
 
     inline static SimulationParameters last_params;
@@ -55,7 +54,7 @@ protected:
         dims[0] = NR;
         dims[1] = NC;
         H5::DataSpace dspace(2, dims);
-        H5::DataType dtype(H5::PredType::NATIVE_UINT8);
+        H5::DataType dtype(H5::PredType::NATIVE_DOUBLE);
 
         H5::DSetCreatPropList plist(H5::DSetCreatPropList::DEFAULT.getId());
         const auto& chunk_sizes = std::get<0>(params);
@@ -91,9 +90,9 @@ protected:
 /*************************************
  *************************************/
 
-class Hdf5DenseUtilsTest : public ::testing::Test, public Hdf5DenseMatrixTestCore {};
+class Hdf5DenseMatrixUtilsTest : public ::testing::Test, public Hdf5DenseMatrixTestCore {};
 
-TEST_F(Hdf5DenseUtilsTest, Basic) {
+TEST_F(Hdf5DenseMatrixUtilsTest, Basic) {
     {
         assemble(SimulationParameters(std::pair(10, 10), 10));
         EXPECT_EQ(mat->nrow(), NR);
@@ -127,7 +126,7 @@ TEST_F(Hdf5DenseUtilsTest, Basic) {
 /*************************************
  *************************************/
 
-class Hdf5DenseAccessFullTest :
+class Hdf5DenseMatrixAccessFullTest :
     public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters> >,
     public Hdf5DenseMatrixTestCore {
 protected:
@@ -136,7 +135,7 @@ protected:
     }
 };
 
-TEST_P(Hdf5DenseAccessFullTest, Basic) {
+TEST_P(Hdf5DenseMatrixAccessFullTest, Basic) {
     auto params = tatami_test::convert_access_parameters(std::get<1>(GetParam()));
     tatami_test::test_full_access(params, mat.get(), ref.get());
     tatami_test::test_full_access(params, tmat.get(), tref.get());
@@ -144,7 +143,7 @@ TEST_P(Hdf5DenseAccessFullTest, Basic) {
 
 INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
-    Hdf5DenseAccessFullTest,
+    Hdf5DenseMatrixAccessFullTest,
     ::testing::Combine(
         Hdf5DenseMatrixTestCore::create_combinations(), 
         tatami_test::standard_test_access_parameter_combinations()

@@ -104,9 +104,13 @@ void transpose(std::vector<CachedValue_>& cache, std::vector<CachedValue_>& buff
 
             auto in = cache.data() + xstart + ystart * actual_dim;
             auto output = buffer.data() + xstart * extract_length + ystart;
-            for (Index_ x = xstart; x < xend; ++x, output += extract_length) {
-                for (Index_ y = ystart; y < yend; ++y, in += actual_dim) {
-                    *(output + y) = *in;
+
+            for (Index_ x = xstart; x < xend; ++x, ++in, output += extract_length) {
+                auto in_copy = in;
+                auto output_copy = output;
+
+                for (Index_ y = ystart; y < yend; ++y, in_copy += actual_dim, ++output_copy) {
+                    *output_copy = *in_copy;
                 }
             }
         }
