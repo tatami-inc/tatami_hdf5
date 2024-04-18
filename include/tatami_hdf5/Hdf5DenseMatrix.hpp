@@ -36,13 +36,13 @@ struct Components {
 };
 
 template<bool by_h5_row_, typename Index_, typename OutputValue_>
-void extract_block(Index_ primary_start, Index_ primary_length, Index_ extract_start, Index_ extract_length, OutputValue_* buffer, Components& comp) {
+void extract_block(Index_ accessed_start, Index_ accessed_length, Index_ extract_start, Index_ extract_length, OutputValue_* buffer, Components& comp) {
     hsize_t offset[2];
     hsize_t count[2];
 
     constexpr int dimdex = by_h5_row_;
-    offset[1-dimdex] = primary_start;
-    count[1-dimdex] = primary_length;
+    offset[1-dimdex] = accessed_start;
+    count[1-dimdex] = accessed_length;
 
     offset[dimdex] = extract_start;
     count[dimdex] = extract_length;
@@ -57,13 +57,13 @@ void extract_block(Index_ primary_start, Index_ primary_length, Index_ extract_s
 }
 
 template<bool by_h5_row_, typename Index_, typename OutputValue_>
-void extract_indices(Index_ primary_start, Index_ primary_length, const std::vector<Index_>& indices, OutputValue_* buffer, Components& comp) {
+void extract_indices(Index_ accessed_start, Index_ accessed_length, const std::vector<Index_>& indices, OutputValue_* buffer, Components& comp) {
     hsize_t offset[2];
     hsize_t count[2];
 
     constexpr int dimdex = by_h5_row_;
-    offset[1-dimdex] = primary_start;
-    count[1-dimdex] = primary_length;
+    offset[1-dimdex] = accessed_start;
+    count[1-dimdex] = accessed_length;
 
     // Take slices across the current chunk for each index. This should be okay if consecutive,
     // but hopefully they've fixed the problem with non-consecutive slices in:
@@ -127,10 +127,10 @@ protected:
     std::unique_ptr<Components> h5comp;
 
     // Various dimension-related members.
-    Index_ primary_dim;
-    Index_ primary_chunkdim;
+    Index_ accessed_dim;
+    Index_ accessed_chunkdim;
     Index_ extract_length;
-    Index_ num_primary_chunks = 0, last_primary_chunkdim = 0;
+    Index_ num_accessed_chunks = 0, last_accessed_chunkdim = 0;
 
     // Other members.
     typedef std::vector<CachedValue_> Slab;
@@ -142,16 +142,16 @@ public:
     Base(
         const std::string& file_name, 
         const std::string& dataset_name, 
-        Index_ primary_dim, 
-        Index_ primary_chunkdim,
+        Index_ accessed_dim, 
+        Index_ accessed_chunkdim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ extract_length,
         size_t cache_size_in_elements,
         bool require_minimum_cache) :
-        primary_dim(primary_dim), 
-        primary_chunkdim(primary_chunkdim),
+        accessed_dim(accessed_dim), 
+        accessed_chunkdim(accessed_chunkdim),
         extract_length(extract_length),
-        cache_workspace(primary_chunkdim, extract_length, cache_size_in_elements, require_minimum_cache, std::move(oracle))
+        cache_workspace(accessed_chunkdim, extract_length, cache_size_in_elements, require_minimum_cache, std::move(oracle))
     {
         serialize([&]() -> void {
             h5comp.reset(new Components);
@@ -168,9 +168,9 @@ public:
             h5comp->dataspace = h5comp->dataset.getSpace();
         });
 
-        if (primary_chunkdim > 0) {
-            num_primary_chunks = primary_dim / primary_chunkdim + (primary_dim % primary_chunkdim > 0); // i.e., integer ceiling.
-            last_primary_chunkdim = (primary_dim > 0 ? (primary_dim - (num_primary_chunks - 1) * primary_chunkdim) : 0);
+        if (accessed_chunkdim > 0) {
+            num_accessed_chunks = accessed_dim / accessed_chunkdim + (accessed_dim % accessed_chunkdim > 0); // i.e., integer ceiling.
+            last_accessed_chunkdim = (accessed_dim > 0 ? (accessed_dim - (num_accessed_chunks - 1) * accessed_chunkdim) : 0);
         }
     }
 
@@ -181,12 +181,12 @@ public:
     }
 
 protected:
-    // Overload that handles the truncated slab at the bottom/right edges of each matrix.
-    Index_ get_primary_chunkdim(Index_ chunk_id) const {
-        if (chunk_id + 1 == num_primary_chunks) {
-            return last_primary_chunkdim;
+    // Handle the truncated slab at the bottom/right edges of each matrix.
+    Index_ get_accessed_chunkdim(Index_ chunk_id) const {
+        if (chunk_id + 1 == num_accessed_chunks) {
+            return last_accessed_chunkdim;
         } else {
-            return primary_chunkdim;
+            return accessed_chunkdim;
         }
     }
 
@@ -198,7 +198,7 @@ public:
         if constexpr(oracle_) {
             auto info = cache_workspace.cache.next(
                 /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
-                    return std::pair<Index_, Index_>(current / primary_chunkdim, current % primary_chunkdim);
+                    return std::pair<Index_, Index_>(current / accessed_chunkdim, current % accessed_chunkdim);
                 }, 
                 /* create = */ [&]() -> Slab {
                     return Slab(cache_workspace.slab_size_in_elements);
@@ -210,8 +210,8 @@ public:
 
                     serialize([&]() -> void {
                         for (const auto& c : chunks) {
-                            auto curdim = get_primary_chunkdim(c.first);
-                            extract(c.first * primary_chunkdim, curdim, c.second->data());
+                            auto curdim = get_accessed_chunkdim(c.first);
+                            extract(c.first * accessed_chunkdim, curdim, c.second->data());
                             if constexpr(!by_h5_row_) {
                                 cache_transpose_info.emplace_back(c.second, curdim);
                             }
@@ -230,8 +230,8 @@ public:
             ptr = info.first->data() + extract_length * info.second;
 
         } else {
-            auto chunk = i / primary_chunkdim;
-            auto index = i % primary_chunkdim;
+            auto chunk = i / accessed_chunkdim;
+            auto index = i % accessed_chunkdim;
 
             const auto& info = cache_workspace.cache.find(
                 chunk, 
@@ -239,9 +239,9 @@ public:
                     return Slab(cache_workspace.slab_size_in_elements);
                 },
                 /* populate = */ [&](Index_ id, Slab& contents) -> void {
-                    auto curdim = get_primary_chunkdim(id);
+                    auto curdim = get_accessed_chunkdim(id);
                     serialize([&]() -> void {
-                        extract(id * primary_chunkdim, curdim, contents.data());
+                        extract(id * accessed_chunkdim, curdim, contents.data());
                     });
 
                     // Applying a transposition for easier retrieval, but only once the lock is released.
@@ -276,19 +276,19 @@ struct Full : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public ta
     Full(
         const std::string& file_name, 
         const std::string& dataset_name, 
-        Index_ primary_dim, 
-        Index_ primary_chunkdim, 
+        Index_ accessed_dim, 
+        Index_ accessed_chunkdim, 
         tatami::MaybeOracle<oracle_, Index_> oracle,
-        Index_ secondary_dim,
+        Index_ nonaccessed_dim,
         size_t cache_size_in_elements,
         bool require_minimum_cache) :
         Base<use_h5_row_, oracle_, Index_, CachedValue_>(
             file_name, 
             dataset_name, 
-            primary_dim, 
-            primary_chunkdim, 
+            accessed_dim, 
+            accessed_chunkdim, 
             std::move(oracle),
-            secondary_dim, 
+            nonaccessed_dim, 
             cache_size_in_elements, 
             require_minimum_cache
         )
@@ -312,8 +312,8 @@ struct Block : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
     Block(
         const std::string& file_name, 
         const std::string& dataset_name, 
-        Index_ primary_dim, 
-        Index_ primary_chunkdim, 
+        Index_ accessed_dim, 
+        Index_ accessed_chunkdim, 
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -322,8 +322,8 @@ struct Block : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
         Base<use_h5_row_, oracle_, Index_, CachedValue_>(
             file_name, 
             dataset_name, 
-            primary_dim, 
-            primary_chunkdim, 
+            accessed_dim, 
+            accessed_chunkdim, 
             std::move(oracle),
             block_length, 
             cache_size_in_elements, 
@@ -354,8 +354,8 @@ struct Index : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
     Index(
         const std::string& file_name, 
         const std::string& dataset_name, 
-        Index_ primary_dim, 
-        Index_ primary_chunkdim, 
+        Index_ accessed_dim, 
+        Index_ accessed_chunkdim, 
         tatami::MaybeOracle<oracle_, Index_> oracle,
         tatami::VectorPtr<Index_> indices_ptr,
         size_t cache_size_in_elements,
@@ -363,8 +363,8 @@ struct Index : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
         Base<use_h5_row_, oracle_, Index_, CachedValue_>(
             file_name,
             dataset_name, 
-            primary_dim, 
-            primary_chunkdim, 
+            accessed_dim, 
+            accessed_chunkdim, 
             std::move(oracle),
             indices_ptr->size(), 
             cache_size_in_elements, 
