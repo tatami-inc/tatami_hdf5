@@ -223,6 +223,10 @@ protected:
     std::unique_ptr<Components> h5comp;
 };
 
+/****************************************
+ **** Virtual classes for extractors ****
+ ****************************************/
+
 template<typename Index_, typename CachedValue_, typename CachedIndex_>
 struct PrimaryLruBase : public PrimaryBase {
     struct Slab {
@@ -244,10 +248,12 @@ public:
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
+        tatami::MaybeOracle<false, Index_>,
         size_t cache_size,
         size_t max_non_zeros, 
         bool needs_cached_value, 
         bool needs_cached_index) : 
+        PrimaryBase(file_name, data_name, index_name, ptrs),
         cache([&]() -> size_t {
             // Always return at least one slab, so that cache.find() is valid.
             if (max_non_zeros == 0) {
@@ -325,7 +331,7 @@ public:
         size_t max_non_zeros, 
         bool needs_cached_value, 
         bool needs_cached_index) : 
-        Base(file_name, data_name, index_name, ptrs),
+        PrimaryBase(file_name, data_name, index_name, ptrs),
         cache(std::move(oracle), cache_size, max_non_zeros, needs_cached_value, needs_cached_index)
     {}
 
@@ -334,6 +340,77 @@ public:
         return cache.next();
     }
 };
+
+template<bool oracle_, typename Index_, typename CachedValue_, typename CachedIndex_>
+using ConditionalPrimaryBase = typename std::conditional<oracle_, PrimaryOracleBase<Index_, CachedValue_, CachedIndex_>, PrimaryLruBase<Index_, CachedValue_, CachedIndex_> >::type;
+
+/************************************
+ **** Concrete extractor classes ****
+ ************************************/
+
+template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
+class PrimaryFullSparse : public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
+    PrimaryFullSparse(
+        const std::string& file_name,
+        const std::string& data_name,
+        const std::string& index_name,
+        const std::vector<hsize_t>& ptrs,
+        tatami::MaybeOracle<oracle_, Index_> oracle,
+        size_t cache_size,
+        size_t max_non_zeros, 
+        bool needs_cached_value, 
+        bool needs_cached_index) : 
+        ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, needs_cached_value, needs_cached_index)
+    {}
+
+    tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
+        tatami::SparseRange<Value_, Index_> output;
+        auto chunk = this->fetch(i);
+        if (chunk.value) {
+            std::copy_n(chunk.value, chunk.length, vbuffer);
+            output.value = vbuffer;
+        }
+        if (chunk.index) {
+            std::copy_n(chunk.index, chunk.length, vbuffer);
+            output.index = ibuffer;
+        }
+        return output;
+    }
+};
+
+template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
+class PrimaryFullDense : public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
+   PrimaryFullDense(
+        const std::string& file_name,
+        const std::string& data_name,
+        const std::string& index_name,
+        const std::vector<hsize_t>& ptrs,
+        tatami::MaybeOracle<oracle_, Index_> oracle,
+        size_t cache_size,
+        size_t max_non_zeros,
+        Index_ extracted_length) :
+        ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, true, true),
+        extracted_length
+    {}
+
+    const Value_* fetch(Index_ i, Value_* buffer) {
+        std::fill(
+        auto chunk = this->fetch(i);
+        for (Index_ j = 0; j < chunk.length; ++j) {
+
+        }
+        if (chunk.value) {
+            std::copy_n(chunk.value, chunk.length, vbuffer);
+            output.value = vbuffer;
+        }
+        if (chunk.index) {
+            std::copy_n(chunk.index, chunk.length, vbuffer);
+            output.index = ibuffer;
+        }
+        return output;
+    }
+};
+
 
 }
 
