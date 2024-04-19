@@ -271,7 +271,9 @@ struct Full : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public ta
 
     const Value_* fetch(Index_ i, Value_* buffer) {
         if (this->cache_workspace.num_slabs_in_cache == 0) {
-            extract_block<use_h5_row_>(this->reindex(i), static_cast<Index_>(1), static_cast<Index_>(0), this->extract_length, buffer, *(this->h5comp));
+            serialize([&](){
+                extract_block<use_h5_row_>(this->reindex(i), static_cast<Index_>(1), static_cast<Index_>(0), this->extract_length, buffer, *(this->h5comp));
+            });
         } else {
             this->extract(i, buffer, [&](Index_ start, Index_ length, CachedValue_* buf) {
                 extract_block<use_h5_row_>(start, length, static_cast<Index_>(0), this->extract_length, buf, *(this->h5comp));
@@ -308,7 +310,9 @@ struct Block : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
 
     const Value_* fetch(Index_ i, Value_* buffer) {
         if (this->cache_workspace.num_slabs_in_cache == 0) {
-            extract_block<use_h5_row_>(this->reindex(i), static_cast<Index_>(1), block_start, block_length, buffer, *(this->h5comp));
+            serialize([&](){
+                extract_block<use_h5_row_>(this->reindex(i), static_cast<Index_>(1), block_start, block_length, buffer, *(this->h5comp));
+            });
         } else {
             this->extract(i, buffer, [&](Index_ start, Index_ length, CachedValue_* buf) {
                 extract_block<use_h5_row_>(start, length, block_start, block_length, buf, *(this->h5comp));
@@ -346,7 +350,9 @@ struct Index : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
 
     const Value_* fetch(Index_ i, Value_* buffer) {
         if (this->cache_workspace.num_slabs_in_cache == 0) {
-            extract_indices<use_h5_row_>(this->reindex(i), static_cast<Index_>(1), *indices_ptr, buffer, *(this->h5comp));
+            serialize([&](){
+                extract_indices<use_h5_row_>(this->reindex(i), static_cast<Index_>(1), *indices_ptr, buffer, *(this->h5comp));
+            });
         } else {
             this->extract(i, buffer, [&](Index_ start, Index_ length, CachedValue_* buf) {
                 extract_indices<use_h5_row_>(start, length, *indices_ptr, buf, *(this->h5comp));

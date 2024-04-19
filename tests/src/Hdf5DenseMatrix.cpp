@@ -205,7 +205,7 @@ protected:
         assemble(std::get<0>(GetParam()));
     }
 };
-
+  
 TEST_P(Hdf5DenseIndexedTest, Basic) {
     auto tparam = GetParam();
     auto params = tatami_test::convert_access_parameters(std::get<1>(tparam));
@@ -265,5 +265,74 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Combine(
         ::testing::Values(true, false), // row access
         ::testing::Values(true, false)  // oracle usage
+    )
+);
+
+/*************************************
+ *************************************/
+
+class Hdf5DenseParallelTest : public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, bool, bool> >, public Hdf5DenseMatrixTestCore {
+protected:
+    void SetUp() {
+        assemble(std::get<0>(GetParam()));
+    }
+
+    template<bool oracle_>
+    static void compare_sums(bool row, const tatami::Matrix<double, int>* testmat, const tatami::Matrix<double, int>* refmat) {
+        size_t dim = (row ? refmat->nrow() : refmat->ncol());
+        size_t otherdim = (row ? refmat->ncol() : refmat->nrow());
+        std::vector<double> computed(dim), expected(dim);
+
+        tatami::parallelize([&](size_t, int start, int len) -> void {
+            auto ext = [&]() {
+                if constexpr(oracle_) {
+                    return tatami::consecutive_extractor<false>(testmat, row, start, len);
+                } else {
+                    return testmat->dense(row, tatami::Options());
+                }
+            }();
+
+            auto rext = [&]() {
+                if constexpr(oracle_) {
+                    return tatami::consecutive_extractor<false>(refmat, row, start, len);
+                } else {
+                    return refmat->dense(row, tatami::Options());
+                }
+            }();
+
+            std::vector<double> buffer(otherdim), rbuffer(otherdim);
+            for (int i = start; i < start + len; ++i) {
+                auto ptr = ext->fetch(i, buffer.data());
+                auto rptr = rext->fetch(i, rbuffer.data());
+                computed[i] = std::accumulate(ptr, ptr + otherdim, 0.0);
+                expected[i] = std::accumulate(rptr, rptr + otherdim, 0.0);
+            }
+        }, dim, 3); // throw it over three threads.
+
+        EXPECT_EQ(computed, expected);
+    }
+};
+
+TEST_P(Hdf5DenseParallelTest, Simple) {
+    auto param = GetParam();
+    bool row = std::get<1>(param);
+    bool oracle = std::get<2>(param);
+
+    if (oracle) {
+        compare_sums<true>(row, mat.get(), ref.get());
+        compare_sums<true>(row, tmat.get(), tref.get());
+    } else {
+        compare_sums<false>(row, mat.get(), ref.get());
+        compare_sums<false>(row, tmat.get(), tref.get());
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5DenseMatrix,
+    Hdf5DenseParallelTest,
+    ::testing::Combine(
+        Hdf5DenseMatrixTestCore::create_combinations(),
+        ::testing::Values(true, false),
+        ::testing::Values(true, false)
     )
 );
