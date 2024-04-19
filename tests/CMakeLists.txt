@@ -27,7 +27,7 @@ macro(create_h5test target)
         src/load_hdf5_matrix.cpp
         src/write_sparse_matrix_to_hdf5.cpp
         src/Hdf5DenseMatrix.cpp
-#        src/Hdf5CompressedSparseMatrix.cpp
+        src/Hdf5CompressedSparseMatrix.cpp
     )
     target_compile_definitions(${target} PRIVATE DEBUG=1)
 

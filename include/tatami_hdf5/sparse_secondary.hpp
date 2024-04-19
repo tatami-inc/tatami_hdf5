@@ -38,17 +38,17 @@ public:
         cache_workspace(
             dim_stats.chunk_length, 
             extract_length, 
-            cache_size /  size_of_element<Index_, CachedValue_>(needs_cached_value, true),
+            cache_size / Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_cached_value, true),
             require_minimum_cache, 
             std::move(oracle)
         )
     {
         serialize([&]() -> void {
             h5comp.reset(new Components);
-            h5comp->file.openFile(file_name, H5F_ACC_RDONLY, fapl);
-            h5comp->data = h5comp->file.openDataSet(data_name);
-            h5comp->index = h5comp->file.openDataSet(index_name);
-            h5comp->dataspace = h5comp->data.getSpace();
+            h5comp->file.openFile(file_name, H5F_ACC_RDONLY);
+            h5comp->data_dataset = h5comp->file.openDataSet(data_name);
+            h5comp->index_dataset = h5comp->file.openDataSet(index_name);
+            h5comp->dataspace = h5comp->data_dataset.getSpace();
         });
 
         // Allocating it once so that each fetch() call doesn't have to check for width.
@@ -68,6 +68,7 @@ public:
 
 protected:
     const std::vector<hsize_t>& pointers;
+    tatami_chunked::ChunkDimensionStats<Index_> dim_stats;
 
     struct Slab {
         std::vector<CachedValue_> data;
@@ -111,7 +112,7 @@ private:
                 /* populate = */ [&](const std::vector<std::pair<Index_, Slab*> >& chunks) -> void {
                     serialize([&]() -> void {
                         for (const auto& c : chunks) {
-                            extract(c.first * chunk_length, get_primary_chunkdim(c.first), *(c.second));
+                            extract(c.first * dim_stats.chunk_length, dim_stats.get_primary_chunkdim(c.first), *(c.second));
                         }
                     });
                 }
@@ -142,11 +143,11 @@ public:
     // itself (useful for sparse extraction).
     template<bool store_index_>
     std::pair<const Slab*, Index_> fetch_block(Index_ i, Index_ primary_start, Index_ primary_length) {
-        if (cache.num_slabs_in_cache == 0) {
+        if (cache_workspace.num_slabs_in_cache == 0) {
             solo.reset();
             for (Index_ px = 0; px < primary_length; ++px) {
-                auto primary = primary_indices[px];
-                extract_and_append_single(primary, secondary_start, secondary_length, (store_index_ ? px : primary));
+                auto primary = px + primary_start;
+                extract_and_append_single(primary, i, (store_index_ ? px : primary));
             }
             solo.pointers.push_back(solo.index.size());
             return std::make_pair(&solo, 0);
@@ -155,7 +156,7 @@ public:
             return fetch(i, [&](Index_ secondary_start, Index_ secondary_length, Slab& contents) {
                 for (Index_ px = 0; px < primary_length; ++px) {
                     auto primary = px + primary_start;
-                    extract_and_append(primary, secondary, secondary_start, (store_index_ ? px : primary));
+                    extract_and_append(primary, secondary_start, secondary_length, (store_index_ ? px : primary));
                 }
                 compress_and_move_transpose_info(contents, secondary_length);
             });
@@ -164,11 +165,11 @@ public:
 
     template<bool store_index_>
     std::pair<const Slab*, Index_> fetch_indices(Index_ i, const std::vector<Index_>& primary_indices) {
-        if (cache.num_slabs_in_cache == 0) {
+        if (cache_workspace.num_slabs_in_cache == 0) {
             solo.reset();
             for (Index_ px = 0, end = primary_indices.size(); px < end; ++px) {
                 auto primary = primary_indices[px];
-                extract_and_append_single(primary, secondary_start, secondary_length, (store_index_ ? px : primary));
+                extract_and_append_single(primary, i, (store_index_ ? px : primary));
             }
             solo.pointers.push_back(solo.index.size());
             return std::make_pair(&solo, 0);
@@ -189,29 +190,28 @@ private:
     void extract_and_append(Index_ primary, Index_ secondary_start, Index_ secondary_length, Index_ primary_to_add) {
         hsize_t left = pointers[primary], right = pointers[primary + 1];
         hsize_t count = right - left;
-        size_t old_size = store.index.size();
         index_buffer.resize(count);
 
-        work.dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
-        work.memspace.setExtentSimple(1, &count);
-        work.memspace.selectAll();
-        work.index_dataset.read(index_buffer.data(), define_mem_type<Index_>(), work.memspace, work.dataspace);
+        h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
+        h5comp->memspace.setExtentSimple(1, &count);
+        h5comp->memspace.selectAll();
+        h5comp->index_dataset.read(index_buffer.data(), define_mem_type<Index_>(), h5comp->memspace, h5comp->dataspace);
 
-        auto start = store.index.begin(), end = store.index.end();
+        auto start = index_buffer.begin(), end = index_buffer.end();
         refine_primary_limits(start, end, dim_stats.dimension_extent, secondary_start, secondary_start + secondary_length);
         for (auto x = start; x != end; ++x) {
             transpose_store.index[*start - secondary_start].push_back(primary_to_add);
         }
 
         if (start != end && needs_cached_value) {
-            hsize_t better_left = left + (start - store.index.begin());
+            hsize_t better_left = left + (start - index_buffer.begin());
             hsize_t better_count = end - start;
-            work.dataspace.selectHyperslab(H5S_SELECT_SET, &better_count, &better_offset);
-            work.memspace.setExtentSimple(1, &better_count);
-            work.memspace.selectAll();
+            h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &better_count, &better_left);
+            h5comp->memspace.setExtentSimple(1, &better_count);
+            h5comp->memspace.selectAll();
 
             data_buffer.resize(better_count);
-            work.data.read(data_buffer.data(), define_mem_type<CachedValue_>(), work.memspace, work.dataspace);
+            h5comp->data_dataset.read(data_buffer.data(), define_mem_type<CachedValue_>(), h5comp->memspace, h5comp->dataspace);
             size_t y = 0;
             for (auto x = start; x != end; ++x, ++y) {
                 transpose_store.value[*start - secondary_start].push_back(data_buffer[y]);
@@ -221,45 +221,46 @@ private:
 
     void compress_and_move_transpose_info(Slab& slab, Index_ secondary_length) {
         slab.reset();
-        for (const auto& x : store.index) {
+        for (Index_ s = 0; s < secondary_length; ++s) {
+            auto& x = transpose_store.index[s];
             slab.pointers.push_back(slab.pointers.back() + x.size());
             slab.index.insert(slab.index.end(), x.begin(), x.end());
             x.clear();
         }
 
-        if (needs_value) {
-            for (const auto& x : store.data) {
+        if (needs_cached_value) {
+            for (Index_ s = 0; s < secondary_length; ++s) {
+                auto& x = transpose_store.index[s];
                 slab.data.insert(slab.data.end(), x.begin(), x.end());
                 x.clear();
             }
         }
     }
 
-    void extract_and_append_single(Index_ primary, Index_ secondary_start, Index_ secondary_length, Index_ primary_to_add) {
+    void extract_and_append_single(Index_ primary, Index_ secondary, Index_ primary_to_add) {
         hsize_t left = pointers[primary], right = pointers[primary + 1];
         hsize_t count = right - left;
-        size_t old_size = store.index.size();
         index_buffer.resize(count);
 
-        work.dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
-        work.memspace.setExtentSimple(1, &count);
-        work.memspace.selectAll();
-        work.index_dataset.read(index_buffer.data(), define_mem_type<Index_>(), work.memspace, work.dataspace);
+        h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
+        h5comp->memspace.setExtentSimple(1, &count);
+        h5comp->memspace.selectAll();
+        h5comp->index_dataset.read(index_buffer.data(), define_mem_type<Index_>(), h5comp->memspace, h5comp->dataspace);
 
-        auto start = store.index.begin(), end = store.index.end();
+        auto start = index_buffer.begin(), end = index_buffer.end();
         auto it = std::lower_bound(start, end, secondary);
 
         if (it != end && *it == secondary) {
             solo.index.push_back(primary_to_add);
-            if (needs_value) {
+            if (needs_cached_value) {
                 hsize_t offset = left + (it - start);
                 count = 1;
-                core.dataspace.selectHyperslab(H5S_SELECT_SET, &count, &offset);
-                core.memspace.setExtentSimple(1, &count);
-                core.memspace.selectAll();
+                h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &offset);
+                h5comp->memspace.setExtentSimple(1, &count);
+                h5comp->memspace.selectAll();
 
-                Value_ dest;
-                work.data_dataset.read(&dest, define_mem_type<Value_>(), work.memspace, work.dataspace);
+                CachedValue_ dest;
+                h5comp->data_dataset.read(&dest, define_mem_type<CachedValue_>(), h5comp->memspace, h5comp->dataspace);
                 solo.value.push_back(dest);
             }
         }
@@ -268,7 +269,7 @@ private:
 
 public:
     template<typename Value_>
-    tatami::SparseRange<Value, Index_> slab_to_sparse(const Slab& chunk, Index_ offset, Value_* vbuffer, Index_* ibuffer, bool needs_index) {
+    tatami::SparseRange<Value_, Index_> slab_to_sparse(const Slab& chunk, Index_ offset, Value_* vbuffer, Index_* ibuffer, bool needs_index) {
         size_t start = chunk.pointers[offset];
         size_t length = chunk.pointers[offset + 1] - start;
 
@@ -328,7 +329,7 @@ class SecondaryFullSparse : public SecondaryBase<oracle_, Index_, CachedValue_> 
             std::move(oracle), 
             uncached_dim,
             cache_size, 
-            require_minimum_value,
+            require_minimum_cache,
             needs_value 
         ),
         uncached_dim(uncached_dim),
@@ -345,8 +346,8 @@ private:
     bool needs_index;
 };
 
-template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class SecondaryFullDense : public ConditionalSecondaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
+template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
+class SecondaryFullDense : public SecondaryBase<oracle_, Index_, CachedValue_> {
    SecondaryFullDense(
         const std::string& file_name, 
         const std::string& data_name, 
@@ -366,7 +367,7 @@ class SecondaryFullDense : public ConditionalSecondaryBase<oracle_, Index_, Cach
             std::move(oracle), 
             uncached_dim,
             cache_size,
-            require_minimum_value,
+            require_minimum_cache,
             true
         ),
         uncached_dim(uncached_dim)
@@ -387,7 +388,7 @@ private:
  *********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryBlockSparse : public SecondaryBase<oracle_, Index_, CachedIndex_> {
+class SecondaryBlockSparse : public SecondaryBase<oracle_, Index_, CachedValue_> {
     SecondaryBlockSparse(
         const std::string& file_name,
         const std::string& data_name,
@@ -441,7 +442,7 @@ class SecondaryBlockDense : public SecondaryBase<oracle_, Index_, CachedValue_> 
         Index_ block_start,
         Index_ block_length,
         size_t cache_size,
-        size_t max_non_zeros) :
+        bool require_minimum_cache) :
         SecondaryBase<oracle_, Index_, CachedValue_>(
             file_name, 
             data_name, 
@@ -455,7 +456,7 @@ class SecondaryBlockDense : public SecondaryBase<oracle_, Index_, CachedValue_> 
             true
         ),
         block_start(block_start),
-        block_length(block_length),
+        block_length(block_length)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
@@ -495,7 +496,7 @@ class SecondaryIndexSparse : public SecondaryBase<oracle_, Index_, CachedValue_>
             std::move(oracle), 
             idx_ptr->size(),
             cache_size, 
-            require_minimum_value,
+            require_minimum_cache,
             needs_value 
         ),
         indices_ptr(std::move(idx_ptr)),
@@ -512,8 +513,8 @@ private:
     bool needs_index;
 };
 
-template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class SecondaryIndexDense : public ConditionalSecondaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
+template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
+class SecondaryIndexDense : public SecondaryBase<oracle_, Index_, CachedValue_> {
    SecondaryIndexDense(
         const std::string& file_name,
         const std::string& data_name,
@@ -521,9 +522,9 @@ class SecondaryIndexDense : public ConditionalSecondaryBase<oracle_, Index_, Cac
         const std::vector<hsize_t>& ptrs,
         tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
-        tatami::VectorPtr<Index_> indices_ptr,
+        tatami::VectorPtr<Index_> idx_ptr,
         size_t cache_size,
-        size_t max_non_zeros) :
+        bool require_minimum_cache) :
         SecondaryBase<oracle_, Index_, CachedValue_>(
             file_name, 
             data_name, 
@@ -533,10 +534,10 @@ class SecondaryIndexDense : public ConditionalSecondaryBase<oracle_, Index_, Cac
             std::move(oracle), 
             idx_ptr->size(),
             cache_size, 
-            require_minimum_value,
+            require_minimum_cache,
             true
         ),
-        indices_ptr(std::move(idx_ptr)),
+        indices_ptr(std::move(idx_ptr))
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {

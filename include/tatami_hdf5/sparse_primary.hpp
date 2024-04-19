@@ -124,7 +124,7 @@ struct RetrievePrimarySubsetSparse {
 };
 
 // Other utilities begin here.
-template<typename CachedValue_, typename CachedIndex_ = Index_>
+template<typename CachedValue_, typename CachedIndex_>
 size_t size_of_cached_element(bool needs_cached_value, bool needs_cached_index) {
     return (needs_cached_index ? sizeof(CachedIndex_) : 0) + (needs_cached_value ? sizeof(CachedValue_) : 0);
 }
@@ -166,8 +166,8 @@ struct Chunk {
 template<typename Index_, typename CachedValue_, typename CachedIndex_>
 class ContiguousOracleSlabCache {
 private:
-    std::vector<CachedValue_> cache_value;
-    std::vector<CachedIndex_> cache_index;
+    std::vector<CachedValue_> full_value_buffer;
+    std::vector<CachedIndex_> full_index_buffer;
     std::unordered_map<Index_, Index_> cache_exists, next_cache_exists;
 
     struct Element {
@@ -189,7 +189,7 @@ public:
     ContiguousOracleSlabCache(std::shared_ptr<const tatami::Oracle<Index_> > ora, size_t cache_size, size_t min_elements, bool needs_cached_value, bool needs_cached_index) : 
         oracle(std::move(ora)), 
         max_cache_elements([&]() -> size_t {
-            size_t elsize = size_of_element<CachedIndex_, CachedValue_>(needs_cached_value, needs_cached_index);
+            size_t elsize = size_of_cached_element<CachedIndex_, CachedValue_>(needs_cached_value, needs_cached_index);
             if (elsize == 0) {
                 return min_elements;
             } else {
@@ -202,10 +202,10 @@ public:
         needs_cached_value(needs_cached_value)
     {
         if (needs_cached_index) {
-            cache_index.resize(max_cache_elements);
+            full_index_buffer.resize(max_cache_elements);
         }
-        if (needs_value) {
-            cache_value.resize(max_cache_elements);
+        if (needs_cached_value) {
+            full_value_buffer.resize(max_cache_elements);
         }
     }
 
@@ -268,17 +268,17 @@ public:
                 // elements in the rest of the buffer. This needs some sorting
                 // to ensure that we're not clobbering one re-used element's
                 // contents when shifting another element to the start.
-                sort_by_field(present, [&next_cache_data](size_t i) -> size_t { return next_cache_data[i].mem_offset; });
+                sort_by_field(present, [&](size_t i) -> size_t { return next_cache_data[i].mem_offset; });
 
                 for (auto p : present) {
                     auto& info = next_cache_data[p];
                     if (needs_cached_index) {
-                        auto isrc = cache_index.begin() + info.mem_offset;
-                        std::copy(isrc, isrc + info.length, cache_index.begin() + dest_offset);
+                        auto isrc = full_index_buffer.begin() + info.mem_offset;
+                        std::copy(isrc, isrc + info.length, full_index_buffer.begin() + dest_offset);
                     }
                     if (needs_cached_value) {
-                        auto vsrc = cache_value.begin() + info.mem_offset;
-                        std::copy(vsrc, vsrc + info.length, cache_value.begin() + dest_offset); 
+                        auto vsrc = full_value_buffer.begin() + info.mem_offset;
+                        std::copy(vsrc, vsrc + info.length, full_value_buffer.begin() + dest_offset); 
                     }
                     info.mem_offset = dest_offset;
                     dest_offset += info.length;
@@ -287,12 +287,12 @@ public:
 
             // Sorting so that we get consecutive accesses in the hyperslab construction.
             // This should improve re-use of partially read chunks inside the HDF5 call.
-            sort_by_field(needed, [&next_data_cache](size_t i) -> size_t { return next_cache_data[i].data_offset; });
+            sort_by_field(needed, [&](size_t i) -> size_t { return next_cache_data[i].data_offset; });
 
             serialize([&]() -> void {
                 size_t sofar = 0;
                 hsize_t combined_len = 0;
-                h5comp->dataspace.selectNone();
+                h5comp.dataspace.selectNone();
 
                 while (sofar < needed.size()) {
                     auto& first = next_cache_data[needed[sofar]];
@@ -311,17 +311,17 @@ public:
                         len += next.length;
                     }
 
-                    h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &len, &src_offset);
+                    h5comp.dataspace.selectHyperslab(H5S_SELECT_OR, &len, &src_offset);
                     combined_len += len;
                 }
 
-                h5comp->memspace.setExtentSimple(1, &combined_len);
-                h5comp->memspace.selectAll();
+                h5comp.memspace.setExtentSimple(1, &combined_len);
+                h5comp.memspace.selectAll();
                 if (needs_cached_index) {
-                    h5comp->index.read(cache_index.data() + dest_offset, define_mem_type<CachedIndex_>(), h5comp->memspace, h5comp->dataspace);
+                    h5comp.index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), h5comp.memspace, h5comp.dataspace);
                 }
-                if (needs_value) {
-                    h5comp->data.read(cache_value.data() + dest_offset, define_mem_type<CachedValue_>(), h5comp->memspace, h5comp->dataspace);
+                if (needs_cached_value) {
+                    h5comp.data_dataset.read(full_value_buffer.data() + dest_offset, define_mem_type<CachedValue_>(), h5comp.memspace, h5comp.dataspace);
                 }
             });
         }
@@ -331,20 +331,20 @@ public:
     }
 
 public:
-    Chunk next(Components& h5comp) {
+    Chunk<Index_, CachedValue_, CachedIndex_> next(Components& h5comp) {
         if (counter == future) {
             populate(h5comp);
         }
         auto current = oracle->get(counter++);
         const auto& info = cache_data[cache_exists.find(current)->second];
 
-        Chunk output;
+        Chunk<Index_, CachedValue_, CachedIndex_> output;
         output.length = info.length;
         if (needs_cached_value) {
-            output.value = cached_value.data() + info.mem_offset;
+            output.value = full_value_buffer.data() + info.mem_offset;
         }
         if (needs_cached_index) {
-            output.index = cached_index.data() + info.mem_offset;
+            output.index = full_index_buffer.data() + info.mem_offset;
         }
         return output;
     }
@@ -360,9 +360,9 @@ public:
             // TODO: set more suitable chunk cache values here, to avoid re-reading
             // chunks that are only partially consumed.
             h5comp->file.openFile(file_name, H5F_ACC_RDONLY);
-            h5comp->data = h5comp->file.openDataSet(data_name);
-            h5comp->index = h5comp->file.openDataSet(index_name);
-            h5comp->dataspace = h5comp->data.getSpace();
+            h5comp->data_dataset = h5comp->file.openDataSet(data_name);
+            h5comp->index_dataset = h5comp->file.openDataSet(index_name);
+            h5comp->dataspace = h5comp->data_dataset.getSpace();
         });
     }
 
@@ -414,8 +414,8 @@ public:
                 return 1;
             }
 
-            auto elsize = size_of_element<CachedValue_, CachedIndex_>(needs_cached_value, needs_cached_index);
-            if elsize == 0 {
+            auto elsize = size_of_cached_element<CachedValue_, CachedIndex_>(needs_cached_value, needs_cached_index);
+            if (elsize == 0) {
                 return 1;
             }
 
@@ -435,7 +435,7 @@ public:
     Chunk<Index_, CachedValue_, CachedIndex_> fetch(Index_ i) {
         const auto& slab = cache.find(
             i, 
-            /* create = */ [&]() -> LruSlab {
+            /* create = */ [&]() -> Slab {
                 return Slab(max_non_zeros, needs_cached_value, needs_cached_index);
             },
             /* populate = */ [&](Index_ i, Slab& current_cache) -> void {
@@ -448,10 +448,10 @@ public:
                     this->h5comp->memspace.setExtentSimple(1, &extraction_len);
                     this->h5comp->memspace.selectAll();
                     if (needs_cached_index) {
-                        this->h5comp->index.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                        this->h5comp->index_dataset.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
                     }
-                    if (needs_value) {
-                        this->h5comp->data.read(current_cache.value.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                    if (needs_cached_value) {
+                        this->h5comp->data_dataset.read(current_cache.value.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
                     }
                 });
             }
@@ -515,7 +515,17 @@ class PrimaryFullSparse : public ConditionalPrimaryBase<oracle_, Index_, CachedV
         size_t max_non_zeros, 
         bool needs_value, 
         bool needs_index) : 
-        ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, needs_value, needs_index)
+        ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>(
+            file_name, 
+            data_name, 
+            index_name, 
+            ptrs, 
+            std::move(oracle), 
+            cache_size, 
+            max_non_zeros, 
+            needs_value, 
+            needs_index
+        )
     {}
 
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
@@ -544,7 +554,17 @@ class PrimaryFullDense : public ConditionalPrimaryBase<oracle_, Index_, CachedVa
         tatami::MaybeOracle<oracle_, Index_> oracle,
         size_t cache_size,
         size_t max_non_zeros) :
-        ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, true, true),
+        ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>(
+            file_name, 
+            data_name, 
+            index_name, 
+            ptrs, 
+            std::move(oracle), 
+            cache_size, 
+            max_non_zeros, 
+            true, 
+            true
+        ),
         uncached_dim(uncached_dim)
     {}
 
@@ -554,7 +574,7 @@ class PrimaryFullDense : public ConditionalPrimaryBase<oracle_, Index_, CachedVa
         for (Index_ j = 0; j < chunk.length; ++j) {
             buffer[chunk.index[j]] = chunk.value[j];
         }
-        return output;
+        return buffer;
     }
 
 private:
@@ -580,7 +600,17 @@ class PrimaryBlockSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
         size_t max_non_zeros, 
         bool needs_value, 
         bool needs_index) : 
-        ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, needs_value, true)
+        ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>(
+            file_name,
+            data_name, 
+            index_name, 
+            ptrs, 
+            std::move(oracle), 
+            cache_size, 
+            max_non_zeros, 
+            needs_value, 
+            true
+        ),
         block_start(block_start),
         block_length(block_length),
         uncached_dim(uncached_dim),
@@ -591,7 +621,7 @@ class PrimaryBlockSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
         auto chunk = this->fetch(i);
         auto start = chunk.index, end = chunk.index + chunk.length;
         auto original = start;
-        tatami::sparse_utils::refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length); // WARNING: not documented by tatami!
+        refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length);
         chunk.length = end - start;
 
         tatami::SparseRange<Value_, Index_> output;
@@ -626,24 +656,34 @@ class PrimaryBlockDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
         Index_ block_length,
         size_t cache_size,
         size_t max_non_zeros) :
-        ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, true, true),
+        ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>(
+            file_name,
+            data_name,
+            index_name,
+            ptrs,
+            std::move(oracle), 
+            cache_size, 
+            max_non_zeros, 
+            true, 
+            true
+        ),
         block_start(block_start),
         block_length(block_length),
-        uncached_dim(uncached_dim),
+        uncached_dim(uncached_dim)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
         auto chunk = this->fetch(i);
         auto start = chunk.index, end = chunk.index + chunk.length;
         auto original = start;
-        tatami::sparse_utils::refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length); // WARNING: not documented by tatami!
+        refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length);
 
         std::fill_n(buffer, block_length, 0);
         auto valptr = chunk.value + (start - original);
         for (; start != end; ++start, ++valptr) {
             buffer[*start] = *valptr;
         }
-        return output;
+        return buffer;
     }
 
 private:
@@ -670,7 +710,17 @@ class PrimaryIndexSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
         size_t max_non_zeros, 
         bool needs_value, 
         bool needs_index) : 
-        ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, needs_value, true),
+        ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>(
+            file_name,
+            data_name,
+            index_name,
+            ptrs, 
+            std::move(oracle), 
+            cache_size, 
+            max_non_zeros, 
+            needs_value, 
+            true
+        ),
         retriever(*indices_ptr, uncached_dim), 
         needs_index(needs_index)
     {}
@@ -688,7 +738,7 @@ class PrimaryIndexSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
             [&](size_t offset, Index_ ix) {
                 ++count;
                 if (needs_value) {
-                    *vcopy = *(vIt + offset);
+                    *vcopy = *(chunk.value + offset);
                     ++vcopy;
                 }
                 if (needs_index) {
@@ -698,12 +748,12 @@ class PrimaryIndexSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
             }
         );
 
-        return SparseRange<Value_, Index_>(count, needs_value ? vbuffer : NULL, needs_index ? ibuffer : NULL);
+        return tatami::SparseRange<Value_, Index_>(count, needs_value ? vbuffer : NULL, needs_index ? ibuffer : NULL);
     }
 
 private:
     tatami::VectorPtr<Index_> indices_ptr;
-    tatami::sparse_utils::RetrievePrimarySubsetSparse<Index_> retriever; // WARNING: not documented by tatami!
+    tatami::sparse_utils::RetrievePrimarySubsetSparse<Index_> retriever;
     bool needs_index;
 };
 
@@ -719,7 +769,17 @@ class PrimaryIndexDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
         tatami::VectorPtr<Index_> indices_ptr,
         size_t cache_size,
         size_t max_non_zeros) :
-        ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, true, true),
+        ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>(
+            file_name,
+            data_name,
+            index_name,
+            ptrs, 
+            std::move(oracle), 
+            cache_size, 
+            max_non_zeros, 
+            true, 
+            true
+        ),
         retriever(*indices_ptr, uncached_dim),
         num_indices(indices_ptr->size())
     {}
@@ -732,7 +792,7 @@ class PrimaryIndexDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
             chunk.index,
             chunk.index + chunk.length,
             [&](size_t offset, Index_ ix) {
-                buffer[ix] = *(vIt + offset);
+                buffer[ix] = *(chunk.value + offset);
             }
         );
 
@@ -741,7 +801,7 @@ class PrimaryIndexDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
 
 private:
     tatami::VectorPtr<Index_> indices_ptr;
-    tatami::sparse_utils::RetrievePrimarySubsetDense<Index_> retriever; // WARNING: not documented by tatami!
+    tatami::sparse_utils::RetrievePrimarySubsetDense<Index_> retriever;
     size_t num_indices;
 };
 
