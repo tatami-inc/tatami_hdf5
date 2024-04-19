@@ -1,10 +1,12 @@
-#ifndef TATAMI_HDF5_PRIMARY_SPARSE_UTILS_HPP
-#define TATAMI_HDF5_PRIMARY_SPARSE_UTILS_HPP
+#ifndef TATAMI_HDF5_SPARSE_SECONDARY_HPP
+#define TATAMI_HDF5_SPARSE_SECONDARY_HPP
 
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
+
 #include "tatami/tatami.hpp"
+#include "sparse_primary.hpp"
 
 namespace tatami_hdf5 {
 
@@ -20,18 +22,22 @@ public:
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        Index_ secondary_dim,
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
         Index_ extract_length,
-        Index_ chunk_length,
-        size_t cache_size_in_elements, 
+        size_t cache_size, 
         bool require_minimum_cache,
         bool needs_cached_value) :
         pointers(ptrs),
-        secondary_dim(secondary_dim),
+        dim_stats(std::move(cache_dim_stats)),
         needs_cached_value(needs_cached_value),
-        cache_workspace(chunk_length, extract_length, cache_size_in_elements, require_minimum_cache, std::move(oracle)),
-        chunk_length(chunk_length)
+        cache_workspace(
+            dim_stats.chunk_length, 
+            extract_length, 
+            cache_size /  size_of_element<Index_, CachedValue_>(needs_cached_value, true),
+            require_minimum_cache, 
+            std::move(oracle)
+        )
     {
         serialize([&]() -> void {
             h5comp.reset(new Components);
@@ -44,9 +50,9 @@ public:
         // Allocating it once so that each fetch() call doesn't have to check for width.
         // Don't be tempted to resize these vectors over the lifetime of this object;
         // we want to avoid destructing the internal vectors to re-use their capacity.
-        transpose_store.value.resize(chunk_length);
+        transpose_store.value.resize(dim_stats.chunk_length);
         if (needs_cached_value) {
-            transpose_store.value.resize(chunk_length);
+            transpose_store.value.resize(dim_stats.chunk_length);
         }
     }
 
@@ -58,7 +64,6 @@ public:
 
 protected:
     const std::vector<hsize_t>& pointers;
-    Index_ secondary_dim;
 
     struct Slab {
         std::vector<CachedValue_> data;
@@ -76,7 +81,6 @@ protected:
 
     tatami_chunked::TypicalSlabCacheWorkspace<oracle_, false, Index_, Slab> cache_workspace;
     Slab solo;
-    Index_ chunk_length;
 
     std::vector<CachedValue_> data_buffer;
     std::vector<Index_> index_buffer;
@@ -95,7 +99,7 @@ private:
         if constexpr(oracle_) {
             return cache_workspace.cache.next(
                 /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
-                    return std::pair<Index_, Index_>(current / chunk_length, current % chunk_length);
+                    return std::pair<Index_, Index_>(current / dim_stats.chunk_length, current % dim_stats.chunk_length);
                 }, 
                 /* create = */ [&]() -> Slab {
                     return Slab();
@@ -103,25 +107,23 @@ private:
                 /* populate = */ [&](const std::vector<std::pair<Index_, Slab*> >& chunks) -> void {
                     serialize([&]() -> void {
                         for (const auto& c : chunks) {
-                            auto curdim = get_primary_chunkdim(c.first);
-                            extract(c.first * chunk_length, curdim, *(c.second));
+                            extract(c.first * chunk_length, get_primary_chunkdim(c.first), *(c.second));
                         }
                     });
                 }
             );
 
         } else {
-            auto chunk = i / chunk_length;
-            auto index = i % chunk_length;
+            auto chunk = i / dim_stats.chunk_length;
+            auto index = i % dim_stats.chunk_length;
             auto ptr = cache_workspace.cache.find(
                 chunk, 
                 /* create = */ [&]() -> Slab {
                     return Slab();
                 },
                 /* populate = */ [&](Index_ id, Slab& contents) -> void {
-                    auto curdim = get_primary_chunkdim(id);
                     serialize([&]() -> void {
-                        extract(id * chunk_length, curdim, contents);
+                        extract(id * dim_stats.chunk_length, dim_stats.get_primary_chunkdim(id), contents);
                     });
                 }
             );
@@ -192,7 +194,7 @@ private:
         work.index_dataset.read(index_buffer.data(), define_mem_type<Index_>(), work.memspace, work.dataspace);
 
         auto start = store.index.begin(), end = store.index.end();
-        refine_primary_limits(start, end, secondary_dim, secondary_start, secondary_start + secondary_length);
+        refine_primary_limits(start, end, dim_stats.dimension_extent, secondary_start, secondary_start + secondary_length);
         for (auto x = start; x != end; ++x) {
             transpose_store.index[*start - secondary_start].push_back(primary_to_add);
         }
@@ -306,11 +308,10 @@ class SecondaryFullSparse : public SecondaryBase<oracle_, Index_, CachedValue_> 
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        Index_ primary_dim,
-        Index_ secondary_dim,
+        tatami_chunked::ChunkDimensionStats<Index_>& cache_dim_stats,
+        Index_ uncached_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
-        Index_ chunk_length,
-        size_t cache_size_in_elements, 
+        size_t cache_size, 
         bool require_minimum_cache,
         bool needs_value,
         bool needs_index) : 
@@ -319,25 +320,24 @@ class SecondaryFullSparse : public SecondaryBase<oracle_, Index_, CachedValue_> 
             data_name, 
             index_name, 
             ptrs, 
-            secondary_dim,
+            std::move(cache_dim_stats),
             std::move(oracle), 
-            secondary_dim,
-            chunk_length,
-            cache_size_in_elements, 
+            uncached_dim,
+            cache_size, 
             require_minimum_value,
             needs_value 
         ),
-        primary_dim(primary_dim),
+        uncached_dim(uncached_dim),
         needs_index(needs_index)
     {}
 
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
-        auto cached = this->template fetch_block<false>(i, 0, primary_dim);
+        auto cached = this->template fetch_block<false>(i, 0, uncached_dim);
         return slab_to_sparse(*(cached.first), cached.second, vbuffer, ibuffer, needs_index);
     }
 
 private:
-    Index_ primary_dim;
+    Index_ uncached_dim;
     bool needs_index;
 };
 
@@ -348,36 +348,34 @@ class SecondaryFullDense : public ConditionalSecondaryBase<oracle_, Index_, Cach
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        Index_ primary_dim,
-        Index_ secondary_dim,
+        tatami_chunked::ChunkDimensionStats<Index_>& cache_dim_stats,
+        Index_ uncached_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
-        Index_ chunk_length,
-        size_t cache_size_in_elements, 
+        size_t cache_size, 
         bool require_minimum_cache) :
         SecondaryBase<oracle_, Index_, CachedValue_>(
             file_name, 
             data_name, 
             index_name, 
             ptrs, 
-            secondary_dim,
+            std::move(cache_dim_stats),
             std::move(oracle), 
-            secondary_dim,
-            chunk_length,
-            cache_size_in_elements, 
+            uncached_dim,
+            cache_size,
             require_minimum_value,
             true
         ),
-        primary_dim(primary_dim),
+        uncached_dim(uncached_dim)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        auto cached = this->template fetch_block<true>(i, 0, primary_dim);
-        slab_to_dense(*(cached.first), cached.second, buffer, primary_dim);
+        auto cached = this->template fetch_block<true>(i, 0, uncached_dim);
+        slab_to_dense(*(cached.first), cached.second, buffer, uncached_dim);
         return buffer;
     }
 
 private:
-    Index_ primary_dim;
+    Index_ uncached_dim;
 };
 
 /*********************************
@@ -391,7 +389,7 @@ class SecondaryBlockSparse : public SecondaryBase<oracle_, Index_, CachedIndex_>
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -404,10 +402,9 @@ class SecondaryBlockSparse : public SecondaryBase<oracle_, Index_, CachedIndex_>
             data_name, 
             index_name, 
             ptrs, 
-            secondary_dim,
+            std::move(cache_dim_stats),
             std::move(oracle), 
             block_length, 
-            chunk_length,
             cache_size, 
             require_minimum_cache,
             needs_value
@@ -435,7 +432,7 @@ class SecondaryBlockDense : public SecondaryBase<oracle_, Index_, CachedValue_> 
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -446,10 +443,9 @@ class SecondaryBlockDense : public SecondaryBase<oracle_, Index_, CachedValue_> 
             data_name, 
             index_name, 
             ptrs, 
-            secondary_dim,
+            std::move(cache_dim_stats),
             std::move(oracle), 
             block_length,
-            chunk_length,
             cache_size, 
             require_minimum_cache,
             true
@@ -479,11 +475,10 @@ class SecondaryIndexSparse : public SecondaryBase<oracle_, Index_, CachedValue_>
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        Index_ secondary_dim,
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
         tatami::VectorPtr<Index_> idx_ptr,
-        Index_ chunk_length,
-        size_t cache_size_in_elements, 
+        size_t cache_size, 
         bool require_minimum_cache,
         bool needs_value,
         bool needs_index) : 
@@ -492,11 +487,10 @@ class SecondaryIndexSparse : public SecondaryBase<oracle_, Index_, CachedValue_>
             data_name, 
             index_name, 
             ptrs, 
-            secondary_dim,
+            std::move(cache_dim_stats),
             std::move(oracle), 
             idx_ptr->size(),
-            chunk_length,
-            cache_size_in_elements, 
+            cache_size, 
             require_minimum_value,
             needs_value 
         ),
@@ -521,18 +515,28 @@ class SecondaryIndexDense : public ConditionalSecondaryBase<oracle_, Index_, Cac
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         tatami::VectorPtr<Index_> indices_ptr,
         size_t cache_size,
         size_t max_non_zeros) :
-        ConditionalSecondaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, true, true),
-        retriever(*indices_ptr, secondary_dim),
-        num_indices(indices_ptr->size())
+        SecondaryBase<oracle_, Index_, CachedValue_>(
+            file_name, 
+            data_name, 
+            index_name, 
+            ptrs, 
+            std::move(cache_dim_stats),
+            std::move(oracle), 
+            idx_ptr->size(),
+            cache_size, 
+            require_minimum_value,
+            true
+        ),
+        indices_ptr(std::move(idx_ptr)),
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        auto cached = this->fetch_indices<false>(i, *indices_ptr);
+        auto cached = this->fetch_indices<true>(i, *indices_ptr);
         return slab_to_dense(*(cached.first), cached.second, buffer, indices_ptr->size());
     }
 
