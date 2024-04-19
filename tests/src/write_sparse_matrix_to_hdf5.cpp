@@ -69,7 +69,6 @@ TEST_P(WriteSparseMatrixToHdf5BasicTest, SparseColumn) {
 
     {
         auto reloaded = tatami_hdf5::load_hdf5_compressed_sparse_matrix<false, double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr");
-        tatami_test::test_simple_row_access(&reloaded, &mat);
 
         auto mwrk = mat.dense_row();
         auto rwrk = reloaded.dense_row();
