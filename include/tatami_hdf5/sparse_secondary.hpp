@@ -6,7 +6,11 @@
 #include <algorithm>
 
 #include "tatami/tatami.hpp"
+#include "tatami_chunked/tatami_chunked.hpp"
+
 #include "sparse_primary.hpp"
+#include "serialize.hpp"
+#include "utils.hpp"
 
 namespace tatami_hdf5 {
 

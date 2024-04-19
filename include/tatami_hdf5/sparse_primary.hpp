@@ -6,6 +6,10 @@
 #include <algorithm>
 
 #include "tatami/tatami.hpp"
+#include "tatami_chunked/tatami_chunked.hpp"
+
+#include "serialize.hpp"
+#include "utils.hpp"
 
 namespace tatami_hdf5 {
 
@@ -505,7 +509,7 @@ class PrimaryFullSparse : public ConditionalPrimaryBase<oracle_, Index_, CachedV
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        [[maybe_unused]] Index_ secondary_dim, // for consistency only.
+        [[maybe_unused]] Index_ uncached_dim, // for consistency only.
         tatami::MaybeOracle<oracle_, Index_> oracle,
         size_t cache_size,
         size_t max_non_zeros, 
@@ -536,16 +540,16 @@ class PrimaryFullDense : public ConditionalPrimaryBase<oracle_, Index_, CachedVa
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
+        Index_ uncached_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         size_t cache_size,
         size_t max_non_zeros) :
         ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, true, true),
-        secondary_dim(secondary_dim)
+        uncached_dim(uncached_dim)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        std::fill_n(buffer, secondary_dim, 0);
+        std::fill_n(buffer, uncached_dim, 0);
         auto chunk = this->fetch(i);
         for (Index_ j = 0; j < chunk.length; ++j) {
             buffer[chunk.index[j]] = chunk.value[j];
@@ -554,7 +558,7 @@ class PrimaryFullDense : public ConditionalPrimaryBase<oracle_, Index_, CachedVa
     }
 
 private:
-    Index_ secondary_dim;
+    Index_ uncached_dim;
 };
 
 /*********************************
@@ -568,7 +572,7 @@ class PrimaryBlockSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
+        Index_ uncached_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -579,7 +583,7 @@ class PrimaryBlockSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
         ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, needs_value, true)
         block_start(block_start),
         block_length(block_length),
-        secondary_dim(secondary_dim),
+        uncached_dim(uncached_dim),
         needs_index(needs_index)
     {}
 
@@ -587,7 +591,7 @@ class PrimaryBlockSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
         auto chunk = this->fetch(i);
         auto start = chunk.index, end = chunk.index + chunk.length;
         auto original = start;
-        tatami::sparse_utils::refine_primary_limits(start, end, secondary_dim, block_start, block_start + block_length); // WARNING: not documented by tatami!
+        tatami::sparse_utils::refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length); // WARNING: not documented by tatami!
         chunk.length = end - start;
 
         tatami::SparseRange<Value_, Index_> output;
@@ -605,7 +609,7 @@ class PrimaryBlockSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
 private:
     Index_ block_start;
     Index_ block_length;
-    Index_ secondary_dim;
+    Index_ uncached_dim;
     bool needs_index;
 };
 
@@ -616,7 +620,7 @@ class PrimaryBlockDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
+        Index_ uncached_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -625,14 +629,14 @@ class PrimaryBlockDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
         ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, true, true),
         block_start(block_start),
         block_length(block_length),
-        secondary_dim(secondary_dim),
+        uncached_dim(uncached_dim),
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
         auto chunk = this->fetch(i);
         auto start = chunk.index, end = chunk.index + chunk.length;
         auto original = start;
-        tatami::sparse_utils::refine_primary_limits(start, end, secondary_dim, block_start, block_start + block_length); // WARNING: not documented by tatami!
+        tatami::sparse_utils::refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length); // WARNING: not documented by tatami!
 
         std::fill_n(buffer, block_length, 0);
         auto valptr = chunk.value + (start - original);
@@ -645,7 +649,7 @@ class PrimaryBlockDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
 private:
     Index_ block_start;
     Index_ block_length;
-    Index_ secondary_dim;
+    Index_ uncached_dim;
 };
 
 /*********************************
@@ -659,7 +663,7 @@ class PrimaryIndexSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
+        Index_ uncached_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         tatami::VectorPtr<Index_> indices_ptr,
         size_t cache_size,
@@ -667,7 +671,7 @@ class PrimaryIndexSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
         bool needs_value, 
         bool needs_index) : 
         ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, needs_value, true),
-        retriever(*indices_ptr, secondary_dim), 
+        retriever(*indices_ptr, uncached_dim), 
         needs_index(needs_index)
     {}
 
@@ -710,13 +714,13 @@ class PrimaryIndexDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
+        Index_ uncached_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         tatami::VectorPtr<Index_> indices_ptr,
         size_t cache_size,
         size_t max_non_zeros) :
         ConditionalPrimaryBase(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, true, true),
-        retriever(*indices_ptr, secondary_dim),
+        retriever(*indices_ptr, uncached_dim),
         num_indices(indices_ptr->size())
     {}
 
