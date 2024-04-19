@@ -36,16 +36,16 @@ struct Components {
 };
 
 template<bool by_h5_row_, typename Index_, typename OutputValue_>
-void extract_block(Index_ accessed_start, Index_ accessed_length, Index_ extract_start, Index_ extract_length, OutputValue_* buffer, Components& comp) {
+void extract_block(Index_ cache_start, Index_ cache_length, Index_ block_start, Index_ block_length, OutputValue_* buffer, Components& comp) {
     hsize_t offset[2];
     hsize_t count[2];
 
     constexpr int dimdex = by_h5_row_;
-    offset[1-dimdex] = accessed_start;
-    count[1-dimdex] = accessed_length;
+    offset[1-dimdex] = cache_start;
+    count[1-dimdex] = cache_length;
 
-    offset[dimdex] = extract_start;
-    count[dimdex] = extract_length;
+    offset[dimdex] = block_start;
+    count[dimdex] = block_length;
     comp.dataspace.selectHyperslab(H5S_SELECT_SET, count, offset);
 
     // HDF5 is a lot faster when the memspace and dataspace match in dimensionality.
@@ -57,13 +57,13 @@ void extract_block(Index_ accessed_start, Index_ accessed_length, Index_ extract
 }
 
 template<bool by_h5_row_, typename Index_, typename OutputValue_>
-void extract_indices(Index_ accessed_start, Index_ accessed_length, const std::vector<Index_>& indices, OutputValue_* buffer, Components& comp) {
+void extract_indices(Index_ cache_start, Index_ cache_length, const std::vector<Index_>& indices, OutputValue_* buffer, Components& comp) {
     hsize_t offset[2];
     hsize_t count[2];
 
     constexpr int dimdex = by_h5_row_;
-    offset[1-dimdex] = accessed_start;
-    count[1-dimdex] = accessed_length;
+    offset[1-dimdex] = cache_start;
+    count[1-dimdex] = cache_length;
 
     // Take slices across the current chunk for each index. This should be okay if consecutive,
     // but hopefully they've fixed the problem with non-consecutive slices in:
@@ -127,10 +127,8 @@ protected:
     std::unique_ptr<Components> h5comp;
 
     // Various dimension-related members.
-    Index_ accessed_dim;
-    Index_ accessed_chunkdim;
+    tatami_chunked::ChunkDimensionStats<Index_> dim_stats;
     Index_ extract_length;
-    Index_ num_accessed_chunks = 0, last_accessed_chunkdim = 0;
 
     // Other members.
     typedef std::vector<CachedValue_> Slab;
@@ -142,16 +140,14 @@ public:
     Base(
         const std::string& file_name, 
         const std::string& dataset_name, 
-        Index_ accessed_dim, 
-        Index_ accessed_chunkdim,
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ extract_length,
         size_t cache_size_in_elements,
         bool require_minimum_cache) :
-        accessed_dim(accessed_dim), 
-        accessed_chunkdim(accessed_chunkdim),
+        dim_stats(std::move(cache_dim_stats)),
         extract_length(extract_length),
-        cache_workspace(accessed_chunkdim, extract_length, cache_size_in_elements, require_minimum_cache, std::move(oracle))
+        cache_workspace(dim_stats.chunk_length, extract_length, cache_size_in_elements, require_minimum_cache, std::move(oracle))
     {
         serialize([&]() -> void {
             h5comp.reset(new Components);
@@ -167,27 +163,12 @@ public:
             h5comp->dataset = h5comp->file.openDataSet(dataset_name);
             h5comp->dataspace = h5comp->dataset.getSpace();
         });
-
-        if (accessed_chunkdim > 0) {
-            num_accessed_chunks = accessed_dim / accessed_chunkdim + (accessed_dim % accessed_chunkdim > 0); // i.e., integer ceiling.
-            last_accessed_chunkdim = (accessed_dim > 0 ? (accessed_dim - (num_accessed_chunks - 1) * accessed_chunkdim) : 0);
-        }
     }
 
     ~Base() {
         serialize([&]() -> void {
             h5comp.reset();
         });
-    }
-
-protected:
-    // Handle the truncated slab at the bottom/right edges of each matrix.
-    Index_ get_accessed_chunkdim(Index_ chunk_id) const {
-        if (chunk_id + 1 == num_accessed_chunks) {
-            return last_accessed_chunkdim;
-        } else {
-            return accessed_chunkdim;
-        }
     }
 
 public:
@@ -198,7 +179,7 @@ public:
         if constexpr(oracle_) {
             auto info = cache_workspace.cache.next(
                 /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
-                    return std::pair<Index_, Index_>(current / accessed_chunkdim, current % accessed_chunkdim);
+                    return std::pair<Index_, Index_>(current / dim_stats.chunk_length, current % dim_stats.chunk_length);
                 }, 
                 /* create = */ [&]() -> Slab {
                     return Slab(cache_workspace.slab_size_in_elements);
@@ -210,8 +191,8 @@ public:
 
                     serialize([&]() -> void {
                         for (const auto& c : chunks) {
-                            auto curdim = get_accessed_chunkdim(c.first);
-                            extract(c.first * accessed_chunkdim, curdim, c.second->data());
+                            auto curdim = dim_stats.get_chunk_length(c.first);
+                            extract(c.first * dim_stats.chunk_length, curdim, c.second->data());
                             if constexpr(!by_h5_row_) {
                                 cache_transpose_info.emplace_back(c.second, curdim);
                             }
@@ -230,8 +211,8 @@ public:
             ptr = info.first->data() + extract_length * info.second;
 
         } else {
-            auto chunk = i / accessed_chunkdim;
-            auto index = i % accessed_chunkdim;
+            auto chunk = i / dim_stats.chunk_length;
+            auto index = i % dim_stats.chunk_length;
 
             const auto& info = cache_workspace.cache.find(
                 chunk, 
@@ -239,9 +220,9 @@ public:
                     return Slab(cache_workspace.slab_size_in_elements);
                 },
                 /* populate = */ [&](Index_ id, Slab& contents) -> void {
-                    auto curdim = get_accessed_chunkdim(id);
+                    auto curdim = dim_stats.get_chunk_length(id);
                     serialize([&]() -> void {
-                        extract(id * accessed_chunkdim, curdim, contents.data());
+                        extract(id * dim_stats.chunk_length, curdim, contents.data());
                     });
 
                     // Applying a transposition for easier retrieval, but only once the lock is released.
@@ -258,10 +239,6 @@ public:
     }
 
 public:
-    Index_ get_extract_length() const {
-        return extract_length;
-    }
-
     Index_ reindex(Index_ i) {
         if constexpr(oracle_) {
             return cache_workspace.cache.next();
@@ -276,19 +253,17 @@ struct Full : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public ta
     Full(
         const std::string& file_name, 
         const std::string& dataset_name, 
-        Index_ accessed_dim, 
-        Index_ accessed_chunkdim, 
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
-        Index_ nonaccessed_dim,
+        Index_ uncached_dim,
         size_t cache_size_in_elements,
         bool require_minimum_cache) :
         Base<use_h5_row_, oracle_, Index_, CachedValue_>(
             file_name, 
             dataset_name, 
-            accessed_dim, 
-            accessed_chunkdim, 
+            std::move(cache_dim_stats),
             std::move(oracle),
-            nonaccessed_dim, 
+            uncached_dim, 
             cache_size_in_elements, 
             require_minimum_cache
         )
@@ -296,10 +271,10 @@ struct Full : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public ta
 
     const Value_* fetch(Index_ i, Value_* buffer) {
         if (this->cache_workspace.num_slabs_in_cache == 0) {
-            extract_block<use_h5_row_>(this->reindex(i), static_cast<Index_>(1), static_cast<Index_>(0), this->get_extract_length(), buffer, *(this->h5comp));
+            extract_block<use_h5_row_>(this->reindex(i), static_cast<Index_>(1), static_cast<Index_>(0), this->extract_length, buffer, *(this->h5comp));
         } else {
             this->extract(i, buffer, [&](Index_ start, Index_ length, CachedValue_* buf) {
-                extract_block<use_h5_row_>(start, length, static_cast<Index_>(0), this->get_extract_length(), buf, *(this->h5comp));
+                extract_block<use_h5_row_>(start, length, static_cast<Index_>(0), this->extract_length, buf, *(this->h5comp));
             });
         }
         return buffer;
@@ -312,8 +287,7 @@ struct Block : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
     Block(
         const std::string& file_name, 
         const std::string& dataset_name, 
-        Index_ accessed_dim, 
-        Index_ accessed_chunkdim, 
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -322,8 +296,7 @@ struct Block : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
         Base<use_h5_row_, oracle_, Index_, CachedValue_>(
             file_name, 
             dataset_name, 
-            accessed_dim, 
-            accessed_chunkdim, 
+            std::move(cache_dim_stats),
             std::move(oracle),
             block_length, 
             cache_size_in_elements, 
@@ -354,8 +327,7 @@ struct Index : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
     Index(
         const std::string& file_name, 
         const std::string& dataset_name, 
-        Index_ accessed_dim, 
-        Index_ accessed_chunkdim, 
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         tatami::VectorPtr<Index_> indices_ptr,
         size_t cache_size_in_elements,
@@ -363,8 +335,7 @@ struct Index : public Base<use_h5_row_, oracle_, Index_, CachedValue_>, public t
         Base<use_h5_row_, oracle_, Index_, CachedValue_>(
             file_name,
             dataset_name, 
-            accessed_dim, 
-            accessed_chunkdim, 
+            std::move(cache_dim_stats),
             std::move(oracle),
             indices_ptr->size(), 
             cache_size_in_elements, 
@@ -420,13 +391,12 @@ private:
  */
 template<typename Value_, typename Index_, bool transpose_ = false, typename CachedValue_ = Value_>
 class Hdf5DenseMatrix : public tatami::Matrix<Value_, Index_> {
-    Index_ firstdim, seconddim;
     std::string file_name, dataset_name;
 
     size_t cache_size_in_elements;
     bool require_minimum_cache;
 
-    Index_ chunk_firstdim, chunk_seconddim;
+    tatami_chunked::ChunkDimensionStats<Index_> firstdim_stats, seconddim_stats;
     bool prefer_firstdim;
 
 public:
@@ -445,26 +415,27 @@ public:
             H5::H5File fhandle(file_name, H5F_ACC_RDONLY);
             auto dhandle = open_and_check_dataset<false>(fhandle, dataset_name);
             auto dims = get_array_dimensions<2>(dhandle, dataset_name);
-            firstdim = dims[0];
-            seconddim = dims[1];
 
+            hsize_t chunk_dims[2];
             auto dparms = dhandle.getCreatePlist();
             if (dparms.getLayout() != H5D_CHUNKED) {
                 // If contiguous, each firstdim is treated as a chunk.
-                chunk_firstdim = 1;
-                chunk_seconddim = seconddim;
+                chunk_dims[0] = 1;
+                chunk_dims[1] = dims[1];
             } else {
-                hsize_t chunk_dims[2];
                 dparms.getChunk(2, chunk_dims);
-                chunk_firstdim = chunk_dims[0];
-                chunk_seconddim = chunk_dims[1];
             }
+
+            firstdim_stats = tatami_chunked::ChunkDimensionStats<Index_>(dims[0], chunk_dims[0]);
+            seconddim_stats = tatami_chunked::ChunkDimensionStats<Index_>(dims[1], chunk_dims[1]);
         });
 
-        // Favoring extraction on the dimension that involves pulling out fewer chunks per dimension element.
-        double chunks_per_firstdim = static_cast<double>(seconddim)/static_cast<double>(chunk_seconddim);
-        double chunks_per_seconddim = static_cast<double>(firstdim)/static_cast<double>(chunk_firstdim);
-        prefer_firstdim = (chunks_per_seconddim > chunks_per_firstdim);
+        // Favoring extraction on the dimension that involves pulling out fewer
+        // chunks per dimension element. Remember, 'firstdim_stats.num_chunks'
+        // represents the number of chunks along the first dimension, and thus
+        // is the number of chunks that need to be loaded to pull out an
+        // element of the **second** dimension; and vice versa.
+        prefer_firstdim = (firstdim_stats.num_chunks > seconddim_stats.num_chunks);
     }
 
     /**
@@ -484,38 +455,30 @@ private:
         }
     }
 
-    Index_ nrow_internal() const {
+    const tatami_chunked::ChunkDimensionStats<Index_>& get_row_stats() const {
         if constexpr(transpose_) {
-            return seconddim;
+            return seconddim_stats;
         } else {
-            return firstdim;
+            return firstdim_stats;
         }
+    }
+
+    const tatami_chunked::ChunkDimensionStats<Index_>& get_column_stats() const {
+        if constexpr(transpose_) {
+            return firstdim_stats;
+        } else {
+            return seconddim_stats;
+        }
+    }
+
+    Index_ nrow_internal() const {
+        return get_row_stats().dimension_extent;
     }
 
     Index_ ncol_internal() const {
-        if constexpr(transpose_) {
-            return firstdim;
-        } else {
-            return seconddim;
-        }
+        return get_column_stats().dimension_extent;
     }
 
-
-    Index_ chunk_nrow() const {
-        if constexpr(transpose_) {
-            return chunk_seconddim;
-        } else {
-            return chunk_firstdim;
-        }
-    }
-
-    Index_ chunk_ncol() const {
-        if constexpr(transpose_) {
-            return chunk_firstdim;
-        } else {
-            return chunk_seconddim;
-        }
-    }
 
 public:
     Index_ nrow() const {
@@ -567,11 +530,11 @@ private:
     const {
         if (row) {
             return std::make_unique<Hdf5DenseMatrix_internal::Full<true, oracle_, Value_, Index_, transpose_, CachedValue_> >(
-                file_name, dataset_name, nrow_internal(), chunk_nrow(), std::move(oracle), ncol_internal(), cache_size_in_elements, require_minimum_cache
+                file_name, dataset_name, get_row_stats(), std::move(oracle), ncol_internal(), cache_size_in_elements, require_minimum_cache
             );
         } else {
             return std::make_unique<Hdf5DenseMatrix_internal::Full<false, oracle_, Value_, Index_, transpose_, CachedValue_> >(
-                file_name, dataset_name, ncol_internal(), chunk_ncol(), std::move(oracle), nrow_internal(), cache_size_in_elements, require_minimum_cache
+                file_name, dataset_name, get_column_stats(), std::move(oracle), nrow_internal(), cache_size_in_elements, require_minimum_cache
             );
         }
     }
@@ -586,11 +549,11 @@ private:
     const {
         if (row) {
             return std::make_unique<Hdf5DenseMatrix_internal::Block<true, oracle_, Value_, Index_, transpose_, CachedValue_> >(
-                file_name, dataset_name, nrow_internal(), chunk_nrow(), std::move(oracle), block_start, block_length, cache_size_in_elements, require_minimum_cache
+                file_name, dataset_name, get_row_stats(), std::move(oracle), block_start, block_length, cache_size_in_elements, require_minimum_cache
             );
         } else {
             return std::make_unique<Hdf5DenseMatrix_internal::Block<false, oracle_, Value_, Index_, transpose_, CachedValue_> >(
-                file_name, dataset_name, ncol_internal(), chunk_ncol(), std::move(oracle), block_start, block_length, cache_size_in_elements, require_minimum_cache
+                file_name, dataset_name, get_column_stats(), std::move(oracle), block_start, block_length, cache_size_in_elements, require_minimum_cache
             );
         }
     }
@@ -604,11 +567,11 @@ private:
     const {
         if (row) {
             return std::make_unique<Hdf5DenseMatrix_internal::Index<true, oracle_, Value_, Index_, transpose_, CachedValue_> >(
-                file_name, dataset_name, nrow_internal(), chunk_nrow(), std::move(oracle), std::move(indices_ptr), cache_size_in_elements, require_minimum_cache
+                file_name, dataset_name, get_row_stats(), std::move(oracle), std::move(indices_ptr), cache_size_in_elements, require_minimum_cache
             );
         } else {
             return std::make_unique<Hdf5DenseMatrix_internal::Index<false, oracle_, Value_, Index_, transpose_, CachedValue_> >(
-                file_name, dataset_name, ncol_internal(), chunk_ncol(), std::move(oracle), std::move(indices_ptr), cache_size_in_elements, require_minimum_cache
+                file_name, dataset_name, get_column_stats(), std::move(oracle), std::move(indices_ptr), cache_size_in_elements, require_minimum_cache
             );
         }
     }
