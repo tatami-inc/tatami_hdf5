@@ -210,7 +210,7 @@ private:
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryBlockDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, (row ? ncols : nrows), secondary_chunk_stats, std::move(oracle), block_start, block_length, cache_size_limit, require_minimum_cache
+                file_name, data_name, index_name, pointers, secondary_chunk_stats, std::move(oracle), block_start, block_length, cache_size_limit, require_minimum_cache
             );
         }
     }
@@ -218,12 +218,12 @@ private:
     template<bool oracle_>
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options&) const {
         if (row == row_) {
-            return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryBlockDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
+            return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryIndexDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
                 file_name, data_name, index_name, pointers, (row ? ncols : nrows), std::move(oracle), std::move(indices_ptr), cache_size_limit, max_non_zeros
             );
         } else {
-            return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryBlockDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, (row ? ncols : nrows), secondary_chunk_stats, std::move(oracle), std::move(indices_ptr), cache_size_limit, require_minimum_cache
+            return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryIndexDense<oracle_, Value_, Index_, CachedValue_> >(
+                file_name, data_name, index_name, pointers, secondary_chunk_stats, std::move(oracle), std::move(indices_ptr), cache_size_limit, require_minimum_cache
             );
         }
     }
@@ -300,7 +300,6 @@ private:
                 data_name, 
                 index_name, 
                 pointers, 
-                (row ? ncols : nrows), 
                 secondary_chunk_stats, 
                 std::move(oracle), 
                 block_start, 
@@ -316,7 +315,7 @@ private:
     template<bool oracle_>
     std::unique_ptr<tatami::SparseExtractor<oracle_, Value_, Index_> > populate_sparse(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options& opt) const {
         if (row == row_) {
-            return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryBlockSparse<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
+            return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryIndexSparse<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
                 file_name, 
                 data_name, 
                 index_name, 
@@ -330,12 +329,11 @@ private:
                 opt.sparse_extract_index
             );
         } else {
-            return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryBlockSparse<oracle_, Value_, Index_, CachedValue_> >(
+            return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryIndexSparse<oracle_, Value_, Index_, CachedValue_> >(
                 file_name, 
                 data_name, 
                 index_name, 
                 pointers, 
-                (row ? ncols : nrows), 
                 secondary_chunk_stats, 
                 std::move(oracle), 
                 std::move(indices_ptr), 
@@ -365,15 +363,15 @@ public:
      ****************************************/
 public:
     std::unique_ptr<tatami::OracularDenseExtractor<Value_, Index_> > dense(bool row, std::shared_ptr<const tatami::Oracle<Index_> > oracle, const tatami::Options& opt) const {
-        return populate_dense<false>(row, std::move(oracle), opt);
+        return populate_dense<true>(row, std::move(oracle), opt);
     }
 
     std::unique_ptr<tatami::OracularDenseExtractor<Value_, Index_> > dense(bool row, std::shared_ptr<const tatami::Oracle<Index_> > oracle, Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
-        return populate_dense<false>(row, std::move(oracle), block_start, block_length, opt);
+        return populate_dense<true>(row, std::move(oracle), block_start, block_length, opt);
     }
 
     std::unique_ptr<tatami::OracularDenseExtractor<Value_, Index_> > dense(bool row, std::shared_ptr<const tatami::Oracle<Index_> > oracle, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options& opt) const {
-        return populate_dense<false>(row, std::move(oracle), std::move(indices_ptr), opt);
+        return populate_dense<true>(row, std::move(oracle), std::move(indices_ptr), opt);
     }
 
     /*****************************************
@@ -381,15 +379,15 @@ public:
      *****************************************/
 public:
     std::unique_ptr<tatami::OracularSparseExtractor<Value_, Index_> > sparse(bool row, std::shared_ptr<const tatami::Oracle<Index_> > oracle, const tatami::Options& opt) const {
-        return populate_sparse<false>(row, std::move(oracle), opt);
+        return populate_sparse<true>(row, std::move(oracle), opt);
     }
 
     std::unique_ptr<tatami::OracularSparseExtractor<Value_, Index_> > sparse(bool row, std::shared_ptr<const tatami::Oracle<Index_> > oracle, Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
-        return populate_sparse<false>(row, std::move(oracle), block_start, block_length, opt);
+        return populate_sparse<true>(row, std::move(oracle), block_start, block_length, opt);
     }
 
     std::unique_ptr<tatami::OracularSparseExtractor<Value_, Index_> > sparse(bool row, std::shared_ptr<const tatami::Oracle<Index_> > oracle, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options& opt) const {
-        return populate_sparse<false>(row, std::move(oracle), std::move(indices_ptr), opt);
+        return populate_sparse<true>(row, std::move(oracle), std::move(indices_ptr), opt);
     }
 };
 

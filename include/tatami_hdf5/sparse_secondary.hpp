@@ -54,9 +54,9 @@ public:
         // Allocating it once so that each fetch() call doesn't have to check for width.
         // Don't be tempted to resize these vectors over the lifetime of this object;
         // we want to avoid destructing the internal vectors to re-use their capacity.
-        transpose_store.value.resize(dim_stats.chunk_length);
+        transpose_store.index.resize(dim_stats.chunk_length);
         if (needs_cached_value) {
-            transpose_store.value.resize(dim_stats.chunk_length);
+            transpose_store.data.resize(dim_stats.chunk_length);
         }
     }
 
@@ -112,7 +112,7 @@ private:
                 /* populate = */ [&](const std::vector<std::pair<Index_, Slab*> >& chunks) -> void {
                     serialize([&]() -> void {
                         for (const auto& c : chunks) {
-                            extract(c.first * dim_stats.chunk_length, dim_stats.get_primary_chunkdim(c.first), *(c.second));
+                            extract(c.first * dim_stats.chunk_length, dim_stats.get_chunk_length(c.first), *(c.second));
                         }
                     });
                 }
@@ -121,19 +121,19 @@ private:
         } else {
             auto chunk = i / dim_stats.chunk_length;
             auto index = i % dim_stats.chunk_length;
-            auto ptr = cache_workspace.cache.find(
+            auto slab = cache_workspace.cache.find(
                 chunk, 
                 /* create = */ [&]() -> Slab {
                     return Slab();
                 },
                 /* populate = */ [&](Index_ id, Slab& contents) -> void {
                     serialize([&]() -> void {
-                        extract(id * dim_stats.chunk_length, dim_stats.get_primary_chunkdim(id), contents);
+                        extract(id * dim_stats.chunk_length, dim_stats.get_chunk_length(id), contents);
                     });
                 }
             );
 
-            return std::make_pair(ptr, index);
+            return std::make_pair(&slab, index);
         }
     }
 
@@ -214,7 +214,7 @@ private:
             h5comp->data_dataset.read(data_buffer.data(), define_mem_type<CachedValue_>(), h5comp->memspace, h5comp->dataspace);
             size_t y = 0;
             for (auto x = start; x != end; ++x, ++y) {
-                transpose_store.value[*start - secondary_start].push_back(data_buffer[y]);
+                transpose_store.data[*start - secondary_start].push_back(data_buffer[y]);
             }
         }
     }
@@ -261,7 +261,7 @@ private:
 
                 CachedValue_ dest;
                 h5comp->data_dataset.read(&dest, define_mem_type<CachedValue_>(), h5comp->memspace, h5comp->dataspace);
-                solo.value.push_back(dest);
+                solo.data.push_back(dest);
             }
         }
     }
@@ -269,18 +269,18 @@ private:
 
 public:
     template<typename Value_>
-    tatami::SparseRange<Value_, Index_> slab_to_sparse(const Slab& chunk, Index_ offset, Value_* vbuffer, Index_* ibuffer, bool needs_index) {
-        size_t start = chunk.pointers[offset];
-        size_t length = chunk.pointers[offset + 1] - start;
+    tatami::SparseRange<Value_, Index_> slab_to_sparse(const Slab& slab, Index_ offset, Value_* vbuffer, Index_* ibuffer, bool needs_index) {
+        size_t start = slab.pointers[offset];
+        size_t length = slab.pointers[offset + 1] - start;
 
         tatami::SparseRange<Value_, Index_> output;
-        if (chunk.value) {
-            std::copy(chunk.value.begin() + start, length, vbuffer);
+        if (needs_cached_value) {
+            std::copy_n(slab.data.begin() + start, length, vbuffer);
             output.value = vbuffer;
         }
 
         if (needs_index) {
-            std::copy(chunk.index.begin() + start, length, ibuffer);
+            std::copy_n(slab.index.begin() + start, length, ibuffer);
             output.index = ibuffer;
         }
 
@@ -288,13 +288,13 @@ public:
     }
 
     template<typename Value_>
-    void slab_to_dense(const Slab& chunk, Index_ offset, Value_* buffer, Index_ extract_length) {
-        size_t start = chunk.pointers[offset];
-        size_t end = chunk.pointers[offset + 1];
+    void slab_to_dense(const Slab& slab, Index_ offset, Value_* buffer, Index_ extract_length) {
+        size_t start = slab.pointers[offset];
+        size_t end = slab.pointers[offset + 1];
         std::fill_n(buffer, extract_length, 0);
 
-        auto valptr = chunk.value.begin() + start;
-        auto idxptr = chunk.index.begin() + start;
+        auto valptr = slab.data.begin() + start;
+        auto idxptr = slab.index.begin() + start;
         for (; start != end; ++start, ++valptr) {
             buffer[*idxptr] = *valptr;
         }
@@ -307,13 +307,16 @@ public:
  ********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryFullSparse : public SecondaryBase<oracle_, Index_, CachedValue_> {
+struct SecondaryFullSparse : 
+    public SecondaryBase<oracle_, Index_, CachedValue_>,
+    public tatami::SparseExtractor<oracle_, Value_, Index_> 
+{
     SecondaryFullSparse(
         const std::string& file_name, 
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        tatami_chunked::ChunkDimensionStats<Index_>& cache_dim_stats,
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         Index_ uncached_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
         size_t cache_size, 
@@ -338,7 +341,7 @@ class SecondaryFullSparse : public SecondaryBase<oracle_, Index_, CachedValue_> 
 
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
         auto cached = this->template fetch_block<false>(i, 0, uncached_dim);
-        return slab_to_sparse(*(cached.first), cached.second, vbuffer, ibuffer, needs_index);
+        return this->slab_to_sparse(*(cached.first), cached.second, vbuffer, ibuffer, needs_index);
     }
 
 private:
@@ -347,13 +350,16 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryFullDense : public SecondaryBase<oracle_, Index_, CachedValue_> {
-   SecondaryFullDense(
+struct SecondaryFullDense : 
+    public SecondaryBase<oracle_, Index_, CachedValue_>,
+    public tatami::DenseExtractor<oracle_, Value_, Index_> 
+{
+    SecondaryFullDense(
         const std::string& file_name, 
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        tatami_chunked::ChunkDimensionStats<Index_>& cache_dim_stats,
+        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
         Index_ uncached_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
         size_t cache_size, 
@@ -375,7 +381,7 @@ class SecondaryFullDense : public SecondaryBase<oracle_, Index_, CachedValue_> {
 
     const Value_* fetch(Index_ i, Value_* buffer) {
         auto cached = this->template fetch_block<true>(i, 0, uncached_dim);
-        slab_to_dense(*(cached.first), cached.second, buffer, uncached_dim);
+        this->slab_to_dense(*(cached.first), cached.second, buffer, uncached_dim);
         return buffer;
     }
 
@@ -388,7 +394,10 @@ private:
  *********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryBlockSparse : public SecondaryBase<oracle_, Index_, CachedValue_> {
+struct SecondaryBlockSparse : 
+    public SecondaryBase<oracle_, Index_, CachedValue_>,
+    public tatami::SparseExtractor<oracle_, Value_, Index_> 
+{
     SecondaryBlockSparse(
         const std::string& file_name,
         const std::string& data_name,
@@ -420,8 +429,8 @@ class SecondaryBlockSparse : public SecondaryBase<oracle_, Index_, CachedValue_>
     {}
 
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
-        auto cached = this->fetch_block<false>(i, block_start, block_length);
-        return slab_to_sparse(*(cached.first), cached.second, vbuffer, ibuffer, needs_index);
+        auto cached = this->template fetch_block<false>(i, block_start, block_length);
+        return this->slab_to_sparse(*(cached.first), cached.second, vbuffer, ibuffer, needs_index);
     }
 
 private:
@@ -431,8 +440,11 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryBlockDense : public SecondaryBase<oracle_, Index_, CachedValue_> {
-   SecondaryBlockDense(
+struct SecondaryBlockDense : 
+    public SecondaryBase<oracle_, Index_, CachedValue_>,
+    public tatami::DenseExtractor<oracle_, Value_, Index_> 
+{
+    SecondaryBlockDense(
         const std::string& file_name,
         const std::string& data_name,
         const std::string& index_name,
@@ -460,8 +472,9 @@ class SecondaryBlockDense : public SecondaryBase<oracle_, Index_, CachedValue_> 
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        auto cached = this->fetch_block<true>(i, block_start, block_length);
-        return slab_to_dense(*(cached.first), cached.second, buffer, block_length);
+        auto cached = this->template fetch_block<true>(i, block_start, block_length);
+        this->slab_to_dense(*(cached.first), cached.second, buffer, block_length);
+        return buffer;
     }
 
 private:
@@ -474,7 +487,10 @@ private:
  *********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryIndexSparse : public SecondaryBase<oracle_, Index_, CachedValue_> {
+struct SecondaryIndexSparse : 
+    public SecondaryBase<oracle_, Index_, CachedValue_>,
+    public tatami::SparseExtractor<oracle_, Value_, Index_> 
+{
     SecondaryIndexSparse(
         const std::string& file_name, 
         const std::string& data_name, 
@@ -504,8 +520,8 @@ class SecondaryIndexSparse : public SecondaryBase<oracle_, Index_, CachedValue_>
     {}
 
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
-        auto cached = this->fetch_indices<false>(i, *indices_ptr);
-        return slab_to_sparse(*(cached.first), cached.second, vbuffer, ibuffer, needs_index);
+        auto cached = this->template fetch_indices<false>(i, *indices_ptr);
+        return this->slab_to_sparse(*(cached.first), cached.second, vbuffer, ibuffer, needs_index);
     }
 
 private:
@@ -514,8 +530,11 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryIndexDense : public SecondaryBase<oracle_, Index_, CachedValue_> {
-   SecondaryIndexDense(
+struct SecondaryIndexDense :
+    public SecondaryBase<oracle_, Index_, CachedValue_>,
+    public tatami::DenseExtractor<oracle_, Value_, Index_> 
+{
+    SecondaryIndexDense(
         const std::string& file_name,
         const std::string& data_name,
         const std::string& index_name,
@@ -541,8 +560,9 @@ class SecondaryIndexDense : public SecondaryBase<oracle_, Index_, CachedValue_> 
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        auto cached = this->fetch_indices<true>(i, *indices_ptr);
-        return slab_to_dense(*(cached.first), cached.second, buffer, indices_ptr->size());
+        auto cached = this->template fetch_indices<true>(i, *indices_ptr);
+        this->slab_to_dense(*(cached.first), cached.second, buffer, indices_ptr->size());
+        return buffer;
     }
 
 private:

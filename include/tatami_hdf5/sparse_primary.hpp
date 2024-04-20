@@ -183,7 +183,7 @@ private:
     std::shared_ptr<const tatami::Oracle<Index_> > oracle;
     size_t max_cache_elements;
     size_t counter = 0, total = 0, future = 0;
-    bool needs_cached_index, needs_cached_value;
+    bool needs_cached_value, needs_cached_index;
 
 public:
     ContiguousOracleSlabCache(std::shared_ptr<const tatami::Oracle<Index_> > ora, size_t cache_size, size_t min_elements, bool needs_cached_value, bool needs_cached_index) : 
@@ -198,8 +198,8 @@ public:
             } 
         }()),
         total(oracle->total()), 
-        needs_cached_index(needs_cached_index), 
-        needs_cached_value(needs_cached_value)
+        needs_cached_value(needs_cached_value),
+        needs_cached_index(needs_cached_index) 
     {
         if (needs_cached_index) {
             full_index_buffer.resize(max_cache_elements);
@@ -331,9 +331,10 @@ public:
     }
 
 public:
-    Chunk<Index_, CachedValue_, CachedIndex_> next(Components& h5comp) {
+    template<typename ... Args_>
+    Chunk<Index_, CachedValue_, CachedIndex_> next(const std::vector<hsize_t>& pointers, Components& h5comp) {
         if (counter == future) {
-            populate(h5comp);
+            populate(pointers, h5comp);
         }
         auto current = oracle->get(counter++);
         const auto& info = cache_data[cache_exists.find(current)->second];
@@ -349,6 +350,10 @@ public:
         return output;
     }
 };
+
+/****************************************
+ **** Virtual classes for extractors ****
+ ****************************************/
 
 // All HDF5-related members are stored in a separate pointer so we can serialize construction and destruction.
 class PrimaryBase {
@@ -376,10 +381,6 @@ protected:
     const std::vector<hsize_t>& pointers;
     std::unique_ptr<Components> h5comp;
 };
-
-/****************************************
- **** Virtual classes for extractors ****
- ****************************************/
 
 template<typename Index_, typename CachedValue_, typename CachedIndex_>
 struct PrimaryLruBase : public PrimaryBase {
@@ -432,7 +433,7 @@ public:
     {}
 
 public:
-    Chunk<Index_, CachedValue_, CachedIndex_> fetch(Index_ i) {
+    Chunk<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ i) {
         const auto& slab = cache.find(
             i, 
             /* create = */ [&]() -> Slab {
@@ -490,8 +491,8 @@ public:
     {}
 
 public:
-    Chunk<Index_, CachedValue_, CachedIndex_> fetch(Index_) {
-        return cache.next(*(this->h5comp));
+    Chunk<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_) {
+        return cache.next(this->pointers, *(this->h5comp));
     }
 };
 
@@ -503,7 +504,10 @@ using ConditionalPrimaryBase = typename std::conditional<oracle_, PrimaryOracleB
  ********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryFullSparse : public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
+struct PrimaryFullSparse : 
+    public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>, 
+    public tatami::SparseExtractor<oracle_, Value_, Index_> 
+{
     PrimaryFullSparse(
         const std::string& file_name,
         const std::string& data_name,
@@ -530,7 +534,7 @@ class PrimaryFullSparse : public ConditionalPrimaryBase<oracle_, Index_, CachedV
 
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
         tatami::SparseRange<Value_, Index_> output;
-        auto chunk = this->fetch(i);
+        auto chunk = this->fetch_raw(i);
         if (chunk.value) {
             std::copy_n(chunk.value, chunk.length, vbuffer);
             output.value = vbuffer;
@@ -544,8 +548,11 @@ class PrimaryFullSparse : public ConditionalPrimaryBase<oracle_, Index_, CachedV
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryFullDense : public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
-   PrimaryFullDense(
+struct PrimaryFullDense : 
+    public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>,
+    public tatami::DenseExtractor<oracle_, Value_, Index_> 
+{
+    PrimaryFullDense(
         const std::string& file_name,
         const std::string& data_name,
         const std::string& index_name,
@@ -570,7 +577,7 @@ class PrimaryFullDense : public ConditionalPrimaryBase<oracle_, Index_, CachedVa
 
     const Value_* fetch(Index_ i, Value_* buffer) {
         std::fill_n(buffer, uncached_dim, 0);
-        auto chunk = this->fetch(i);
+        auto chunk = this->fetch_raw(i);
         for (Index_ j = 0; j < chunk.length; ++j) {
             buffer[chunk.index[j]] = chunk.value[j];
         }
@@ -586,7 +593,10 @@ private:
  *********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryBlockSparse : public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
+struct PrimaryBlockSparse : 
+    public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>,
+    public tatami::SparseExtractor<oracle_, Value_, Index_> 
+{
     PrimaryBlockSparse(
         const std::string& file_name,
         const std::string& data_name,
@@ -618,7 +628,7 @@ class PrimaryBlockSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
     {}
 
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
-        auto chunk = this->fetch(i);
+        auto chunk = this->fetch_raw(i);
         auto start = chunk.index, end = chunk.index + chunk.length;
         auto original = start;
         refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length);
@@ -644,8 +654,11 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryBlockDense : public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
-   PrimaryBlockDense(
+struct PrimaryBlockDense : 
+    public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>,
+    public tatami::DenseExtractor<oracle_, Value_, Index_> 
+{
+    PrimaryBlockDense(
         const std::string& file_name,
         const std::string& data_name,
         const std::string& index_name,
@@ -673,7 +686,7 @@ class PrimaryBlockDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        auto chunk = this->fetch(i);
+        auto chunk = this->fetch_raw(i);
         auto start = chunk.index, end = chunk.index + chunk.length;
         auto original = start;
         refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length);
@@ -697,7 +710,10 @@ private:
  *********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryIndexSparse : public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
+struct PrimaryIndexSparse : 
+    public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>,
+    public tatami::SparseExtractor<oracle_, Value_, Index_> 
+{
     PrimaryIndexSparse(
         const std::string& file_name,
         const std::string& data_name,
@@ -730,7 +746,7 @@ class PrimaryIndexSparse : public ConditionalPrimaryBase<oracle_, Index_, Cached
         auto vcopy = vbuffer;
         auto icopy = ibuffer;
 
-        auto chunk = this->fetch(i);
+        auto chunk = this->fetch_raw(i);
         bool needs_value = chunk.value != NULL;
         retriever.populate(
             chunk.index,
@@ -758,7 +774,10 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryIndexDense : public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_> {
+struct PrimaryIndexDense : 
+    public ConditionalPrimaryBase<oracle_, Index_, CachedValue_, CachedIndex_>,
+    public tatami::DenseExtractor<oracle_, Value_, Index_> 
+{
    PrimaryIndexDense(
         const std::string& file_name,
         const std::string& data_name,
@@ -787,7 +806,7 @@ class PrimaryIndexDense : public ConditionalPrimaryBase<oracle_, Index_, CachedV
     const Value_* fetch(Index_ i, Value_* buffer) {
         std::fill_n(buffer, num_indices, 0);
 
-        auto chunk = this->fetch(i);
+        auto chunk = this->fetch_raw(i);
         retriever.populate(
             chunk.index,
             chunk.index + chunk.length,
