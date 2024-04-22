@@ -197,7 +197,7 @@ private:
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryFullDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, secondary_chunk_stats, (row ? nrows : ncols), std::move(oracle), cache_size_limit, require_minimum_cache
+                file_name, data_name, index_name, pointers, secondary_chunk_stats, (row ? ncols : nrows), std::move(oracle), cache_size_limit, require_minimum_cache
             );
         }
     }
@@ -267,7 +267,7 @@ private:
                 index_name, 
                 pointers, 
                 secondary_chunk_stats, 
-                (row ? nrows : ncols), 
+                (row ? ncols : nrows), 
                 std::move(oracle), 
                 cache_size_limit, 
                 require_minimum_cache, 

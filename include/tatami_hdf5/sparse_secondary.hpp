@@ -121,7 +121,7 @@ private:
         } else {
             auto chunk = i / dim_stats.chunk_length;
             auto index = i % dim_stats.chunk_length;
-            auto slab = cache_workspace.cache.find(
+            auto& slab = cache_workspace.cache.find(
                 chunk, 
                 /* create = */ [&]() -> Slab {
                     return Slab();
@@ -138,6 +138,14 @@ private:
     }
 
 public:
+    Index_ reindex(Index_ i) {
+        if constexpr(oracle_) {
+            return cache_workspace.cache.next();
+        } else {
+            return i;
+        }
+    }
+
     // The store_index_ flag specifies whether we want to store the index of
     // the primary value (useful for dense extraction) or the primary value
     // itself (useful for sparse extraction).
@@ -145,6 +153,7 @@ public:
     std::pair<const Slab*, Index_> fetch_block(Index_ i, Index_ primary_start, Index_ primary_length) {
         if (cache_workspace.num_slabs_in_cache == 0) {
             solo.reset();
+            i = reindex(i);
             for (Index_ px = 0; px < primary_length; ++px) {
                 auto primary = px + primary_start;
                 extract_and_append_single(primary, i, (store_index_ ? px : primary));
@@ -167,6 +176,7 @@ public:
     std::pair<const Slab*, Index_> fetch_indices(Index_ i, const std::vector<Index_>& primary_indices) {
         if (cache_workspace.num_slabs_in_cache == 0) {
             solo.reset();
+            i = reindex(i);
             for (Index_ px = 0, end = primary_indices.size(); px < end; ++px) {
                 auto primary = primary_indices[px];
                 extract_and_append_single(primary, i, (store_index_ ? px : primary));
@@ -200,7 +210,7 @@ private:
         auto start = index_buffer.begin(), end = index_buffer.end();
         refine_primary_limits(start, end, dim_stats.dimension_extent, secondary_start, secondary_start + secondary_length);
         for (auto x = start; x != end; ++x) {
-            transpose_store.index[*start - secondary_start].push_back(primary_to_add);
+            transpose_store.index[*x - secondary_start].push_back(primary_to_add);
         }
 
         if (start != end && needs_cached_value) {
@@ -214,7 +224,7 @@ private:
             h5comp->data_dataset.read(data_buffer.data(), define_mem_type<CachedValue_>(), h5comp->memspace, h5comp->dataspace);
             size_t y = 0;
             for (auto x = start; x != end; ++x, ++y) {
-                transpose_store.data[*start - secondary_start].push_back(data_buffer[y]);
+                transpose_store.data[*x - secondary_start].push_back(data_buffer[y]);
             }
         }
     }
@@ -230,7 +240,7 @@ private:
 
         if (needs_cached_value) {
             for (Index_ s = 0; s < secondary_length; ++s) {
-                auto& x = transpose_store.index[s];
+                auto& x = transpose_store.data[s];
                 slab.data.insert(slab.data.end(), x.begin(), x.end());
                 x.clear();
             }
@@ -274,6 +284,7 @@ public:
         size_t length = slab.pointers[offset + 1] - start;
 
         tatami::SparseRange<Value_, Index_> output;
+        output.number = length;
         if (needs_cached_value) {
             std::copy_n(slab.data.begin() + start, length, vbuffer);
             output.value = vbuffer;
@@ -295,7 +306,7 @@ public:
 
         auto valptr = slab.data.begin() + start;
         auto idxptr = slab.index.begin() + start;
-        for (; start != end; ++start, ++valptr) {
+        for (; start != end; ++start, ++idxptr, ++valptr) {
             buffer[*idxptr] = *valptr;
         }
         return;

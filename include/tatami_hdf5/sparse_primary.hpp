@@ -259,7 +259,7 @@ public:
             next_cache_data.push_back(std::move(latest));
         }
 
-        if (!needed.empty() && present.size()) {
+        if (!needed.empty()) {
             size_t dest_offset = 0;
 
             if (present.size()) {
@@ -535,6 +535,7 @@ struct PrimaryFullSparse :
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
         tatami::SparseRange<Value_, Index_> output;
         auto chunk = this->fetch_raw(i);
+        output.number = chunk.length;
         if (chunk.value) {
             std::copy_n(chunk.value, chunk.length, vbuffer);
             output.value = vbuffer;
@@ -632,11 +633,11 @@ struct PrimaryBlockSparse :
         auto start = chunk.index, end = chunk.index + chunk.length;
         auto original = start;
         refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length);
-        chunk.length = end - start;
 
         tatami::SparseRange<Value_, Index_> output;
+        output.number = end - start;
         if (chunk.value) {
-            std::copy_n(chunk.value + (start - original), chunk.length, vbuffer);
+            std::copy_n(chunk.value + (start - original), output.number, vbuffer);
             output.value = vbuffer;
         }
         if (needs_index) {
@@ -694,7 +695,7 @@ struct PrimaryBlockDense :
         std::fill_n(buffer, block_length, 0);
         auto valptr = chunk.value + (start - original);
         for (; start != end; ++start, ++valptr) {
-            buffer[*start] = *valptr;
+            buffer[*start - block_start] = *valptr;
         }
         return buffer;
     }
@@ -768,7 +769,6 @@ struct PrimaryIndexSparse :
     }
 
 private:
-    tatami::VectorPtr<Index_> indices_ptr;
     tatami::sparse_utils::RetrievePrimarySubsetSparse<Index_> retriever;
     bool needs_index;
 };
@@ -810,7 +810,7 @@ struct PrimaryIndexDense :
         retriever.populate(
             chunk.index,
             chunk.index + chunk.length,
-            [&](size_t offset, Index_ ix) {
+            [&](Index_ ix, Index_ offset) {
                 buffer[ix] = *(chunk.value + offset);
             }
         );
@@ -819,7 +819,6 @@ struct PrimaryIndexDense :
     }
 
 private:
-    tatami::VectorPtr<Index_> indices_ptr;
     tatami::sparse_utils::RetrievePrimarySubsetDense<Index_> retriever;
     size_t num_indices;
 };

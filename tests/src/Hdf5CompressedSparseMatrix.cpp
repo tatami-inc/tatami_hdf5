@@ -13,18 +13,27 @@
 
 class Hdf5SparseMatrixTestCore {
 public:
-    typedef std::tuple<std::pair<int, int>, std::tuple<int, double> > SimulationParameters;
+    typedef std::tuple<int, double> SimulationParameters;
 
-    inline static SimulationParameters last_params;
+    static auto create_combinations() {
+        return ::testing::Combine(
+            ::testing::Values(0, 100), // chunk size
+            ::testing::Values(0, 0.001, 0.01, 0.1) // cache size
+        );
+    }
 
 protected:
+    typedef std::tuple<std::pair<int, int>, SimulationParameters> FullSimulationParameters;
+
+    inline static FullSimulationParameters last_params;
+
     inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat, tref, tmat;
 
     inline static std::string fpath, name;
 
     inline static tatami_test::CompressedSparseDetails<double> triplets;
 
-    static void assemble(const SimulationParameters& params) {
+    static void assemble(const FullSimulationParameters& params) {
         if (ref && params == last_params) {
             return;
         }
@@ -58,7 +67,7 @@ protected:
         hsize_t dims = triplets.value.size();
         H5::DataSpace dspace(1, &dims);
         {
-            H5::DataType dtype(H5::PredType::NATIVE_UINT8);
+            H5::DataType dtype(H5::PredType::NATIVE_DOUBLE);
             auto dhandle = ghandle.createDataSet("data", dtype, dspace, plist);
             dhandle.write(triplets.value.data(), H5::PredType::NATIVE_DOUBLE);
         }
@@ -129,214 +138,151 @@ TEST_F(Hdf5SparseMatrixUtilsTest, Basic) {
     EXPECT_EQ(tmat->prefer_rows_proportion(), 0);
 }
 
-///*************************************
-// *************************************/
-//
-//Class Hdf5SparseAccessTest : public ::testing::TestWithParam<std::tuple<bool, int, int, double> >, public Hdf5SparseMatrixTestMethods {};
-//
-//TEST_P(Hdf5SparseAccessTest, Primary) {
-//    auto param = GetParam(); 
-//    bool FORWARD = std::get<0>(param);
-//    size_t JUMP = std::get<1>(param);
-//
-//    const size_t NR = 200, NC = 100;
-//    dump(std::get<2>(param), NR, NC);
-//    auto cache_size = compute_cache_size(NR, NC, std::get<3>(param)); // We limit the cache size to ensure that the cache management is not trivial.
-//    auto hopt = custom_options(cache_size);
-//
-//    {
-//        auto mat = create_matrix<true>(NR, NC, hopt);
-//        auto ref = create_reference<true>(NR, NC);
-//        tatami_test::test_simple_row_access(&mat, &ref, FORWARD, JUMP);
-//    }
-//
-//    {
-//        auto mat = create_matrix<false>(NR, NC, hopt);
-//        auto ref = create_reference<false>(NR, NC);
-//        tatami_test::test_simple_column_access(&mat, &ref, FORWARD, JUMP);
-//    }
-//}
-//
-//TEST_P(Hdf5SparseAccessTest, Secondary) {
-//    auto param = GetParam(); 
-//    bool FORWARD = std::get<0>(param);
-//    size_t JUMP = std::get<1>(param);
-//
-//    const size_t NR = 50, NC = 10; // much smaller for the secondary dimension.
-//    dump(std::get<2>(param), NR, NC);
-//    int cache_size = compute_cache_size(NR, NC, std::get<3>(param));
-//    auto hopt = custom_options(cache_size);
-//
-//    {
-//        auto mat = create_matrix<true>(NR, NC, hopt);
-//        auto ref = create_reference<true>(NR, NC);
-//        tatami_test::test_simple_column_access(&mat, &ref, FORWARD, JUMP);
-//    }
-//
-//    {
-//        auto mat = create_matrix<false>(NR, NC, hopt);
-//        auto ref = create_reference<false>(NR, NC);
-//        tatami_test::test_simple_row_access(&mat, &ref, FORWARD, JUMP);
-//    }
-//}
-//
-//INSTANTIATE_TEST_SUITE_P(
-//    Hdf5SparseMatrix,
-//    Hdf5SparseAccessTest,
-//    ::testing::Combine(
-//        ::testing::Values(true, false),
-//        ::testing::Values(1, 3),
-//        ::testing::Values(0, 100), // chunk size
-//        ::testing::Values(0, 0.001, 0.01) // cache size
-//    )
-//);
-//
-///*************************************
-// *************************************/
-//
-//Class Hdf5SparseSlicedTest : public ::testing::TestWithParam<std::tuple<bool, int, std::vector<double>, int, double> >, public Hdf5SparseMatrixTestMethods {};
-//
-//TEST_P(Hdf5SparseSlicedTest, Primary) {
-//    auto param = GetParam();
-//    bool FORWARD = std::get<0>(param);
-//    size_t JUMP = std::get<1>(param);
-//    auto interval_info = std::get<2>(param);
-//
-//    const size_t NR = 128, NC = 256;
-//    dump(std::get<3>(param), NR, NC);
-//    int cache_size = compute_cache_size(NR, NC, std::get<4>(param));
-//    auto hopt = custom_options(cache_size);
-//
-//    {
-//        auto mat = create_matrix<true>(NR, NC, hopt);
-//        auto ref = create_reference<true>(NR, NC);
-//        size_t FIRST = interval_info[0] * NC, LAST = interval_info[1] * NC;
-//        tatami_test::test_sliced_row_access(&mat, &ref, FORWARD, JUMP, FIRST, LAST);
-//    }
-//
-//    {
-//        auto mat = create_matrix<false>(NR, NC, hopt);
-//        auto ref = create_reference<false>(NR, NC);
-//        size_t FIRST = interval_info[0] * NC, LAST = interval_info[1] * NC; // NC is deliberate, due to the transposition.
-//        tatami_test::test_sliced_column_access(&mat, &ref, FORWARD, JUMP, FIRST, LAST);
-//    }
-//}
-//
-//TEST_P(Hdf5SparseSlicedTest, Secondary) {
-//    auto param = GetParam();
-//    bool FORWARD = std::get<0>(param);
-//    size_t JUMP = std::get<1>(param);
-//    auto interval_info = std::get<2>(param);
-//
-//    const size_t NR = 50, NC = 10; // much smaller for the secondary dimension.
-//    dump(std::get<3>(param), NR, NC);
-//    int cache_size = compute_cache_size(NR, NC, std::get<4>(param));
-//    auto hopt = custom_options(cache_size);
-//
-//    {
-//        auto mat = create_matrix<true>(NR, NC, hopt);
-//        auto ref = create_reference<true>(NR, NC);
-//        size_t FIRST = interval_info[0] * NR, LAST = interval_info[1] * NR;
-//        tatami_test::test_sliced_column_access(&mat, &ref, FORWARD, JUMP, FIRST, LAST);
-//    }
-//
-//    {
-//        auto mat = create_matrix<false>(NR, NC, hopt);
-//        auto ref = create_reference<false>(NR, NC);
-//        size_t FIRST = interval_info[0] * NC, LAST = interval_info[1] * NC;
-//        tatami_test::test_sliced_row_access(&mat, &ref, FORWARD, JUMP, FIRST, LAST);
-//    }
-//}
-//
-//INSTANTIATE_TEST_SUITE_P(
-//    Hdf5SparseMatrix,
-//    Hdf5SparseSlicedTest,
-//    ::testing::Combine(
-//        ::testing::Values(true, false),
-//        ::testing::Values(1, 3),
-//        ::testing::Values(
-//            std::vector<double>({ 0, 0.333 }), 
-//            std::vector<double>({ 0.222, 0.888 }), 
-//            std::vector<double>({ 0.555, 1 })
-//        ),
-//        ::testing::Values(0, 100), // chunk size
-//        ::testing::Values(0, 0.001, 0.01, 0.02) // cache size
-//    )
-//);
-//
-///*************************************
-// *************************************/
-//
-//Class Hdf5SparseIndexedTest : public ::testing::TestWithParam<std::tuple<bool, int, std::vector<double>, int, double> >, public Hdf5SparseMatrixTestMethods {};
-//
-//TEST_P(Hdf5SparseIndexedTest, Primary) {
-//    auto param = GetParam();
-//    bool FORWARD = std::get<0>(param);
-//    size_t JUMP = std::get<1>(param);
-//    auto interval_info = std::get<2>(param);
-//
-//    const size_t NR = 200, NC = 100;
-//    dump(std::get<3>(param), NR, NC);
-//    int cache_size = compute_cache_size(NR, NC, std::get<4>(param));
-//    auto hopt = custom_options(cache_size);
-//
-//    {
-//        auto mat = create_matrix<true>(NR, NC, hopt);
-//        auto ref = create_reference<true>(NR, NC);
-//        size_t FIRST = interval_info[0] * NC, STEP = interval_info[1];
-//        tatami_test::test_indexed_row_access(&mat, &ref, FORWARD, JUMP, FIRST, STEP);
-//    }
-//
-//    {
-//        auto mat = create_matrix<false>(NR, NC, hopt);
-//        auto ref = create_reference<false>(NR, NC);
-//        size_t FIRST = interval_info[0] * NC, STEP = interval_info[1]; // NC is deliberate, due to the transposition.
-//        tatami_test::test_indexed_column_access(&mat, &ref, FORWARD, JUMP, FIRST, STEP);
-//    }
-//}
-//
-//TEST_P(Hdf5SparseIndexedTest, Secondary) {
-//    auto param = GetParam();
-//    bool FORWARD = std::get<0>(param);
-//    size_t JUMP = std::get<1>(param);
-//    auto interval_info = std::get<2>(param);
-//
-//    const size_t NR = 50, NC = 10; // much smaller for the secondary dimension.
-//    dump(std::get<3>(param), NR, NC);
-//    int cache_size = compute_cache_size(NR, NC, std::get<4>(param));
-//    auto hopt = custom_options(cache_size);
-//
-//    {
-//        auto mat = create_matrix<true>(NR, NC, hopt);
-//        auto ref = create_reference<true>(NR, NC);
-//        size_t FIRST = interval_info[0] * NR, STEP = interval_info[1];
-//        tatami_test::test_indexed_column_access(&mat, &ref, FORWARD, JUMP, FIRST, STEP);
-//    }
-//
-//    {
-//        auto mat = create_matrix<false>(NR, NC, hopt);
-//        auto ref = create_reference<false>(NR, NC);
-//        size_t FIRST = interval_info[0] * NC, STEP = interval_info[1];
-//        tatami_test::test_indexed_row_access(&mat, &ref, FORWARD, JUMP, FIRST, STEP);
-//    }
-//}
-//
-//INSTANTIATE_TEST_SUITE_P(
-//    Hdf5SparseMatrix,
-//    Hdf5SparseIndexedTest,
-//    ::testing::Combine(
-//        ::testing::Values(true, false),
-//        ::testing::Values(1, 3),
-//        ::testing::Values(
-//            std::vector<double>({ 0.3, 5 }), 
-//            std::vector<double>({ 0.322, 8 }), 
-//            std::vector<double>({ 0.455, 9 })
-//        ),
-//        ::testing::Values(0, 100), // chunk size
-//        ::testing::Values(0, 0.001, 0.01, 0.02) // cache size
-//    )
-//);
-//
+/*************************************
+ *************************************/
+
+class Hdf5SparseMatrixFullAccessTest : 
+    public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters> >, 
+    public Hdf5SparseMatrixTestCore
+{};
+
+TEST_P(Hdf5SparseMatrixFullAccessTest, Primary) {
+    auto param = GetParam(); 
+    assemble({ {200, 100}, std::get<0>(param) });
+    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
+
+    if (tparams.use_row) {
+        tatami_test::test_full_access(tparams, mat.get(), ref.get());
+    } else {
+        tatami_test::test_full_access(tparams, tmat.get(), tref.get());
+    }
+}
+
+TEST_P(Hdf5SparseMatrixFullAccessTest, Secondary) {
+    auto param = GetParam(); 
+    assemble({ {50, 10}, std::get<0>(param) }); // much smaller for the secondary dimension.
+    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
+
+    if (tparams.use_row) {
+        tatami_test::test_full_access(tparams, tmat.get(), tref.get());
+    } else {
+        tatami_test::test_full_access(tparams, mat.get(), ref.get());
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5SparseMatrix,
+    Hdf5SparseMatrixFullAccessTest,
+    ::testing::Combine(
+        Hdf5SparseMatrixTestCore::create_combinations(),
+        tatami_test::standard_test_access_parameter_combinations()
+    )
+);
+
+/*************************************
+ *************************************/
+
+class Hdf5SparseMatrixBlockAccessTest : 
+    public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, double> > >, 
+    public Hdf5SparseMatrixTestCore
+{};
+
+TEST_P(Hdf5SparseMatrixBlockAccessTest, Primary) {
+    auto param = GetParam(); 
+    assemble({ {128, 256}, std::get<0>(param) });
+    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
+    auto block = std::get<2>(param);
+
+    if (tparams.use_row) {
+        size_t FIRST = block.first * ref->ncol(), LAST = block.second * ref->ncol();
+        tatami_test::test_block_access(tparams, mat.get(), ref.get(), FIRST, LAST);
+    } else {
+        size_t FIRST = block.first * tref->nrow(), LAST = block.second * tref->nrow();
+        tatami_test::test_block_access(tparams, tmat.get(), tref.get(), FIRST, LAST);
+    }
+}
+
+TEST_P(Hdf5SparseMatrixBlockAccessTest, Secondary) {
+    auto param = GetParam(); 
+    assemble({ {10, 50}, std::get<0>(param) }); // much smaller for the secondary dimension.
+    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
+    auto block = std::get<2>(param);
+
+    if (tparams.use_row) {
+        size_t FIRST = block.first * tref->ncol(), LAST = block.second * tref->ncol();
+        tatami_test::test_block_access(tparams, tmat.get(), tref.get(), FIRST, LAST);
+    } else {
+        size_t FIRST = block.first * ref->nrow(), LAST = block.second * ref->nrow();
+        tatami_test::test_block_access(tparams, mat.get(), ref.get(), FIRST, LAST);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5SparseMatrix,
+    Hdf5SparseMatrixBlockAccessTest,
+    ::testing::Combine(
+        Hdf5SparseMatrixTestCore::create_combinations(),
+        tatami_test::standard_test_access_parameter_combinations(),
+        ::testing::Values(
+            std::make_pair(0.0, 0.333), 
+            std::make_pair(0.222, 0.888), 
+            std::make_pair(0.555, 1.0)
+        )
+    )
+);
+
+/*************************************
+ *************************************/
+
+class Hdf5SparseMatrixIndexedAccessTest :
+    public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, int> > >, 
+    public Hdf5SparseMatrixTestCore
+{};
+
+TEST_P(Hdf5SparseMatrixIndexedAccessTest, Primary) {
+    auto param = GetParam(); 
+    assemble({ {197, 125}, std::get<0>(param) });
+    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
+    auto index_info = std::get<2>(param);
+
+    if (tparams.use_row) {
+        size_t FIRST = index_info.first * ref->ncol(), STEP = index_info.second;
+        tatami_test::test_indexed_access(tparams, mat.get(), ref.get(), FIRST, STEP);
+    } else {
+        size_t FIRST = index_info.first * tref->nrow(), STEP = index_info.second;
+        tatami_test::test_indexed_access(tparams, tmat.get(), tref.get(), FIRST, STEP);
+    }
+}
+
+TEST_P(Hdf5SparseMatrixIndexedAccessTest, Secondary) {
+    auto param = GetParam(); 
+    assemble({ {20, 30}, std::get<0>(param) }); // much smaller for the secondary dimension.
+    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
+    auto index_info = std::get<2>(param);
+
+    if (tparams.use_row) {
+        size_t FIRST = index_info.first * tref->ncol(), STEP = index_info.second; 
+        tatami_test::test_indexed_access(tparams, tmat.get(), tref.get(), FIRST, STEP);
+    } else {
+        size_t FIRST = index_info.first * ref->nrow(), STEP = index_info.second;
+        tatami_test::test_indexed_access(tparams, mat.get(), ref.get(), FIRST, STEP);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5SparseMatrix,
+    Hdf5SparseMatrixIndexedAccessTest,
+    ::testing::Combine(
+        Hdf5SparseMatrixTestCore::create_combinations(),
+        tatami_test::standard_test_access_parameter_combinations(),
+        ::testing::Values(
+            std::make_pair(0.3, 5), 
+            std::make_pair(0.322, 8), 
+            std::make_pair(0.455, 9)
+        )
+    )
+);
+
 ///*************************************
 // *************************************/
 //
