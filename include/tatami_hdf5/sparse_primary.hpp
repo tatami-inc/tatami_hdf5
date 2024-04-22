@@ -513,7 +513,7 @@ struct PrimaryFullSparse :
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        [[maybe_unused]] Index_ uncached_dim, // for consistency only.
+        [[maybe_unused]] Index_ secondary_dim, // for consistency only.
         tatami::MaybeOracle<oracle_, Index_> oracle,
         size_t cache_size,
         size_t max_non_zeros, 
@@ -558,7 +558,7 @@ struct PrimaryFullDense :
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ uncached_dim,
+        Index_ secondary_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         size_t cache_size,
         size_t max_non_zeros) :
@@ -573,11 +573,11 @@ struct PrimaryFullDense :
             true, 
             true
         ),
-        uncached_dim(uncached_dim)
+        secondary_dim(secondary_dim)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        std::fill_n(buffer, uncached_dim, 0);
+        std::fill_n(buffer, secondary_dim, 0);
         auto chunk = this->fetch_raw(i);
         for (Index_ j = 0; j < chunk.length; ++j) {
             buffer[chunk.index[j]] = chunk.value[j];
@@ -586,7 +586,7 @@ struct PrimaryFullDense :
     }
 
 private:
-    Index_ uncached_dim;
+    Index_ secondary_dim;
 };
 
 /*********************************
@@ -603,7 +603,7 @@ struct PrimaryBlockSparse :
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ uncached_dim,
+        Index_ secondary_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -624,7 +624,7 @@ struct PrimaryBlockSparse :
         ),
         block_start(block_start),
         block_length(block_length),
-        uncached_dim(uncached_dim),
+        secondary_dim(secondary_dim),
         needs_index(needs_index)
     {}
 
@@ -632,7 +632,7 @@ struct PrimaryBlockSparse :
         auto chunk = this->fetch_raw(i);
         auto start = chunk.index, end = chunk.index + chunk.length;
         auto original = start;
-        refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length);
+        refine_primary_limits(start, end, secondary_dim, block_start, block_start + block_length);
 
         tatami::SparseRange<Value_, Index_> output;
         output.number = end - start;
@@ -650,7 +650,7 @@ struct PrimaryBlockSparse :
 private:
     Index_ block_start;
     Index_ block_length;
-    Index_ uncached_dim;
+    Index_ secondary_dim;
     bool needs_index;
 };
 
@@ -664,7 +664,7 @@ struct PrimaryBlockDense :
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ uncached_dim,
+        Index_ secondary_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -683,14 +683,14 @@ struct PrimaryBlockDense :
         ),
         block_start(block_start),
         block_length(block_length),
-        uncached_dim(uncached_dim)
+        secondary_dim(secondary_dim)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
         auto chunk = this->fetch_raw(i);
         auto start = chunk.index, end = chunk.index + chunk.length;
         auto original = start;
-        refine_primary_limits(start, end, uncached_dim, block_start, block_start + block_length);
+        refine_primary_limits(start, end, secondary_dim, block_start, block_start + block_length);
 
         std::fill_n(buffer, block_length, 0);
         auto valptr = chunk.value + (start - original);
@@ -703,7 +703,7 @@ struct PrimaryBlockDense :
 private:
     Index_ block_start;
     Index_ block_length;
-    Index_ uncached_dim;
+    Index_ secondary_dim;
 };
 
 /*********************************
@@ -720,7 +720,7 @@ struct PrimaryIndexSparse :
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ uncached_dim,
+        Index_ secondary_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         tatami::VectorPtr<Index_> indices_ptr,
         size_t cache_size,
@@ -738,7 +738,7 @@ struct PrimaryIndexSparse :
             needs_value, 
             true
         ),
-        retriever(*indices_ptr, uncached_dim), 
+        retriever(*indices_ptr, secondary_dim), 
         needs_index(needs_index)
     {}
 
@@ -783,7 +783,7 @@ struct PrimaryIndexDense :
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        Index_ uncached_dim,
+        Index_ secondary_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         tatami::VectorPtr<Index_> indices_ptr,
         size_t cache_size,
@@ -799,7 +799,7 @@ struct PrimaryIndexDense :
             true, 
             true
         ),
-        retriever(*indices_ptr, uncached_dim),
+        retriever(*indices_ptr, secondary_dim),
         num_indices(indices_ptr->size())
     {}
 

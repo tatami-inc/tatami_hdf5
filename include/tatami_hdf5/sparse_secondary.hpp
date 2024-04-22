@@ -26,17 +26,17 @@ public:
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
+        tatami_chunked::ChunkDimensionStats<Index_> secondary_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
         Index_ extract_length,
         size_t cache_size, 
         bool require_minimum_cache,
         bool needs_cached_value) :
         pointers(ptrs),
-        dim_stats(std::move(cache_dim_stats)),
+        sec_dim_stats(std::move(secondary_dim_stats)),
         needs_cached_value(needs_cached_value),
         cache_workspace(
-            dim_stats.chunk_length, 
+            sec_dim_stats.chunk_length, 
             extract_length, 
             cache_size / Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_cached_value, true),
             require_minimum_cache, 
@@ -54,9 +54,9 @@ public:
         // Allocating it once so that each fetch() call doesn't have to check for width.
         // Don't be tempted to resize these vectors over the lifetime of this object;
         // we want to avoid destructing the internal vectors to re-use their capacity.
-        transpose_store.index.resize(dim_stats.chunk_length);
+        transpose_store.index.resize(sec_dim_stats.chunk_length);
         if (needs_cached_value) {
-            transpose_store.data.resize(dim_stats.chunk_length);
+            transpose_store.data.resize(sec_dim_stats.chunk_length);
         }
     }
 
@@ -68,7 +68,7 @@ public:
 
 protected:
     const std::vector<hsize_t>& pointers;
-    tatami_chunked::ChunkDimensionStats<Index_> dim_stats;
+    tatami_chunked::ChunkDimensionStats<Index_> sec_dim_stats;
 
     struct Slab {
         std::vector<CachedValue_> data;
@@ -104,7 +104,7 @@ private:
         if constexpr(oracle_) {
             return cache_workspace.cache.next(
                 /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
-                    return std::pair<Index_, Index_>(current / dim_stats.chunk_length, current % dim_stats.chunk_length);
+                    return std::pair<Index_, Index_>(current / sec_dim_stats.chunk_length, current % sec_dim_stats.chunk_length);
                 }, 
                 /* create = */ [&]() -> Slab {
                     return Slab();
@@ -112,15 +112,15 @@ private:
                 /* populate = */ [&](const std::vector<std::pair<Index_, Slab*> >& chunks) -> void {
                     serialize([&]() -> void {
                         for (const auto& c : chunks) {
-                            extract(c.first * dim_stats.chunk_length, dim_stats.get_chunk_length(c.first), *(c.second));
+                            extract(c.first * sec_dim_stats.chunk_length, sec_dim_stats.get_chunk_length(c.first), *(c.second));
                         }
                     });
                 }
             );
 
         } else {
-            auto chunk = i / dim_stats.chunk_length;
-            auto index = i % dim_stats.chunk_length;
+            auto chunk = i / sec_dim_stats.chunk_length;
+            auto index = i % sec_dim_stats.chunk_length;
             auto& slab = cache_workspace.cache.find(
                 chunk, 
                 /* create = */ [&]() -> Slab {
@@ -128,7 +128,7 @@ private:
                 },
                 /* populate = */ [&](Index_ id, Slab& contents) -> void {
                     serialize([&]() -> void {
-                        extract(id * dim_stats.chunk_length, dim_stats.get_chunk_length(id), contents);
+                        extract(id * sec_dim_stats.chunk_length, sec_dim_stats.get_chunk_length(id), contents);
                     });
                 }
             );
@@ -212,7 +212,7 @@ private:
         h5comp->index_dataset.read(index_buffer.data(), define_mem_type<Index_>(), h5comp->memspace, h5comp->dataspace);
 
         auto start = index_buffer.begin(), end = index_buffer.end();
-        refine_primary_limits(start, end, dim_stats.dimension_extent, secondary_start, secondary_start + secondary_length);
+        refine_primary_limits(start, end, sec_dim_stats.dimension_extent, secondary_start, secondary_start + secondary_length);
         for (auto x = start; x != end; ++x) {
             transpose_store.index[*x - secondary_start].push_back(primary_to_add);
         }
@@ -332,8 +332,8 @@ struct SecondaryFullSparse :
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
-        Index_ uncached_dim,
+        tatami_chunked::ChunkDimensionStats<Index_> secondary_dim_stats,
+        Index_ primary_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
         size_t cache_size, 
         bool require_minimum_cache,
@@ -344,24 +344,24 @@ struct SecondaryFullSparse :
             data_name, 
             index_name, 
             ptrs, 
-            std::move(cache_dim_stats),
+            std::move(secondary_dim_stats),
             std::move(oracle), 
-            uncached_dim,
+            primary_dim,
             cache_size, 
             require_minimum_cache,
             needs_value 
         ),
-        uncached_dim(uncached_dim),
+        primary_dim(primary_dim),
         needs_index(needs_index)
     {}
 
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
-        auto cached = this->template fetch_block<false>(i, 0, uncached_dim);
+        auto cached = this->template fetch_block<false>(i, 0, primary_dim);
         return this->slab_to_sparse(*(cached.first), cached.second, vbuffer, ibuffer, needs_index);
     }
 
 private:
-    Index_ uncached_dim;
+    Index_ primary_dim;
     bool needs_index;
 };
 
@@ -375,8 +375,8 @@ struct SecondaryFullDense :
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
-        Index_ uncached_dim,
+        tatami_chunked::ChunkDimensionStats<Index_> secondary_dim_stats,
+        Index_ primary_dim,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
         size_t cache_size, 
         bool require_minimum_cache) :
@@ -385,24 +385,24 @@ struct SecondaryFullDense :
             data_name, 
             index_name, 
             ptrs, 
-            std::move(cache_dim_stats),
+            std::move(secondary_dim_stats),
             std::move(oracle), 
-            uncached_dim,
+            primary_dim,
             cache_size,
             require_minimum_cache,
             true
         ),
-        uncached_dim(uncached_dim)
+        primary_dim(primary_dim)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        auto cached = this->template fetch_block<true>(i, 0, uncached_dim);
-        this->slab_to_dense(*(cached.first), cached.second, buffer, uncached_dim);
+        auto cached = this->template fetch_block<true>(i, 0, primary_dim);
+        this->slab_to_dense(*(cached.first), cached.second, buffer, primary_dim);
         return buffer;
     }
 
 private:
-    Index_ uncached_dim;
+    Index_ primary_dim;
 };
 
 /*********************************
@@ -419,7 +419,7 @@ struct SecondaryBlockSparse :
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
+        tatami_chunked::ChunkDimensionStats<Index_> secondary_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -432,7 +432,7 @@ struct SecondaryBlockSparse :
             data_name, 
             index_name, 
             ptrs, 
-            std::move(cache_dim_stats),
+            std::move(secondary_dim_stats),
             std::move(oracle), 
             block_length, 
             cache_size, 
@@ -465,7 +465,7 @@ struct SecondaryBlockDense :
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
+        tatami_chunked::ChunkDimensionStats<Index_> secondary_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
@@ -476,7 +476,7 @@ struct SecondaryBlockDense :
             data_name, 
             index_name, 
             ptrs, 
-            std::move(cache_dim_stats),
+            std::move(secondary_dim_stats),
             std::move(oracle), 
             block_length,
             cache_size, 
@@ -512,7 +512,7 @@ struct SecondaryIndexSparse :
         const std::string& data_name, 
         const std::string& index_name, 
         const std::vector<hsize_t>& ptrs, 
-        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
+        tatami_chunked::ChunkDimensionStats<Index_> secondary_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle, 
         tatami::VectorPtr<Index_> idx_ptr,
         size_t cache_size, 
@@ -524,7 +524,7 @@ struct SecondaryIndexSparse :
             data_name, 
             index_name, 
             ptrs, 
-            std::move(cache_dim_stats),
+            std::move(secondary_dim_stats),
             std::move(oracle), 
             idx_ptr->size(),
             cache_size, 
@@ -555,7 +555,7 @@ struct SecondaryIndexDense :
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
-        tatami_chunked::ChunkDimensionStats<Index_> cache_dim_stats,
+        tatami_chunked::ChunkDimensionStats<Index_> secondary_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         tatami::VectorPtr<Index_> idx_ptr,
         size_t cache_size,
@@ -565,7 +565,7 @@ struct SecondaryIndexDense :
             data_name, 
             index_name, 
             ptrs, 
-            std::move(cache_dim_stats),
+            std::move(secondary_dim_stats),
             std::move(oracle), 
             idx_ptr->size(),
             cache_size, 

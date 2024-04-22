@@ -189,15 +189,31 @@ public:
      ************ Myopic dense ************
      **************************************/
 private:
+    Index_ primary_extent() const {
+        if constexpr(row_) {
+            return nrows;
+        } else {
+            return ncols;
+        }
+    }
+
+    Index_ secondary_extent() const {
+        if constexpr(row_) {
+            return ncols;
+        } else {
+            return nrows;
+        }
+    }
+
     template<bool oracle_>
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, const tatami::Options&) const {
         if (row == row_) {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryFullDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
-                file_name, data_name, index_name, pointers, (row ? ncols : nrows), std::move(oracle), cache_size_limit, max_non_zeros
+                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), cache_size_limit, max_non_zeros
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryFullDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, secondary_chunk_stats, (row ? ncols : nrows), std::move(oracle), cache_size_limit, require_minimum_cache
+                file_name, data_name, index_name, pointers, secondary_chunk_stats, primary_extent(), std::move(oracle), cache_size_limit, require_minimum_cache
             );
         }
     }
@@ -206,7 +222,7 @@ private:
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length, const tatami::Options&) const {
         if (row == row_) {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryBlockDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
-                file_name, data_name, index_name, pointers, (row ? ncols : nrows), std::move(oracle), block_start, block_length, cache_size_limit, max_non_zeros
+                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), block_start, block_length, cache_size_limit, max_non_zeros
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryBlockDense<oracle_, Value_, Index_, CachedValue_> >(
@@ -219,7 +235,7 @@ private:
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options&) const {
         if (row == row_) {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryIndexDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
-                file_name, data_name, index_name, pointers, (row ? ncols : nrows), std::move(oracle), std::move(indices_ptr), cache_size_limit, max_non_zeros
+                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), std::move(indices_ptr), cache_size_limit, max_non_zeros
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryIndexDense<oracle_, Value_, Index_, CachedValue_> >(
@@ -253,7 +269,7 @@ private:
                 data_name, 
                 index_name, 
                 pointers, 
-                (row ? ncols : nrows), 
+                secondary_extent(),
                 std::move(oracle), 
                 cache_size_limit, 
                 max_non_zeros, 
@@ -267,7 +283,7 @@ private:
                 index_name, 
                 pointers, 
                 secondary_chunk_stats, 
-                (row ? ncols : nrows), 
+                primary_extent(),
                 std::move(oracle), 
                 cache_size_limit, 
                 require_minimum_cache, 
@@ -285,7 +301,7 @@ private:
                 data_name, 
                 index_name, 
                 pointers, 
-                (row ? ncols : nrows), 
+                secondary_extent(),
                 std::move(oracle), 
                 block_start, 
                 block_length, 
@@ -320,7 +336,7 @@ private:
                 data_name, 
                 index_name, 
                 pointers, 
-                (row ? ncols : nrows), 
+                secondary_extent(),
                 std::move(oracle), 
                 std::move(indices_ptr), 
                 cache_size_limit, 
