@@ -12,6 +12,41 @@
 #include <random>
 #include <algorithm>
 
+class TransposeDenseTest : public ::testing::TestWithParam<std::tuple<int, int> > {};
+
+TEST_P(TransposeDenseTest, Basic) {
+    auto params = GetParam();
+    auto NR = std::get<0>(params);
+    auto NC = std::get<1>(params);
+
+    auto values = tatami_test::simulate_dense_vector<double>(NR * NC, 0, 100, /* seed = */ NR * 10 + NC);
+    tatami::DenseRowMatrix<double, int> original(NR, NC, values);
+
+    std::vector<double> buffer(NR * NC);
+    tatami_hdf5::Hdf5DenseMatrix_internal::transpose(values, buffer, NC, NR);
+    tatami::DenseColumnMatrix<double, int> flipped(NR, NC, values);
+
+    auto oext = original.dense_row();
+    auto fext = flipped.dense_row();
+    for (int r = 0; r < NR; ++r) {
+        auto oout = tatami_test::fetch(oext.get(), r, NC);
+        auto fout = tatami_test::fetch(fext.get(), r, NC);
+        ASSERT_EQ(oout, fout);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5DenseMatrix,
+    TransposeDenseTest,
+    ::testing::Combine(
+        ::testing::Values(10, 20, 40, 80), // number of rows
+        ::testing::Values(10, 20, 40, 80)  // number of columns
+    )
+);
+
+/*************************************
+ *************************************/
+
 class Hdf5DenseMatrixTestCore {
 public:
     static constexpr size_t NR = 200, NC = 100;

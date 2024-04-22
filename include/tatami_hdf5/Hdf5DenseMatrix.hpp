@@ -85,13 +85,15 @@ void extract_indices(Index_ cache_start, Index_ cache_length, const std::vector<
     comp.dataset.read(buffer, define_mem_type<OutputValue_>(), comp.memspace, comp.dataspace);
 }
 
+// 'cache' is assumed to be row-major with 'actual_dim' columns and
+// 'extract_length' rows. On output, it will be column-major instead.
 template<typename CachedValue_, typename Index_>
 void transpose(std::vector<CachedValue_>& cache, std::vector<CachedValue_>& buffer, Index_ actual_dim, Index_ extract_length) {
-    buffer.resize(cache.size());
     if (actual_dim == 1 || extract_length == 1) {
-        std::copy(cache.begin(), cache.end(), buffer.begin());
         return;
     }
+
+    buffer.resize(cache.size());
 
     // Using a blockwise strategy to perform the transposition,
     // in order to be more cache-friendly.
