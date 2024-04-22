@@ -367,8 +367,11 @@ class Hdf5SparseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple
 TEST_P(Hdf5SparseMatrixCacheTypeTest, CastToInt) {
     int NR = 500;
     int NC = 200;
-    assemble({ { NR, NC }, { 100, 0.1 } });
+    double cache_fraction = 0.1;
+    assemble({ { NR, NC }, { 100, cache_fraction } });
 
+    tatami_hdf5::Hdf5Options hopt;
+    hopt.maximum_cache_size = static_cast<double>(NR * NC) * cache_fraction * static_cast<double>(sizeof(int) + sizeof(uint16_t));
     tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int, int, uint16_t> mat(
         NR,
         NC,
@@ -376,7 +379,7 @@ TEST_P(Hdf5SparseMatrixCacheTypeTest, CastToInt) {
         name + "/data", 
         name + "/index", 
         name + "/indptr", 
-        tatami_hdf5::Hdf5Options()
+        hopt
     );
 
     std::vector<int> vcasted(triplets.value.begin(), triplets.value.end());
