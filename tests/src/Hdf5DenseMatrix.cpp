@@ -242,9 +242,9 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5DenseCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> >, public Hdf5DenseMatrixTestCore {};
+class Hdf5DenseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> >, public Hdf5DenseMatrixTestCore {};
 
-TEST_P(Hdf5DenseCacheTypeTest, CastToInt) {
+TEST_P(Hdf5DenseMatrixCacheTypeTest, CastToInt) {
     assemble(SimulationParameters(std::make_pair(9, 13), 1));
 
     tatami_hdf5::Hdf5DenseMatrix<double, int, false, int> mat(fpath, name);
@@ -262,7 +262,7 @@ TEST_P(Hdf5DenseCacheTypeTest, CastToInt) {
 
 INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
-    Hdf5DenseCacheTypeTest,
+    Hdf5DenseMatrixCacheTypeTest,
     ::testing::Combine(
         ::testing::Values(true, false), // row access
         ::testing::Values(true, false)  // oracle usage
@@ -272,7 +272,7 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5DenseParallelTest : public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, bool, bool> >, public Hdf5DenseMatrixTestCore {
+class Hdf5DenseMatrixParallelTest : public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, bool, bool> >, public Hdf5DenseMatrixTestCore {
 protected:
     void SetUp() {
         assemble(std::get<0>(GetParam()));
@@ -314,7 +314,7 @@ protected:
     }
 };
 
-TEST_P(Hdf5DenseParallelTest, Simple) {
+TEST_P(Hdf5DenseMatrixParallelTest, Simple) {
     auto param = GetParam();
     bool row = std::get<1>(param);
     bool oracle = std::get<2>(param);
@@ -330,10 +330,10 @@ TEST_P(Hdf5DenseParallelTest, Simple) {
 
 INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
-    Hdf5DenseParallelTest,
+    Hdf5DenseMatrixParallelTest,
     ::testing::Combine(
         Hdf5DenseMatrixTestCore::create_combinations(),
-        ::testing::Values(true, false),
-        ::testing::Values(true, false)
+        ::testing::Values(true, false), // row access
+        ::testing::Values(true, false)  // oracle usage
     )
 );

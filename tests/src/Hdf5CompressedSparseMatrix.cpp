@@ -283,297 +283,197 @@ INSTANTIATE_TEST_SUITE_P(
     )
 );
 
-///*************************************
-// *************************************/
-//
-//Class Hdf5SparseBasicCacheTest : public ::testing::TestWithParam<double>, public Hdf5SparseMatrixTestMethods {};
-//
-//TEST_P(Hdf5SparseBasicCacheTest, LruRandomized) {
-//    // Check that the LRU cache works as expected with totally random access.
-//    const size_t NR = 100, NC = 150; 
-//    dump(NR, NC);
-//    int cache_size = compute_cache_size(NR, NC, GetParam());
-//    auto hopt = custom_options(cache_size);
-//
-//    {
-//        auto mat = create_matrix<true>(NR, NC, hopt);
-//        auto ref = create_reference<true>(NR, NC);
-//
-//        std::mt19937_64 rng(cache_size * 123);
-//        auto m_ext = mat.dense_row();
-//        auto r_ext = ref.dense_row();
-//        for (size_t r0 = 0, end = NR * 10; r0 < end; ++r0) {
-//            auto r = rng() % NR;
-//            EXPECT_EQ(m_ext->fetch(r), r_ext->fetch(r));
-//        }
-//    }
-//
-//    {
-//        auto mat = create_matrix<false>(NR, NC, hopt);
-//        auto ref = create_reference<false>(NR, NC);
-//
-//        std::mt19937_64 rng(cache_size * 456);
-//        auto m_ext = mat.dense_column();
-//        auto r_ext = ref.dense_column();
-//        for (size_t c0 = 0, end = NR * 10; c0 < end; ++c0) {
-//            auto c = rng() % NR;
-//            EXPECT_EQ(m_ext->fetch(c), r_ext->fetch(c));
-//        }
-//    }
-//}
-//
-//TEST_P(Hdf5SparseBasicCacheTest, SimpleOracle) {
-//    // Checking that access with an oracle behaves as expected.
-//    const size_t NR = 189, NC = 123; 
-//    dump(NR, NC);
-//    int cache_size = compute_cache_size(NR, NC, GetParam());
-//    auto hopt = custom_options(cache_size);
-//
-//    {
-//        auto mat = create_matrix<true>(NR, NC, hopt);
-//        auto ref = create_reference<true>(NR, NC);
-//
-//        tatami_test::test_oracle_row_access<tatami::NumericMatrix>(&mat, &ref, false); // consecutive
-//        tatami_test::test_oracle_row_access<tatami::NumericMatrix>(&mat, &ref, false, 0.3 * NR, 0.5 * NR); // consecutive with bounds
-//
-//        tatami_test::test_oracle_row_access<tatami::NumericMatrix>(&mat, &ref, true); // randomized
-//        tatami_test::test_oracle_row_access<tatami::NumericMatrix>(&mat, &ref, true, 0.2 * NR, 0.6 * NR); // randomized with bounds
-//
-//        // Oracle-based extraction still works if we turn off value or index extraction.
-//        auto rwork = ref.sparse_row();
-//
-//        tatami::Options opt;
-//        opt.sparse_extract_value = false;
-//        auto iwork = mat.sparse_row(opt);
-//        iwork->set_oracle(std::make_unique<tatami::ConsecutiveOracle<int> >(0, NR));
-//
-//        opt.sparse_extract_index = false;
-//        auto bwork = mat.sparse_row(opt);
-//        bwork->set_oracle(std::make_unique<tatami::ConsecutiveOracle<int> >(0, NR));
-//
-//        opt.sparse_extract_value = true;
-//        auto vwork = mat.sparse_row(opt);
-//        vwork->set_oracle(std::make_unique<tatami::ConsecutiveOracle<int> >(0, NR));
-//
-//        for (size_t r = 0; r < NR; ++r) {
-//            auto rout = rwork->fetch(r);
-//
-//            auto iout = iwork->fetch(r);
-//            EXPECT_EQ(iout.index, rout.index);
-//            EXPECT_EQ(iout.value.size(), 0);
-//
-//            auto vout = vwork->fetch(r);
-//            EXPECT_EQ(vout.value, rout.value);
-//            EXPECT_EQ(vout.index.size(), 0);
-//
-//            auto bout = bwork->fetch(r, NULL, NULL);
-//            EXPECT_EQ(bout.number, rout.value.size());
-//        }
-//    }
-//
-//    {
-//        auto mat = create_matrix<false>(NR, NC, hopt);
-//        auto ref = create_reference<false>(NR, NC);
-//
-//        tatami_test::test_oracle_column_access<tatami::NumericMatrix>(&mat, &ref, false); // consecutive
-//        tatami_test::test_oracle_column_access<tatami::NumericMatrix>(&mat, &ref, false, 0.1 * NR, 0.7 * NR); // consecutive with bounds
-//
-//        tatami_test::test_oracle_column_access<tatami::NumericMatrix>(&mat, &ref, true); // randomized
-//        tatami_test::test_oracle_column_access<tatami::NumericMatrix>(&mat, &ref, true, 0.25 * NR, 0.6 * NR); // randomized with bounds
-//    }
-//}
-//
-//TEST_P(Hdf5SparseBasicCacheTest, Repeated) {
-//    size_t NR = 199, NC = 288;
-//    dump(NR, NC);
-//    int cache_size = compute_cache_size(NR, NC, GetParam());
-//    auto hopt = custom_options(cache_size);
-//
-//    // Check that we re-use the cache effectively when no new elements are
-//    // requested; no additional extractions from file should occur.
-//    std::vector<int> predictions;
-//    for (size_t i = 0; i < NR * 10; ++i) {
-//        predictions.push_back(i % 2);
-//    }
-//
-//    auto mat = create_matrix<true>(NR, NC, hopt);
-//    auto ref = create_reference<true>(NR, NC);
-//
-//    auto rwork = ref.dense_row();
-//    auto mwork = mat.dense_row();
-//    auto mwork_o = mat.dense_row();
-//    mwork_o->set_oracle(std::make_unique<tatami::FixedOracle<int> >(predictions.data(), predictions.size()));
-//
-//    for (auto i : predictions) {
-//        auto expected = rwork->fetch(i);
-//        EXPECT_EQ(mwork->fetch(i), expected);
-//        EXPECT_EQ(mwork_o->fetch(i), expected);
-//    }
-//}
-//
-//INSTANTIATE_TEST_SUITE_P(
-//    Hdf5SparseMatrix,
-//    Hdf5SparseBasicCacheTest,
-//    ::testing::Values(0, 0.001, 0.01, 0.1) 
-//);
-//
-///*************************************
-// *************************************/
-//
-//Class Hdf5SparseReuseCacheTest : public ::testing::TestWithParam<std::tuple<double, int, int> >, public Hdf5SparseMatrixTestMethods {
-//Protected:
-//    size_t NR = 150, NC = 200; 
-//    std::shared_ptr<tatami::NumericMatrix> mat, ref;
-//    std::vector<int> predictions;
-//
-//    template<class Params_>
-//    void assemble(const Params_& params) {
-//        dump(NR, NC);
-//
-//        double cache_multiplier = std::get<0>(params);
-//        int interval_jump = std::get<1>(params);
-//        int interval_size = std::get<2>(params);
-//
-//        int cache_size = compute_cache_size(NR, NC, cache_multiplier);
-//        auto hopt = custom_options(cache_size);
-//
-//        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt));
-//        ref.reset(new tatami::CompressedSparseMatrix<
-//            true, 
-//            double, 
-//            int, 
-//            decltype(triplets.value), 
-//            decltype(triplets.index), 
-//            decltype(triplets.ptr)
-//        >(NR, NC, triplets.value, triplets.index, triplets.ptr));
-//
-//        // Repeated scans over the same area, to check for correct re-use of
-//        // cache elements. We scramble the interval to check that the
-//        // reordering of elements is done correctly in oracle mode.
-//        std::vector<int> interval(interval_size);
-//        std::iota(interval.begin(), interval.end(), 0);
-//        std::mt19937_64 rng(cache_size + interval_size);
-//
-//        for (size_t r0 = 0; r0 < NR; r0 += interval_jump) {
-//            std::shuffle(interval.begin(), interval.end(), rng);
-//            for (auto i : interval) {
-//                if (i + r0 < NR) {
-//                    predictions.push_back(i + r0);
-//                }
-//            }
-//        }
-//    }
-//};
-//
-//TEST_P(Hdf5SparseReuseCacheTest, FullExtent) {
-//    assemble(GetParam());
-//
-//    auto rwork = ref->dense_row();
-//    auto mwork = mat->dense_row();
-//    auto mwork_o = mat->dense_row();
-//    mwork_o->set_oracle(std::make_unique<tatami::FixedOracle<int> >(predictions.data(), predictions.size()));
-//
-//    for (auto i : predictions) {
-//        auto expected = rwork->fetch(i);
-//        EXPECT_EQ(mwork->fetch(i), expected);
-//        EXPECT_EQ(mwork_o->fetch(i), expected);
-//    }
-//}
-//
-//TEST_P(Hdf5SparseReuseCacheTest, SlicedBounds) {
-//    assemble(GetParam());
-//
-//    // Testing that the extraction bounds are actually re-used during extraction.
-//    // This requires that the elements leave the cache and are then requested again;
-//    // if it's still in the cache, the non-bounded cache element will just be used.
-//    auto cstart = NC * 0.25, clen = NC * 0.5;
-//    tatami::Options opt;
-//    opt.cache_for_reuse = true;
-//
-//    auto rwork = ref->dense_row(cstart, clen, opt);
-//    auto mwork = mat->dense_row(cstart, clen, opt);
-//    auto mwork_o = mat->dense_row(cstart, clen, opt);
-//
-//    // Doing one final scan across all rows to re-request elements that have
-//    // likely left the cache, to force them to be reloaded with bounds.
-//    for (size_t r = 0; r < NR; ++r) {
-//        predictions.push_back(r);
-//    }
-//    mwork_o->set_oracle(std::make_unique<tatami::FixedOracle<int> >(predictions.data(), predictions.size()));
-//
-//    for (auto i : predictions) {
-//        auto expected = rwork->fetch(i);
-//        EXPECT_EQ(mwork->fetch(i), expected);
-//        EXPECT_EQ(mwork_o->fetch(i), expected);
-//    }
-//}
-//
-//INSTANTIATE_TEST_SUITE_P(
-//    Hdf5SparseMatrix,
-//    Hdf5SparseReuseCacheTest,
-//    ::testing::Combine(
-//        ::testing::Values(0, 0.001, 0.01, 0.1), // cache size multiplier
-//        ::testing::Values(1, 3), // jump between intervals
-//        ::testing::Values(5, 10, 20) // reuse interval size
-//    )
-//);
-//
-///*************************************
-// *************************************/
-//
-//Class Hdf5SparseApplyTest : public ::testing::TestWithParam<double>, public Hdf5SparseMatrixTestMethods {};
-//
-//TEST_P(Hdf5SparseApplyTest, Basic) {
-//    // Just putting it through its paces for correct oracular parallelization via apply.
-//    size_t NR = 500;
-//    size_t NC = 200;
-//    dump(NR, NC);
-//    int cache_size = compute_cache_size(NR, NC, GetParam());
-//    auto hopt = custom_options(cache_size);
-//
-//    auto mat = create_matrix<true>(NR, NC, hopt);
-//    auto ref = create_reference<true>(NR, NC);
-//
-//    EXPECT_EQ(tatami::row_sums(&mat), tatami::row_sums(&ref));
-//    EXPECT_EQ(tatami::column_sums(&mat), tatami::column_sums(&ref));
-//}
-//
-//INSTANTIATE_TEST_SUITE_P(
-//    Hdf5SparseMatrix,
-//    Hdf5SparseApplyTest,
-//    ::testing::Values(0, 0.001, 0.01, 0.1) // cache size multiplier
-//);
-//
-///*************************************
-// *************************************/
-//
-//Class Hdf5SparseCacheTypeTest : public ::testing::Test, public Hdf5SparseMatrixTestMethods {};
-//
-//TEST_F(Hdf5SparseCacheTypeTest, CastToInt) {
-//    size_t NR = 500;
-//    size_t NC = 200;
-//    dump(NR, NC);
-//
-//    tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int, int, uint16_t> mat(
-//        NR,
-//        NC,
-//        fpath, 
-//        name + "/data", 
-//        name + "/index", 
-//        name + "/indptr", 
-//        tatami_hdf5::Hdf5Options()
-//    );
-//
-//    std::vector<int> vcasted(triplets.value.begin(), triplets.value.end());
-//    std::vector<uint16_t> icasted(triplets.index.begin(), triplets.index.end());
-//    tatami::CompressedSparseMatrix<true, double, int, decltype(vcasted), decltype(icasted), decltype(triplets.ptr)> ref(
-//        NR,
-//        NC, 
-//        std::move(vcasted),
-//        std::move(icasted),
-//        triplets.ptr
-//    );
-//
-//    EXPECT_EQ(tatami::row_sums(&mat), tatami::row_sums(&ref));
-//    EXPECT_EQ(tatami::column_sums(&mat), tatami::column_sums(&ref));
-//}
+/*************************************
+ *************************************/
+
+class Hdf5SparseMatrixReusePrimaryCacheTest : public ::testing::TestWithParam<std::tuple<double, int, int> >, public Hdf5SparseMatrixTestCore {
+protected:
+    std::vector<int> predictions;
+
+    void SetUp() {
+        auto params = GetParam();
+        auto cache_fraction = std::get<0>(params);
+        int NR = 150, NC = 200;
+        assemble({ { NR, NC }, { 100, cache_fraction } });
+
+        auto interval_jump = std::get<1>(params);
+        auto interval_size = std::get<2>(params);
+
+        // Repeated scans over the same area, to check for correct re-use of
+        // cache elements. We scramble the interval to check that the
+        // reordering of elements is done correctly in oracle mode.
+        std::vector<int> interval(interval_size);
+        std::iota(interval.begin(), interval.end(), 0);
+        std::mt19937_64 rng(cache_fraction * 1000 + interval_size);
+
+        for (int r0 = 0; r0 < NR; r0 += interval_jump) {
+            std::shuffle(interval.begin(), interval.end(), rng);
+            for (auto i : interval) {
+                if (i + r0 < NR) {
+                    predictions.push_back(i + r0);
+                }
+            }
+        }
+    }
+};
+
+TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, FullExtent) {
+    auto rwork = ref->dense_row();
+    auto mwork = mat->dense_row();
+    auto mwork2 = mat->dense_row(std::make_unique<tatami::FixedViewOracle<int> >(predictions.data(), predictions.size()));
+    auto full = ref->ncol();
+
+    for (auto i : predictions) {
+        auto expected = tatami_test::fetch(rwork.get(), i, full);
+        auto observed = tatami_test::fetch(mwork.get(), i, full);
+        EXPECT_EQ(observed, expected);
+        auto observed2 = tatami_test::fetch(mwork2.get(), full);
+        EXPECT_EQ(observed2, expected);
+    }
+}
+
+TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, SlicedBounds) {
+    auto full = ref->ncol();
+    auto cstart = full * 0.25, clen = full * 0.5;
+
+    auto rwork = ref->dense_row(cstart, clen);
+    auto mwork = mat->dense_row(cstart, clen);
+    auto mwork2 = mat->dense_row(std::make_unique<tatami::FixedViewOracle<int> >(predictions.data(), predictions.size()), cstart, clen);
+
+    for (auto i : predictions) {
+        auto expected = tatami_test::fetch(rwork.get(), i, clen);
+        auto observed = tatami_test::fetch(mwork.get(), i, clen);
+        EXPECT_EQ(observed, expected);
+        auto observed2 = tatami_test::fetch(mwork2.get(), clen);
+        EXPECT_EQ(observed2, expected);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5SparseMatrix,
+    Hdf5SparseMatrixReusePrimaryCacheTest,
+    ::testing::Combine(
+        ::testing::Values(0, 0.001, 0.01, 0.1), // cache size multiplier
+        ::testing::Values(1, 3), // jump between intervals
+        ::testing::Values(5, 10, 20) // reuse interval size
+    )
+);
+
+/*************************************
+ *************************************/
+
+class Hdf5SparseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> >, public Hdf5SparseMatrixTestCore {};
+
+TEST_P(Hdf5SparseMatrixCacheTypeTest, CastToInt) {
+    int NR = 500;
+    int NC = 200;
+    assemble({ { NR, NC }, { 100, 0.1 } });
+
+    tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int, int, uint16_t> mat(
+        NR,
+        NC,
+        fpath, 
+        name + "/data", 
+        name + "/index", 
+        name + "/indptr", 
+        tatami_hdf5::Hdf5Options()
+    );
+
+    std::vector<int> vcasted(triplets.value.begin(), triplets.value.end());
+    std::vector<uint16_t> icasted(triplets.index.begin(), triplets.index.end());
+    tatami::CompressedSparseMatrix<true, double, int, decltype(vcasted), decltype(icasted), decltype(triplets.ptr)> ref(
+        NR,
+        NC, 
+        std::move(vcasted),
+        std::move(icasted),
+        triplets.ptr
+    );
+
+    tatami_test::TestAccessParameters params;
+    auto tparam = GetParam();
+    params.use_row = std::get<0>(tparam);
+    params.use_oracle = std::get<1>(tparam);
+
+    tatami_test::test_full_access(params, &mat, &ref);
+    tatami_test::test_block_access(params, &mat, &ref, 5, 20);
+    tatami_test::test_indexed_access(params, &mat, &ref, 3, 5);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5SparseMatrix,
+    Hdf5SparseMatrixCacheTypeTest,
+    ::testing::Combine(
+        ::testing::Values(true, false), // row access
+        ::testing::Values(true, false)  // oracle usage
+    )
+);
+
+/*************************************
+ *************************************/
+
+class Hdf5SparseMatrixParallelTest : public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, bool, bool> >, public Hdf5SparseMatrixTestCore {
+protected:
+    void SetUp() {
+        assemble({ { 100, 200 }, std::get<0>(GetParam()) });
+    }
+
+    template<bool oracle_>
+    static void compare_sums(bool row, const tatami::Matrix<double, int>* testmat, const tatami::Matrix<double, int>* refmat) {
+        size_t dim = (row ? refmat->nrow() : refmat->ncol());
+        size_t otherdim = (row ? refmat->ncol() : refmat->nrow());
+        std::vector<double> computed(dim), expected(dim);
+
+        tatami::parallelize([&](size_t, int start, int len) -> void {
+            auto ext = [&]() {
+                if constexpr(oracle_) {
+                    return tatami::consecutive_extractor<true>(testmat, row, start, len);
+                } else {
+                    return testmat->sparse(row, tatami::Options());
+                }
+            }();
+
+            auto rext = [&]() {
+                if constexpr(oracle_) {
+                    return tatami::consecutive_extractor<true>(refmat, row, start, len);
+                } else {
+                    return refmat->sparse(row, tatami::Options());
+                }
+            }();
+
+            std::vector<double> vbuffer(otherdim), rvbuffer(otherdim);
+            std::vector<int> ibuffer(otherdim), ribuffer(otherdim);
+            for (int i = start; i < start + len; ++i) {
+                auto out = ext->fetch(i, vbuffer.data(), ibuffer.data());
+                auto rout = rext->fetch(i, rvbuffer.data(), ribuffer.data());
+                computed[i] = std::accumulate(out.value, out.value + out.number, 0.0);
+                expected[i] = std::accumulate(rout.value, rout.value + rout.number, 0.0);
+            }
+        }, dim, 3); // throw it over three threads.
+
+        EXPECT_EQ(computed, expected);
+    }
+};
+
+TEST_P(Hdf5SparseMatrixParallelTest, Simple) {
+    auto param = GetParam();
+    bool row = std::get<1>(param);
+    bool oracle = std::get<2>(param);
+
+    if (oracle) {
+        compare_sums<true>(row, mat.get(), ref.get());
+        compare_sums<true>(row, tmat.get(), tref.get());
+    } else {
+        compare_sums<false>(row, mat.get(), ref.get());
+        compare_sums<false>(row, tmat.get(), tref.get());
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5SparseMatrix,
+    Hdf5SparseMatrixParallelTest,
+    ::testing::Combine(
+        Hdf5SparseMatrixTestCore::create_combinations(),
+        ::testing::Values(true, false), // row access
+        ::testing::Values(true, false)  // oracle usage
+    )
+);

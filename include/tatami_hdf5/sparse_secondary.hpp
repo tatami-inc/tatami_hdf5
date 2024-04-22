@@ -154,10 +154,12 @@ public:
         if (cache_workspace.num_slabs_in_cache == 0) {
             solo.reset();
             i = reindex(i);
-            for (Index_ px = 0; px < primary_length; ++px) {
-                auto primary = px + primary_start;
-                extract_and_append_single(primary, i, (store_index_ ? px : primary));
-            }
+            serialize([&]() {
+                for (Index_ px = 0; px < primary_length; ++px) {
+                    auto primary = px + primary_start;
+                    extract_and_append_single(primary, i, (store_index_ ? px : primary));
+                }
+            });
             solo.pointers.push_back(solo.index.size());
             return std::make_pair(&solo, 0);
 
@@ -177,10 +179,12 @@ public:
         if (cache_workspace.num_slabs_in_cache == 0) {
             solo.reset();
             i = reindex(i);
-            for (Index_ px = 0, end = primary_indices.size(); px < end; ++px) {
-                auto primary = primary_indices[px];
-                extract_and_append_single(primary, i, (store_index_ ? px : primary));
-            }
+            serialize([&](){
+                for (Index_ px = 0, end = primary_indices.size(); px < end; ++px) {
+                    auto primary = primary_indices[px];
+                    extract_and_append_single(primary, i, (store_index_ ? px : primary));
+                }
+            });
             solo.pointers.push_back(solo.index.size());
             return std::make_pair(&solo, 0);
 
@@ -247,6 +251,7 @@ private:
         }
     }
 
+    // Serial locks should be applied by the callers before calling this.
     void extract_and_append_single(Index_ primary, Index_ secondary, Index_ primary_to_add) {
         hsize_t left = pointers[primary], right = pointers[primary + 1];
         hsize_t count = right - left;
