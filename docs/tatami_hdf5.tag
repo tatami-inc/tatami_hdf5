@@ -1,85 +1,50 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
-<tagfile doxygen_version="1.9.5">
+<tagfile doxygen_version="1.9.8">
   <compound kind="file">
     <name>Hdf5CompressedSparseMatrix.hpp</name>
-    <path>/github/workspace/include/tatami_hdf5/</path>
+    <path>tatami_hdf5/</path>
     <filename>Hdf5CompressedSparseMatrix_8hpp.html</filename>
     <class kind="class">tatami_hdf5::Hdf5CompressedSparseMatrix</class>
     <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>Hdf5DenseMatrix.hpp</name>
-    <path>/github/workspace/include/tatami_hdf5/</path>
+    <path>tatami_hdf5/</path>
     <filename>Hdf5DenseMatrix_8hpp.html</filename>
     <class kind="class">tatami_hdf5::Hdf5DenseMatrix</class>
     <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>load_hdf5_matrix.hpp</name>
-    <path>/github/workspace/include/tatami_hdf5/</path>
+    <path>tatami_hdf5/</path>
     <filename>load__hdf5__matrix_8hpp.html</filename>
     <namespace>tatami_hdf5</namespace>
-    <member kind="function">
-      <type>tatami::CompressedSparseMatrix&lt; row_, Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_ &gt;</type>
-      <name>load_hdf5_compressed_sparse_matrix</name>
-      <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>acf08ac352e8f0caa63483d0967ea88a3</anchor>
-      <arglist>(size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr)</arglist>
-    </member>
-    <member kind="function">
-      <type>tatami::DenseMatrix&lt;!transpose_, Value_, Index_, ValueStorage_ &gt;</type>
-      <name>load_hdf5_dense_matrix</name>
-      <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>a9c60ce93385d89902f042f3c43fae5bb</anchor>
-      <arglist>(const std::string &amp;file, const std::string &amp;name)</arglist>
-    </member>
   </compound>
   <compound kind="file">
     <name>serialize.hpp</name>
-    <path>/github/workspace/include/tatami_hdf5/</path>
+    <path>tatami_hdf5/</path>
     <filename>serialize_8hpp.html</filename>
     <namespace>tatami_hdf5</namespace>
-    <member kind="function">
-      <type>void</type>
-      <name>serialize</name>
-      <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>a7e77c93d845d11169165ed14249970fd</anchor>
-      <arglist>(Function_ f)</arglist>
-    </member>
   </compound>
   <compound kind="file">
     <name>tatami_hdf5.hpp</name>
-    <path>/github/workspace/include/tatami_hdf5/</path>
+    <path>tatami_hdf5/</path>
     <filename>tatami__hdf5_8hpp.html</filename>
     <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>utils.hpp</name>
-    <path>/github/workspace/include/tatami_hdf5/</path>
+    <path>tatami_hdf5/</path>
     <filename>utils_8hpp.html</filename>
     <class kind="struct">tatami_hdf5::Hdf5Options</class>
     <namespace>tatami_hdf5</namespace>
   </compound>
   <compound kind="file">
     <name>write_sparse_matrix_to_hdf5.hpp</name>
-    <path>/github/workspace/include/tatami_hdf5/</path>
+    <path>tatami_hdf5/</path>
     <filename>write__sparse__matrix__to__hdf5_8hpp.html</filename>
     <class kind="struct">tatami_hdf5::WriteSparseMatrixToHdf5Parameters</class>
     <namespace>tatami_hdf5</namespace>
-    <member kind="function">
-      <type>void</type>
-      <name>write_sparse_matrix_to_hdf5</name>
-      <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>a9a0cf7882b3882b88773db1b4a50e4bf</anchor>
-      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location, const WriteSparseMatrixToHdf5Parameters &amp;params)</arglist>
-    </member>
-    <member kind="function">
-      <type>void</type>
-      <name>write_sparse_matrix_to_hdf5</name>
-      <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>a831a53fbca90181db7cae439bde28b1d</anchor>
-      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location)</arglist>
-    </member>
   </compound>
   <compound kind="class">
     <name>tatami_hdf5::Hdf5CompressedSparseMatrix</name>
@@ -126,7 +91,7 @@
     <templarg>typename Index_</templarg>
     <templarg>bool transpose_</templarg>
     <templarg>typename CachedValue_</templarg>
-    <base>VirtualDenseMatrix&lt; Value_, Index_ &gt;</base>
+    <base>Matrix&lt; Value_, Index_ &gt;</base>
     <member kind="function">
       <type></type>
       <name>Hdf5DenseMatrix</name>
@@ -313,6 +278,6 @@
     <name>index</name>
     <title>tatami for HDF5 matrices</title>
     <filename>index.html</filename>
-    <docanchor file="index.html">md__github_workspace_README</docanchor>
+    <docanchor file="index.html">md__2github_2workspace_2README</docanchor>
   </compound>
 </tagfile>

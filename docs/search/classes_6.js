@@ -1,6 +1,5 @@
 var searchData=
 [
-  ['hdf5compressedsparsematrix_0',['Hdf5CompressedSparseMatrix',['../classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html',1,'tatami_hdf5']]],
-  ['hdf5densematrix_1',['Hdf5DenseMatrix',['../classtatami__hdf5_1_1Hdf5DenseMatrix.html',1,'tatami_hdf5']]],
-  ['hdf5options_2',['Hdf5Options',['../structtatami__hdf5_1_1Hdf5Options.html',1,'tatami_hdf5']]]
+  ['indexsparsifiedwrapper_0',['IndexSparsifiedWrapper',['https://tatami-inc.github.io/tatami/structtatami_1_1IndexSparsifiedWrapper.html',1,'tatami']]],
+  ['iterator_1',['Iterator',['https://tatami-inc.github.io/tatami/structtatami_1_1SomeNumericArray_1_1Iterator.html',1,'tatami::SomeNumericArray']]]
 ];

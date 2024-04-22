@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['block_5flength_0',['block_length',['https://tatami-inc.github.io/tatami/structtatami_1_1BlockExtractor.html#a2421eff5ead7d4b29306374de30ca8a2',1,'tatami::BlockExtractor']]],
-  ['block_5fstart_1',['block_start',['https://tatami-inc.github.io/tatami/structtatami_1_1BlockExtractor.html#a6c013beccbd49cfa2cf5aae42098a527',1,'tatami::BlockExtractor']]]
+  ['chunk_5fsize_0',['chunk_size',['../structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html#ab826ad41c914cc2b92f08dceac019ba3',1,'tatami_hdf5::WriteSparseMatrixToHdf5Parameters']]],
+  ['columnar_1',['columnar',['../structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html#acfc56828595cd56c598da68c5c2d8541',1,'tatami_hdf5::WriteSparseMatrixToHdf5Parameters']]]
 ];

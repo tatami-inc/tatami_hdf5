@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['variances_2ehpp_0',['variances.hpp',['https://tatami-inc.github.io/tatami/variances_8hpp.html',1,'']]],
-  ['virtualdensematrix_2ehpp_1',['VirtualDenseMatrix.hpp',['https://tatami-inc.github.io/tatami/VirtualDenseMatrix_8hpp.html',1,'']]]
+  ['wrap_5fshared_5fptr_2ehpp_0',['wrap_shared_ptr.hpp',['https://tatami-inc.github.io/tatami/wrap__shared__ptr_8hpp.html',1,'']]],
+  ['write_5fsparse_5fmatrix_5fto_5fhdf5_2ehpp_1',['write_sparse_matrix_to_hdf5.hpp',['../write__sparse__matrix__to__hdf5_8hpp.html',1,'']]]
 ];
