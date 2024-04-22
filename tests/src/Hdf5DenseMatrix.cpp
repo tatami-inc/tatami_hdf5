@@ -46,6 +46,9 @@ protected:
         }
         last_params = params;
 
+        auto chunk_sizes = std::get<0>(params);
+        auto cache_size = std::get<1>(params);
+
         fpath = tatami_test::temp_file_path("tatami-dense-test.h5");
         tatami_test::remove_file_path(fpath);
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
@@ -57,7 +60,6 @@ protected:
         H5::DataType dtype(H5::PredType::NATIVE_DOUBLE);
 
         H5::DSetCreatPropList plist(H5::DSetCreatPropList::DEFAULT.getId());
-        const auto& chunk_sizes = std::get<0>(params);
         if (chunk_sizes.first == 0) {
             plist.setLayout(H5D_CONTIGUOUS);
         } else {
@@ -70,13 +72,12 @@ protected:
 
         name = "stuff";
         auto dhandle = fhandle.createDataSet(name, dtype, dspace, plist);
-        auto values = tatami_test::simulate_dense_vector<double>(NR * NC, 0, 100);
+        auto values = tatami_test::simulate_dense_vector<double>(NR * NC, 0, 100, /* seed = */ chunk_sizes.first * chunk_sizes.second + cache_size);
         dhandle.write(values.data(), H5::PredType::NATIVE_DOUBLE);
 
         ref.reset(new tatami::DenseRowMatrix<double, int>(NR, NC, std::move(values)));
         tref.reset(new tatami::DelayedTranspose<double, int>(ref));
 
-        auto cache_size = std::get<1>(params);
         tatami_hdf5::Hdf5Options opt;
         opt.maximum_cache_size = sizeof(double) * cache_size;
         opt.require_minimum_cache = (cache_size > 0);
@@ -241,9 +242,9 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5DenseCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> >, public Hdf5DenseMatrixTestCore {};
+class Hdf5DenseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> >, public Hdf5DenseMatrixTestCore {};
 
-TEST_P(Hdf5DenseCacheTypeTest, CastToInt) {
+TEST_P(Hdf5DenseMatrixCacheTypeTest, CastToInt) {
     assemble(SimulationParameters(std::make_pair(9, 13), 1));
 
     tatami_hdf5::Hdf5DenseMatrix<double, int, false, int> mat(fpath, name);
@@ -261,7 +262,7 @@ TEST_P(Hdf5DenseCacheTypeTest, CastToInt) {
 
 INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
-    Hdf5DenseCacheTypeTest,
+    Hdf5DenseMatrixCacheTypeTest,
     ::testing::Combine(
         ::testing::Values(true, false), // row access
         ::testing::Values(true, false)  // oracle usage
@@ -271,7 +272,7 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5DenseParallelTest : public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, bool, bool> >, public Hdf5DenseMatrixTestCore {
+class Hdf5DenseMatrixParallelTest : public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, bool, bool> >, public Hdf5DenseMatrixTestCore {
 protected:
     void SetUp() {
         assemble(std::get<0>(GetParam()));
@@ -313,7 +314,7 @@ protected:
     }
 };
 
-TEST_P(Hdf5DenseParallelTest, Simple) {
+TEST_P(Hdf5DenseMatrixParallelTest, Simple) {
     auto param = GetParam();
     bool row = std::get<1>(param);
     bool oracle = std::get<2>(param);
@@ -329,10 +330,10 @@ TEST_P(Hdf5DenseParallelTest, Simple) {
 
 INSTANTIATE_TEST_SUITE_P(
     Hdf5DenseMatrix,
-    Hdf5DenseParallelTest,
+    Hdf5DenseMatrixParallelTest,
     ::testing::Combine(
         Hdf5DenseMatrixTestCore::create_combinations(),
-        ::testing::Values(true, false),
-        ::testing::Values(true, false)
+        ::testing::Values(true, false), // row access
+        ::testing::Values(true, false)  // oracle usage
     )
 );
