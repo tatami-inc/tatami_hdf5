@@ -197,7 +197,7 @@ private:
             size_t y = 0;
             for (auto x = start; x != end; ++x, ++y) {
                 Index_ current = *x - secondary_start;
-                cache_index[cache_offsets[current] + static_cast<size_t>(cache_count[current])] = data_buffer[y];
+                cache_data[cache_offsets[current] + static_cast<size_t>(cache_count[current])] = data_buffer[y];
             }
         }
 
@@ -259,7 +259,7 @@ public:
             )
         )
     {
-        size_t alloc = multiply(cache.get_num_slabs(), extract_length);
+        size_t alloc = multiply(cache.get_max_slabs(), extract_length);
         if (needs_index) {
             cache_index.resize(alloc);
         }
@@ -277,8 +277,8 @@ protected:
     bool needs_index;
 
     struct Slab {
-        CachedValue_* value;
-        Index_* index;
+        CachedValue_* value = NULL;
+        Index_* index = NULL;
         Index_ number = 0;
     };
     tatami_chunked::OracleSlabCache<Index_, Index_, Slab> cache;
@@ -302,10 +302,10 @@ private:
                 Slab latest;
                 size_t offset = multiply(counter, extract_length);
                 if (needs_value) {
-                    latest.value = data_buffer.data() + offset;
+                    latest.value = cache_data.data() + offset;
                 }
                 if (needs_index) {
-                    latest.index = index_buffer.data() + offset;
+                    latest.index = cache_index.data() + offset;
                 }
                 ++counter;
                 return latest;
@@ -351,7 +351,7 @@ private:
             for (auto x = start; x != end; ++x) {
                 auto slab_ptr = slab_ptrs[*x];
                 if (slab_ptr != NULL) {
-                    slab_ptr->value[slab_ptr->number] = primary_to_add;
+                    slab_ptr->index[slab_ptr->number] = primary_to_add;
                 }
             }
         }
@@ -381,6 +381,7 @@ private:
                 ++(slab_ptr->number);
             }
         }
+
     }
 
 public:
