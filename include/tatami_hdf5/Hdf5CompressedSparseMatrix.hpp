@@ -61,9 +61,7 @@ class Hdf5CompressedSparseMatrix : public tatami::Matrix<Value_, Index_> {
     std::vector<hsize_t> pointers;
 
     size_t cache_size_limit;
-    bool require_minimum_cache; 
     Index_ max_non_zeros;
-    tatami_chunked::ChunkDimensionStats<Index_> secondary_chunk_stats;
 
 public:
     /**
@@ -83,8 +81,7 @@ public:
         file_name(std::move(file)), 
         data_name(std::move(vals)), 
         index_name(std::move(idx)), 
-        cache_size_limit(options.maximum_cache_size),
-        require_minimum_cache(options.require_minimum_cache)
+        cache_size_limit(options.maximum_cache_size)
     {
         serialize([&]() -> void {
             H5::H5File file_handle(file_name, H5F_ACC_RDONLY);
@@ -121,10 +118,6 @@ public:
                 max_non_zeros = diff;
             }
         }
-
-        Index_ secondary_dim = (row_ ? nc : nr);
-        Index_ secondary_chunkdim = std::max(10, static_cast<int>(std::ceil(std::sqrt(static_cast<double>(secondary_dim))))); // arbitrary choice, but whatever.
-        secondary_chunk_stats = tatami_chunked::ChunkDimensionStats<Index_>(secondary_dim, secondary_chunkdim);
     }
 
     /**
@@ -213,7 +206,7 @@ private:
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryFullDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, secondary_chunk_stats, primary_extent(), std::move(oracle), cache_size_limit, require_minimum_cache
+                file_name, data_name, index_name, pointers, secondary_extent(), primary_extent(), std::move(oracle), cache_size_limit
             );
         }
     }
@@ -226,7 +219,7 @@ private:
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryBlockDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, secondary_chunk_stats, std::move(oracle), block_start, block_length, cache_size_limit, require_minimum_cache
+                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), block_start, block_length, cache_size_limit
             );
         }
     }
@@ -239,7 +232,7 @@ private:
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryIndexDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, secondary_chunk_stats, std::move(oracle), std::move(indices_ptr), cache_size_limit, require_minimum_cache
+                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), std::move(indices_ptr), cache_size_limit
             );
         }
     }
@@ -282,11 +275,10 @@ private:
                 data_name, 
                 index_name, 
                 pointers, 
-                secondary_chunk_stats, 
+                secondary_extent(), 
                 primary_extent(),
                 std::move(oracle), 
                 cache_size_limit, 
-                require_minimum_cache, 
                 opt.sparse_extract_value, 
                 opt.sparse_extract_index
             );
@@ -316,12 +308,11 @@ private:
                 data_name, 
                 index_name, 
                 pointers, 
-                secondary_chunk_stats, 
+                secondary_extent(), 
                 std::move(oracle), 
                 block_start, 
                 block_length, 
                 cache_size_limit, 
-                require_minimum_cache, 
                 opt.sparse_extract_value, 
                 opt.sparse_extract_index
             );
@@ -350,11 +341,10 @@ private:
                 data_name, 
                 index_name, 
                 pointers, 
-                secondary_chunk_stats, 
+                secondary_extent(), 
                 std::move(oracle), 
                 std::move(indices_ptr), 
                 cache_size_limit, 
-                require_minimum_cache,
                 opt.sparse_extract_value, 
                 opt.sparse_extract_index
             );
