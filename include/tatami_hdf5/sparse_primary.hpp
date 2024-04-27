@@ -89,18 +89,21 @@ struct Chunk {
 // defragmenting within this buffer but that's probably overkill.
 template<typename Index_, typename CachedValue_, typename CachedIndex_>
 class ContiguousOracleSlabCache {
-private:
-    std::vector<CachedValue_> full_value_buffer;
-    std::vector<CachedIndex_> full_index_buffer;
-    std::unordered_map<Index_, Index_> cache_exists, next_cache_exists;
-
+public:
     struct Element {
         size_t data_offset;
         size_t mem_offset;
         Index_ length;
     };
-    std::vector<Element> cache_data, next_cache_data;
 
+private:
+    const std::vector<size_t>& pointers;
+
+    std::vector<CachedValue_> full_value_buffer;
+    std::vector<CachedIndex_> full_index_buffer;
+    std::unordered_map<Index_, Index_> cache_exists, next_cache_exists;
+
+    std::vector<Element> cache_data, next_cache_data;
     std::vector<Index_> needed;
     std::vector<Index_> present;
 
@@ -110,7 +113,14 @@ private:
     bool needs_cached_value, needs_cached_index;
 
 public:
-    ContiguousOracleSlabCache(std::shared_ptr<const tatami::Oracle<Index_> > ora, size_t cache_size, size_t min_elements, bool needs_cached_value, bool needs_cached_index) : 
+    ContiguousOracleSlabCache(
+        const std::vector<size_t>& ptrs, 
+        std::shared_ptr<const tatami::Oracle<Index_> > ora, 
+        size_t cache_size, 
+        size_t min_elements, 
+        bool needs_cached_value, 
+        bool needs_cached_index) : 
+        pointers(ptrs),
         oracle(std::move(ora)), 
         max_cache_elements([&]() -> size_t {
             size_t elsize = size_of_cached_element<CachedIndex_, CachedValue_>(needs_cached_value, needs_cached_index);
@@ -134,7 +144,8 @@ public:
     }
 
 public:
-    void populate(const std::vector<hsize_t>& pointers, Components& h5comp) {
+    template<class Extract_>
+    void populate(Extract_ extract) {
         size_t filled_elements = 0;
         needed.clear();
         present.clear();
@@ -213,41 +224,7 @@ public:
             // This should improve re-use of partially read chunks inside the HDF5 call.
             sort_by_field(needed, [&](size_t i) -> size_t { return next_cache_data[i].data_offset; });
 
-            serialize([&]() -> void {
-                size_t sofar = 0;
-                hsize_t combined_len = 0;
-                h5comp.dataspace.selectNone();
-
-                while (sofar < needed.size()) {
-                    auto& first = next_cache_data[needed[sofar]];
-                    first.mem_offset = dest_offset + combined_len;
-                    hsize_t src_offset = first.data_offset;
-                    hsize_t len = first.length;
-                    ++sofar;
-
-                    // Finding the stretch of consecutive extractions, and bundling them into a single hyperslab.
-                    for (; sofar < needed.size(); ++sofar) {
-                        auto& next = next_cache_data[needed[sofar]];
-                        if (src_offset + len < next.data_offset) {
-                            break;
-                        }
-                        next.mem_offset = first.mem_offset + len;
-                        len += next.length;
-                    }
-
-                    h5comp.dataspace.selectHyperslab(H5S_SELECT_OR, &len, &src_offset);
-                    combined_len += len;
-                }
-
-                h5comp.memspace.setExtentSimple(1, &combined_len);
-                h5comp.memspace.selectAll();
-                if (needs_cached_index) {
-                    h5comp.index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), h5comp.memspace, h5comp.dataspace);
-                }
-                if (needs_cached_value) {
-                    h5comp.data_dataset.read(full_value_buffer.data() + dest_offset, define_mem_type<CachedValue_>(), h5comp.memspace, h5comp.dataspace);
-                }
-            });
+            extract(dest_offset, needed, next_cache_data, full_value_buffer, full_index_buffer);
         }
 
         cache_data.swap(next_cache_data);
@@ -255,10 +232,10 @@ public:
     }
 
 public:
-    template<typename ... Args_>
-    Chunk<Index_, CachedValue_, CachedIndex_> next(const std::vector<hsize_t>& pointers, Components& h5comp) {
+    template<class Extract_>
+    Chunk<Index_, CachedValue_, CachedIndex_> next(Extract_&& extract) {
         if (counter == future) {
-            populate(pointers, h5comp);
+            populate(std::forward<Extract_>(extract));
         }
         auto current = oracle->get(counter++);
         const auto& info = cache_data[cache_exists.find(current)->second];
@@ -275,9 +252,9 @@ public:
     }
 };
 
-/****************************************
- **** Virtual classes for extractors ****
- ****************************************/
+/*************************************
+ **** Sparse base extractor class ****
+ *************************************/
 
 // All HDF5-related members are stored in a separate pointer so we can serialize construction and destruction.
 class PrimaryBase {
@@ -306,11 +283,15 @@ protected:
     std::unique_ptr<Components> h5comp;
 };
 
+/************************************
+ **** LRU base extractor classes ****
+ ************************************/
+
 template<typename Index_, typename CachedValue_, typename CachedIndex_>
 struct PrimaryLruBase : public PrimaryBase {
     struct Slab {
-        Slab(size_t capacity, bool needs_cached_value, bool needs_cached_index) : 
-            value(needs_cached_value ? capacity : 0), index(needs_cached_index ? capacity : 0) {}
+        Slab(size_t capacity, bool needs_value, bool needs_index) : 
+            value(needs_value ? capacity : 0), index(needs_index ? capacity : 0) {}
         std::vector<CachedValue_> value;
         std::vector<CachedIndex_> index;
         Index_ length;
@@ -318,10 +299,10 @@ struct PrimaryLruBase : public PrimaryBase {
         Chunk<Index_, CachedValue_, CachedIndex_> as_chunk() const {
             Chunk<Index_, CachedValue_, CachedIndex_> output;
             output.length = slab.length;
-            if (needs_cached_value) {
+            if (needs_value) {
                 output.value = slab.value.data();
             }
-            if (needs_cached_index) {
+            if (needs_index) {
                 output.index = slab.index.data();
             }
             return output;
@@ -331,7 +312,7 @@ struct PrimaryLruBase : public PrimaryBase {
 protected:
     tatami_chunked::LruSlabCache<Index_, Slab> cache;
     size_t max_non_zeros;
-    bool needs_cached_value, needs_cached_index;
+    bool needs_value, needs_index;
 
 public:
     PrimaryLruBase(
@@ -342,8 +323,8 @@ public:
         tatami::MaybeOracle<false, Index_>, // for consistency with the oracular constructors.
         size_t cache_size,
         size_t max_non_zeros, 
-        bool needs_cached_value, 
-        bool needs_cached_index) : 
+        bool needs_value, 
+        bool needs_index) : 
         PrimaryBase(file_name, data_name, index_name, ptrs),
         cache([&]() -> size_t {
             // Always return at least one slab, so that cache.find() is valid.
@@ -351,7 +332,7 @@ public:
                 return 1;
             }
 
-            auto elsize = size_of_cached_element<CachedValue_, CachedIndex_>(needs_cached_value, needs_cached_index);
+            auto elsize = size_of_cached_element<CachedValue_, CachedIndex_>(needs_value, needs_index);
             if (elsize == 0) {
                 return 1;
             }
@@ -364,8 +345,8 @@ public:
             return num_slabs;
         }()),
         max_non_zeros(max_non_zeros),
-        needs_cached_value(needs_cached_value),
-        needs_cached_index(needs_cached_index)
+        needs_value(needs_value),
+        needs_index(needs_index)
     {}
 };
 
@@ -376,12 +357,13 @@ struct PrimaryLruFullBase : public PrimaryLruBase<Index_, CachedValue_, CachedIn
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
+        [[maybe_unused]] Index_ secondary_dim, // ignored, put here only for consistency with other subclasses.
         tatami::MaybeOracle<false, Index_> oracle, 
         size_t cache_size,
         size_t max_non_zeros, 
-        bool needs_cached_value, 
-        bool needs_cached_index) : 
-        PrimaryLruBase<Index_, CachedValue_, CachedIndex_>(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_nonzeros, needs_cached_value, needs_cached_index)
+        bool needs_value, 
+        bool needs_index) : 
+        PrimaryLruBase<Index_, CachedValue_, CachedIndex_>(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_nonzeros, needs_value, needs_index)
     {}
 
 public:
@@ -389,13 +371,13 @@ public:
         const auto& slab = cache.find(
             i, 
             /* create = */ [&]() -> Slab {
-                return Slab(max_non_zeros, needs_cached_value, needs_cached_index);
+                return Slab(max_non_zeros, needs_value, needs_index);
             },
             /* populate = */ [&](Index_ i, Slab& current_cache) -> void {
                 hsize_t extraction_start = this->pointers[i];
                 hsize_t extraction_len = this->pointers[i + 1] - pointers[i];
                 current_cache.length = extraction_len;
-                if (extraction_len == 0) {
+                if (extraction_len != 0) {
                     return;
                 }
 
@@ -403,10 +385,10 @@ public:
                     this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
                     this->h5comp->memspace.setExtentSimple(1, &extraction_len);
                     this->h5comp->memspace.selectAll();
-                    if (this->needs_cached_index) {
+                    if (this->needs_index) {
                         this->h5comp->index_dataset.read(current_cache.index.data(), define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
                     }
-                    if (this->needs_cached_value) {
+                    if (this->needs_value) {
                         this->h5comp->data_dataset.read(current_cache.value.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
                     }
                 });
@@ -430,9 +412,19 @@ struct PrimaryLruBlockBase : public PrimaryLruBase<Index_, CachedValue_, CachedI
         Index_ block_length,
         size_t cache_size,
         size_t max_non_zeros, 
-        bool needs_cached_value, 
-        bool needs_cached_index) : 
-        PrimaryLruBase<Index_, CachedValue_, CachedIndex_>(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_nonzeros, needs_cached_value, needs_cached_index),
+        bool needs_value, 
+        bool needs_index) : 
+        PrimaryLruBase<Index_, CachedValue_, CachedIndex_>(
+            file_name, 
+            data_name, 
+            index_name, 
+            ptrs, 
+            std::move(oracle), 
+            cache_size, 
+            std::min(max_nonzeros, static_cast<size_t>(block_length)), // Tighten the bounds if we can.
+            needs_value, 
+            needs_index
+        ),
         secondary_dim(secondary_dim),
         secondary_start(block_start),
         secondary_past_end(block_start + block_length)
@@ -448,15 +440,16 @@ public:
         const auto& slab = cache.find(
             i, 
             /* create = */ [&]() -> Slab {
-                return Slab(max_non_zeros, needs_cached_value, needs_cached_index);
+                return Slab(max_non_zeros, needs_value, needs_index);
             },
             /* populate = */ [&](Index_ i, Slab& current_cache) -> void {
                 hsize_t extraction_start = this->pointers[i];
                 hsize_t extraction_len = this->pointers[i + 1] - pointers[i];
-                index_buffer.resize(extraction_len);
                 if (extraction_len == 0) {
+                    current_cache.length = 0;
                     return;
                 }
+                index_buffer.resize(extraction_len);
 
                 serialize([&]() -> void {
                     this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
@@ -467,31 +460,29 @@ public:
                     auto indices_start = index_buffer.begin();
                     auto indices_end = index_end.begin();
                     if (secondary_start) {
+                        // Using a custom comparator to avoid casting problems when CachedIndex_ is of a different type than Index_.
                         indices_start = std::lower_bound(indices_start, indices_end, secondary_start, [](Index_ a, Index_ b) -> bool { return a < b; });
                     }
                     if (secondary_past_end != secondary_dim) {
                         indices_end = std::lower_bound(indices_start, indices_end, secondary_past_end, [](Index_ a, Index_ b) -> bool { return a < b; });
                     }
 
-                    extraction_len = indices_end - indices_start;
-                    if (extraction_len == 0) {
-                        return;
-                    }
+                    current_cache.length = indices_end - indices_start;
 
-                    // Shifting the indices to the front.
-                    if (this->needs_cached_index) {
-                        std::copy(indices_start, indices_end, current_cache.index.begin());
-                    }
-                    if (this->needs_cached_value) {
-                        extraction_start += indices_start - index_buffer.begin();
-                        this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
-                        this->h5comp->memspace.setExtentSimple(1, &extraction_len);
-                        this->h5comp->memspace.selectAll();
-                        this->h5comp->data_dataset.read(current_cache.value.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                    if (current_cache.length) {
+                        if (this->needs_index) {
+                            std::copy(indices_start, indices_end, current_cache.index.begin());
+                        }
+                        if (this->needs_value) {
+                            hsize_t new_start = extraction_start + (indices_start - index_buffer.begin());
+                            hsize_t new_len = current_cache.length;
+                            this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &new_len, &new_start);
+                            this->h5comp->memspace.setExtentSimple(1, &new_len);
+                            this->h5comp->memspace.selectAll();
+                            this->h5comp->data_dataset.read(current_cache.value.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                        }
                     }
                 });
-
-                current_cache.length = extraction_len;
             }
         );
 
@@ -511,9 +502,19 @@ struct PrimaryLruIndexBase : public PrimaryruBase<Index_, CachedValue_, CachedIn
         const std::vector<Index_>& indices,
         size_t cache_size,
         size_t max_non_zeros, 
-        bool needs_cached_value, 
-        bool needs_cached_index) : 
-        PrimaryLruBase<Index_, CachedValue_, CachedIndex_>(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_nonzeros, needs_cached_value, needs_cached_index),
+        bool needs_value, 
+        bool needs_index) : 
+        PrimaryLruBase<Index_, CachedValue_, CachedIndex_>(
+            file_name, 
+            data_name, 
+            index_name, 
+            ptrs, 
+            std::move(oracle), 
+            cache_size, 
+            std::min(max_nonzeros, indices.size()), // Tighten the bounds if we can.
+            needs_value, 
+            needs_index
+        ),
         secondary_dim(secondary_dim)
     {
         populate_sparse_remap_vector(remap, first_index, past_last_index);
@@ -524,21 +525,23 @@ private:
     Index_ first_index, past_last_index;
     SparseRemapVector<sparse_, Index_> remap;
     std::vector<CachedIndex_> index_buffer;
+    std::vector<Index_> found;
 
 public:
     Chunk<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ i) {
         const auto& slab = cache.find(
             i, 
             /* create = */ [&]() -> Slab {
-                return Slab(max_non_zeros, needs_cached_value, needs_cached_index);
+                return Slab(max_non_zeros, needs_value, needs_index);
             },
             /* populate = */ [&](Index_ i, Slab& current_cache) -> void {
                 hsize_t extraction_start = this->pointers[i];
                 hsize_t extraction_len = this->pointers[i + 1] - pointers[i];
-                index_buffer.resize(extraction_len);
                 if (extraction_len == 0) {
+                    current_cache.length = 0;
                     return;
                 }
+                index_buffer.resize(extraction_len);
 
                 serialize([&]() -> void {
                     this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
@@ -549,53 +552,56 @@ public:
                     auto indices_start = index_buffer.begin();
                     auto indices_end = index_end.begin();
                     if (first_index) {
+                        // Using a custom comparator to avoid casting problems when CachedIndex_ is of a different type than Index_.
                         indices_start = std::lower_bound(indices_start, indices_end, first_index, [](Index_ a, Index_ b) -> bool { return a < b; });
                     }
                     if (past_last_index != secondary_dim) {
                         indices_end = std::lower_bound(indices_start, indices_end, past_last_index, [](Index_ a, Index_ b) -> bool { return a < b; });
                     }
-                    if (indices_start == indices_end) {
-                        return;
-                    }
 
-                    extraction_len = 0;
-                    auto cacheIIt = current_cache.indices.begin();
-                    Index_ last_value = secondary_dim;
-                    if (this->needs_cached_value) {
-                        this->h5comp->dataspace.selectNone();
-                    }
+                    Index_ num_found = 0;
+                    if (indices_start != indices_end) {
+                        Index_ counter = 0;
+                        found.clear();
+                        auto ciIt = current_cache.index.begin();
 
-                    for (auto x = indices_start; x != indices_end; ++x) {
-                        auto offset = *x - first_index;
-                        auto present = remap[offset];
-                        if (!present) {
-                            continue;
-                        }
-
-                        if (this->needs_cached_index) {
-                            if constexpr(sparse_) {
-                                *cacheIit = *x;
-                            } else {
-                                *cacheIIt = present;
+                        for (auto x = indices_start; x != indices_end; ++x, ++counter) {
+                            auto present = remap[*x - first_index];
+                            if (present) {
+                                if (this->needs_index) {
+                                    if constexpr(sparse_) {
+                                        *cIt = *x;
+                                    } else {
+                                        *cIt = present;
+                                    }
+                                    ++cIt;
+                                }
+                                if (this->needs_value) {
+                                    found.push_back(counter);
+                                }
+                                ++num_found;
                             }
-                            ++cacheIIt;
                         }
 
-                        if (this->needs_cached_value) {
-
+                        if (this->needs_value && num_found) {
+                            hsize_t new_start = extraction_start + (indices_start - current_cache.index.begin());
+                            this->h5comp->dataspace.selectNone();
+                            tatami::process_consecutive_indices<Index_>(found.data(), found.size(),
+                                [&](Index_ start, Index_ length) {
+                                    hsize_t offset = start + new_start;
+                                    hsize_t count = length;
+                                    this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, count, offset);
+                                }
+                            );
+                            hsize_t new_len = num_found;
+                            this->h5comp->memspace.setExtentSimple(1, &new_len);
+                            this->h5comp->memspace.selectAll();
+                            this->h5comp->data_dataset.read(current_cache.value.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
                         }
-
-                        ++extraction_len;
                     }
 
-                    if (this->needs_cached_value) {
-                        this->h5comp->memspace.setExtentSimple(1, &extraction_len);
-                        this->h5comp->memspace.selectAll();
-                        this->h5comp->data_dataset.read(current_cache.value.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
-                    }
+                    current_cache.length = num_found;
                 });
-
-                current_cache.length = extraction_len;
             }
         );
 
@@ -603,11 +609,15 @@ public:
     }
 };
 
+/******************************************
+ **** Oraclular base extractor classes ****
+ ******************************************/
 
 template<typename Index_, typename CachedValue_, typename CachedIndex_>
 class PrimaryOracleBase : public PrimaryBase {
-private:
+protected:
     ContiguousOracleSlabCache<Index_, CachedValue_, CachedIndex_> cache;
+    typedef typename decltype(cache)::Element Element;
 
 public:
     PrimaryOracleBase(
@@ -615,23 +625,326 @@ public:
         const std::string& data_name,
         const std::string& index_name,
         const std::vector<hsize_t>& ptrs,
+        [[maybe_unused]] Index_ secondary_dim, // ignored, put here only for consistency with other subclasses.
         std::shared_ptr<const tatami::Oracle<Index_> > oracle,
         size_t cache_size,
         size_t max_non_zeros, 
         bool needs_cached_value, 
         bool needs_cached_index) : 
-        PrimaryBase(file_name, data_name, index_name, ptrs),
-        cache(std::move(oracle), cache_size, max_non_zeros, needs_cached_value, needs_cached_index)
+        cache(ptrs, std::move(oracle), cache_size, max_non_zeros, needs_cached_value, needs_cached_index)
     {}
 
-public:
-    Chunk<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_) {
-        return cache.next(this->pointers, *(this->h5comp));
+protected:
+    void prepare_index_extractor(size_t dest_offset, std::vector<Index_>& needed, std::vector<Element>& next_cache_data) {
+        size_t sofar = 0, num_needed = needed.size();
+        size_t combined_len = 0;
+        this->h5comp->dataspace.selectNone();
+
+        while (sofar < num_needed) {
+            auto& first = next_cache_data[needed[sofar]];
+            first.mem_offset = dest_offset + combined_len;
+            hsize_t src_offset = first.data_offset;
+            hsize_t len = first.length;
+            ++sofar;
+
+            // Finding the stretch of consecutive extractions, and bundling them into a single hyperslab.
+            for (; sofar < num_needed; ++sofar) {
+                auto& next = next_cache_data[needed[sofar]];
+                if (src_offset + len < next.data_offset) {
+                    break;
+                }
+                next.mem_offset = first.mem_offset + len;
+                len += next.length;
+            }
+
+            this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &len, &src_offset);
+            combined_len += len;
+        }
+
+        this->h5comp->memspace.setExtentSimple(1, &combined_len);
+        this->h5comp->memspace.selectAll();
     }
 };
 
-template<bool oracle_, typename Index_, typename CachedValue_, typename CachedIndex_>
-using ConditionalPrimaryBase = typename std::conditional<oracle_, PrimaryOracleBase<Index_, CachedValue_, CachedIndex_>, PrimaryLruBase<Index_, CachedValue_, CachedIndex_> >::type;
+template<typename Index_, typename CachedValue_, typename CachedIndex_>
+class PrimaryOracleFullBase : public PrimaryOracleBase<Index_, CachedValue_, CachedIndex_> {
+public:
+    PrimaryOracleFullBase(
+        const std::string& file_name,
+        const std::string& data_name,
+        const std::string& index_name,
+        const std::vector<hsize_t>& ptrs,
+        [[maybe_unused]] Index_ secondary_dim, // ignored, put here only for consistency with other subclasses.
+        std::shared_ptr<const tatami::Oracle<Index_> > oracle,
+        size_t cache_size,
+        size_t max_non_zeros, 
+        bool needs_value, 
+        bool needs_index) : 
+        PrimaryOracleBase<Index_, CachedValue_, CachedIndex_>(file_name, data_name, index_name, ptrs, std::move(oracle), cache_size, max_non_zeros, needs_value, needs_index),
+        needs_value(needs_value),
+        needs_index(needs_index)
+    {}
+
+private:
+    bool needs_value, needs_index;
+
+public:
+    Chunk<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
+        return this->next([&](
+            size_t dest_offset,
+            std::vector<Index_>& needed, 
+            std::vector<Element>& next_cache_data, 
+            std::vector<CachedValue_>& full_value_buffer, 
+            std::vector<CachedIndex_>& full_index_buffer) -> void {
+                serialize([&](){
+                    prepare_index_extractor(dest_offset, needed, next_cache_data);
+                    if (needs_index) {
+                        this->h5comp->index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                    }
+                    if (needs_value) {
+                        this->h5comp->data_dataset.read(full_value_buffer.data() + dest_offset, define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                    }
+                });
+            }
+        );
+    }
+};
+
+template<typename Index_, typename CachedValue_, typename CachedIndex_>
+class PrimaryOracleBlockBase : public PrimaryOracleBase<Index_, CachedValue_, CachedIndex_> {
+public:
+    PrimaryOracleBlockBase(
+        const std::string& file_name,
+        const std::string& data_name,
+        const std::string& index_name,
+        const std::vector<hsize_t>& ptrs,
+        Index_ secondary_dim,
+        std::shared_ptr<const tatami::Oracle<Index_> > oracle,
+        Index_ block_start,
+        Index_ block_length,
+        size_t cache_size,
+        size_t max_non_zeros, 
+        bool needs_value, 
+        bool needs_index) : 
+        PrimaryOracleBase<Index_, CachedValue_, CachedIndex_>(
+            file_name, 
+            data_name, 
+            index_name, 
+            ptrs, 
+            std::move(oracle), 
+            cache_size, 
+            max_non_zeros, // do NOT tighten the bounds at this point; we need the full space for the initial index load.
+            needs_value,
+            true // we always need indices to compute the block boundaries.
+        ),
+        secondary_dim(secondary_dim),
+        block_start(block_start),
+        block_past_end(block_start + block_length),
+        needs_value(needs_value),
+        needs_index(needs_index)
+    {}
+
+private:
+    Index_ secondary_dim;
+    Index_ block_start, block_past_end;
+    bool needs_value, needs_index;
+
+public:
+    Chunk<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
+        return this->next([&](
+            size_t dest_offset,
+            std::vector<Index_>& needed,
+            std::vector<Element>& next_cache_data, 
+            std::vector<CachedValue_>& full_value_buffer, 
+            std::vector<CachedIndex_>& full_index_buffer) -> void {
+                serialize([&](){
+                    this->prepare_index_extractor(dest_offset, needed, next_cache_data);
+                    this->h5comp->index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
+
+                    // Now, we go through and identify the block boundaries within each cached Element.
+                    size_t pre_shift_len = 0;
+                    size_t post_shift_len = 0;
+                    if (needs_value) {
+                        this->h5comp->dataspace.selectNone();
+                    }
+
+                    for (size_t i = 0; i < num_needed; ++i) {
+                        auto& current = next_cache_data[needed[i]];
+                        current.mem_offset = dest_offset + post_shift_len;
+
+                        auto indices_start = full_index_buffer.begin() + dest_offset + pre_shift_len;
+                        auto indices_end = indices_start + current.length;
+                        size_t delta = 0;
+                        if (block_start) {
+                            auto original = indices_start;
+                            // Using a custom comparator to avoid casting problems when CachedIndex_ is of a different type than Index_.
+                            indices_start = std::lower_bound(indices_start, indices_end, block_start, [](Index_ a, Index_ b) -> bool { return a < b; });
+                            delta = indices_start - original;
+                        }
+                        if (block_past_end != secondary_dim) {
+                            indices_end = std::lower_bound(indices_start, indices_end, block_past_end, [](Index_ a, Index_ b) -> bool { return a < b; });
+                        }
+
+                        size_t new_len = indices_end - indices_start;
+                        if (new_len) {
+                            if (needs_index) {
+                                auto indices_dest = full_index_buffer.data() + current.mem_offset;
+                                if (indices_start != indices_dest) {
+                                    std::copy(indices_start, indices_end, indices_dest);
+                                }
+                            }
+                            if (needs_value) {
+                                hsize_t len = new_len;
+                                hsize_t src_offset = current.data_offset + delta;
+                                this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &len, &src_offset);
+                            }
+                        }
+
+                        pre_shift_len += current.length;
+                        current.length = new_len;
+                        post_shift_len += new_len;
+                    }
+
+                    // Bundling everything into a single call to the HDF5 libary.
+                    if (needs_value && post_shift_len > 0) {
+                        hsize_t new_len = post_shift_len;
+                        this->h5comp->memspace.setExtentSimple(1, &new_len);
+                        this->h5comp->memspace.selectAll();
+                        this->h5comp->data_dataset.read(full_data_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                    }
+                });
+            }
+        );
+    }
+};
+
+template<bool sparse_, typename Index_, typename CachedValue_, typename CachedIndex_>
+class PrimaryOracleIndexBase : public PrimaryOracleBase<Index_, CachedValue_, CachedIndex_> {
+public:
+    PrimaryOracleIndexBase(
+        const std::string& file_name,
+        const std::string& data_name,
+        const std::string& index_name,
+        const std::vector<hsize_t>& ptrs,
+        Index_ secondary_dim,
+        std::shared_ptr<const tatami::Oracle<Index_> > oracle,
+        const std::vector<Index_>& indices,
+        size_t cache_size,
+        size_t max_non_zeros, 
+        bool needs_value, 
+        bool needs_index) : 
+        PrimaryOracleBase<Index_, CachedValue_, CachedIndex_>(
+            file_name, 
+            data_name, 
+            index_name, 
+            ptrs, 
+            std::move(oracle), 
+            cache_size, 
+            max_non_zeros, // do NOT tighten the bounds at this point; we need the full space for the initial index load.
+            needs_value,
+            true // we always need indices to figure out which elements to keep.
+        ),
+        secondary_dim(secondary_dim),
+        needs_value(needs_value),
+        needs_index(needs_index)
+    {
+        populate_sparse_remap_vector(remap, first_index, past_last_index);
+    }
+
+private:
+    Index_ secondary_dim;
+    Index_ first_index, index_past_last;
+    SparseRemapVector<sparse_, Index_> remap;
+    std::vector<size_t> found;
+    bool needs_value, needs_index;
+
+public:
+    Chunk<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
+        return this->next([&](
+            size_t dest_offset,
+            std::vector<Index_>& needed,
+            std::vector<Element>& next_cache_data, 
+            std::vector<CachedValue_>& full_value_buffer, 
+            std::vector<CachedIndex_>& full_index_buffer) -> void {
+                serialize([&](){
+                    // First pulling out all the indices.
+                    hsize_t combined_len = this->prepare_index_extractor(dest_offset, needed, next_cache_data);
+                    this->h5comp->memspace.setExtentSimple(1, &combined_len);
+                    this->h5comp->memspace.selectAll();
+                    this->h5comp->index_dataset.read(full_index_buffer.data(), define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
+
+                    // Now, we go through and identify the values of interest. 
+                    size_t pre_shift_len = 0;
+                    size_t post_shift_len = 0;
+                    if (this->needs_value) {
+                        this->h5comp->dataspace.selectNone();
+                    }
+                    found.clear();
+
+                    for (size_t i = 0; i < num_needed; ++i) {
+                        auto& current = next_cache_data[needed[i]];
+                        current.mem_offset = dest_offset + post_shift_len;
+
+                        auto indices_start = full_index_buffer.begin() + dest_offset + pre_shift_len;
+                        auto indices_end = indices_start + current.length;
+                        size_t delta = 0;
+                        if (first_index) {
+                            auto original = indices_start;
+                            // Using a custom comparator to avoid casting problems when CachedIndex_ is of a different type than Index_.
+                            indices_start = std::lower_bound(indices_start, indices_end, first_index, [](Index_ a, Index_ b) -> bool { return a < b; });
+                            delta = indices_start - original;
+                        }
+                        if (past_last_index != secondary_dim) {
+                            indices_end = std::lower_bound(indices_start, indices_end, past_last_index, [](Index_ a, Index_ b) -> bool { return a < b; });
+                        }
+
+                        Index_ num_found = 0;
+                        if (indices_start == indices_end) {
+                            size_t counter = delta + current.data_offset;
+                            auto ciIt = full_index_buffer.begin() + current.mem_offset;
+
+                            for (auto x = indices_start; x != indices_end; ++x, ++counter) {
+                                auto present = remap[*x - first_index];
+                                if (present) {
+                                    if (needs_index) {
+                                        if constexpr(sparse_) {
+                                            *cIt = *x;
+                                        } else {
+                                            *cIt = present;
+                                        }
+                                        ++cIt;
+                                    }
+                                    if (needs_value) {
+                                        found.push_back(counter);
+                                    }
+                                    ++num_found;
+                                }
+                            }
+                        }
+
+                        pre_shift_len += current.length;
+                        current.length = num_found;
+                        post_shift_len += num_found;
+                    }
+
+                    // Bundling everything into a single call to the HDF5 libary.
+                    if (this->needs_value && !found.empty()) {
+                        this->h5comp->dataspace.selectNone();
+                        tatami::process_consecutive_indices<Index_>(found.data(), found.size(),
+                            [&](hsize_t start, hsize_t length) {
+                                this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &length, &start);
+                            }
+                        );
+                        hsize_t new_len = found.size();
+                        this->h5comp->memspace.setExtentSimple(1, &new_len);
+                        this->h5comp->memspace.selectAll();
+                        this->h5comp->data_dataset.read(current_cache.value.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                    }
+                });
+            }
+        );
+    }
+};
 
 /********************************
  **** Full extractor classes ****
