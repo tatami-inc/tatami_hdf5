@@ -15,6 +15,10 @@ namespace tatami_hdf5 {
 
 namespace Hdf5CompressedSparseMatrix_internal {
 
+/***************************
+ **** General utitities ****
+ ***************************/
+
 template<typename CachedValue_, typename CachedIndex_>
 size_t size_of_cached_element(bool needs_cached_value, bool needs_cached_index) {
     return (needs_cached_index ? sizeof(CachedIndex_) : 0) + (needs_cached_value ? sizeof(CachedValue_) : 0);
@@ -39,48 +43,6 @@ struct MatrixDetails {
     const std::vector<hsize_t>& pointers;
     Index_ secondary_dim;
 };
-
-template<typename Index_, class Function_>
-void sort_by_field(std::vector<Index_>& indices, Function_ field) {
-    auto comp = [&field](size_t l, size_t r) -> bool {
-        return field(l) < field(r);
-    };
-    if (!std::is_sorted(indices.begin(), indices.end(), comp)) {
-        std::sort(indices.begin(), indices.end(), comp);
-    }
-}
-
-// Utilities for remapping sparse values for indexed extraction.
-template<bool sparse_, typename Index_>
-using SparseRemapVector = typename std::conditional<sparse_, std::vector<uint8_t>, std::vector<Index_> >::type;
-
-template<bool sparse_, typename Index_>
-void populate_sparse_remap_vector(const std::vector<Index_>& indices, SparseRemapVector<sparse_, Index_>& remap, Index_& first_index, Index_& past_last_index) {
-    if (indices.empty()) {
-        first_index = 0;
-        past_last_index = 0;
-        return;
-    }
-
-    first_index = indices.front();
-    past_last_index = indices.back() + 1;
-    remap.resize(past_last_index - first_index);
-
-    if constexpr(sparse_) {
-        for (auto i : indices) {
-            remap[i - first_index] = 1;
-        }
-    } else {
-        // We start from +1 so that we can still use 0 as an 'absent' counter.
-        // This should not overflow as Index_ should be large enough to hold
-        // the dimension extent so it should be able to tolerate +1.
-        Index_ counter = 1;
-        for (auto i : indices) {
-            remap[i - first_index] = counter;
-            ++counter;
-        }
-    }
-}
 
 // Unfortunately we can't use tatami::SparseRange, as CachedIndex_ might not be
 // large enough to represent the number of cached indices, e.g., if there were
@@ -115,6 +77,10 @@ struct Chunk {
         return buffer;
     }
 };
+
+/***********************************
+ **** Oracular cache definition ****
+ ***********************************/
 
 // Here, we use a giant contiguous buffer to optimize for near-consecutive
 // iteration. This allows the HDF5 library to pull out long strips of data from
@@ -178,6 +144,17 @@ public:
         }
         if (needs_cached_value) {
             full_value_buffer.resize(max_cache_elements);
+        }
+    }
+
+private:
+    template<class Function_>
+    void sort_by_field(std::vector<Index_>& indices, Function_ field) {
+        auto comp = [&field](size_t l, size_t r) -> bool {
+            return field(l) < field(r);
+        };
+        if (!std::is_sorted(indices.begin(), indices.end(), comp)) {
+            std::sort(indices.begin(), indices.end(), comp);
         }
     }
 
@@ -270,8 +247,12 @@ public:
     }
 
 public:
+    // Note that needs_cached_index may not always equal needs_index,
+    // as we need the index to determine the block/index (and thus
+    // it needs to be loaded into the cache at some point) even if we
+    // don't want to report those indices.
     template<class Extract_>
-    Chunk<Index_, CachedValue_, CachedIndex_> next(Extract_&& extract) {
+    Chunk<Index_, CachedValue_, CachedIndex_> next(Extract_&& extract, bool needs_value, bool needs_index) {
         if (counter == future) {
             populate(std::forward<Extract_>(extract));
         }
@@ -280,15 +261,62 @@ public:
 
         Chunk<Index_, CachedValue_, CachedIndex_> output;
         output.length = info.length;
-        if (needs_cached_value) {
+        if (needs_value) {
             output.value = full_value_buffer.data() + info.mem_offset;
         }
-        if (needs_cached_index) {
+        if (needs_index) {
             output.index = full_index_buffer.data() + info.mem_offset;
         }
         return output;
     }
 };
+
+/*************************************
+ **** Subset extraction utilities ****
+ *************************************/
+
+template<class IndexIt_, typename Index_>
+void refine_primary_limits(IndexIt_& indices_start, IndexIt_& indices_end, Index_ extent, Index_ smallest, Index_ largest_plus_one) {
+    if (smallest) {
+        // Using custom comparator to ensure that we cast to Index_ for signedness-safe comparisons.
+        indices_start = std::lower_bound(indices_start, indices_end, smallest, [](Index_ a, Index_ b) -> bool { return a < b; });
+    }
+
+    if (largest_plus_one != extent) {
+        indices_end = std::lower_bound(indices_start, indices_end, largest_plus_one, [](Index_ a, Index_ b) -> bool { return a < b; });
+    }
+}
+
+template<bool sparse_, typename Index_>
+using SparseRemapVector = typename std::conditional<sparse_, std::vector<uint8_t>, std::vector<Index_> >::type;
+
+template<bool sparse_, typename Index_>
+void populate_sparse_remap_vector(const std::vector<Index_>& indices, SparseRemapVector<sparse_, Index_>& remap, Index_& first_index, Index_& past_last_index) {
+    if (indices.empty()) {
+        first_index = 0;
+        past_last_index = 0;
+        return;
+    }
+
+    first_index = indices.front();
+    past_last_index = indices.back() + 1;
+    remap.resize(past_last_index - first_index);
+
+    if constexpr(sparse_) {
+        for (auto i : indices) {
+            remap[i - first_index] = 1;
+        }
+    } else {
+        // We start from +1 so that we can still use 0 as an 'absent' counter.
+        // This should not overflow as Index_ should be large enough to hold
+        // the dimension extent so it should be able to tolerate +1.
+        Index_ counter = 1;
+        for (auto i : indices) {
+            remap[i - first_index] = counter;
+            ++counter;
+        }
+    }
+}
 
 /*************************************
  **** Sparse base extractor class ****
@@ -411,7 +439,7 @@ public:
                 hsize_t extraction_start = this->pointers[i];
                 hsize_t extraction_len = this->pointers[i + 1] - this->pointers[i];
                 current_cache.length = extraction_len;
-                if (extraction_len != 0) {
+                if (extraction_len == 0) {
                     return;
                 }
 
@@ -453,13 +481,13 @@ struct PrimaryLruBlockBase : public PrimaryLruBase<Index_, CachedValue_, CachedI
             needs_index
         ),
         secondary_dim(details.secondary_dim),
-        secondary_start(block_start),
-        secondary_past_end(block_start + block_length)
+        block_start(block_start),
+        block_past_end(block_start + block_length)
     {}
 
 private:
     Index_ secondary_dim;
-    Index_ secondary_start, secondary_past_end;
+    Index_ block_start, block_past_end;
     std::vector<CachedIndex_> index_buffer;
 
 public:
@@ -487,14 +515,7 @@ public:
 
                     auto indices_start = index_buffer.begin();
                     auto indices_end = index_buffer.end();
-                    if (secondary_start) {
-                        // Using a custom comparator to avoid casting problems when CachedIndex_ is of a different type than Index_.
-                        indices_start = std::lower_bound(indices_start, indices_end, secondary_start, [](Index_ a, Index_ b) -> bool { return a < b; });
-                    }
-                    if (secondary_past_end != secondary_dim) {
-                        indices_end = std::lower_bound(indices_start, indices_end, secondary_past_end, [](Index_ a, Index_ b) -> bool { return a < b; });
-                    }
-
+                    refine_primary_limits(indices_start, indices_end, secondary_dim, block_start, block_past_end);
                     current_cache.length = indices_end - indices_start;
 
                     if (current_cache.length) {
@@ -502,10 +523,10 @@ public:
                             std::copy(indices_start, indices_end, current_cache.index.begin());
                             if constexpr(!sparse_) {
                                 // For sparse extraction, we store the index as-is; for
-                                // dense extraction, we subtract the secondary_start 
+                                // dense extraction, we subtract the block_start 
                                 // to make life easier when filling up the output vector.
                                 for (Index_ i = 0; i < current_cache.length; ++i) {
-                                    current_cache.index[i] -= secondary_start;
+                                    current_cache.index[i] -= block_start;
                                 }
                             }
                         }
@@ -581,13 +602,7 @@ public:
 
                     auto indices_start = index_buffer.begin();
                     auto indices_end = index_buffer.end();
-                    if (first_index) {
-                        // Using a custom comparator to avoid casting problems when CachedIndex_ is of a different type than Index_.
-                        indices_start = std::lower_bound(indices_start, indices_end, first_index, [](Index_ a, Index_ b) -> bool { return a < b; });
-                    }
-                    if (past_last_index != secondary_dim) {
-                        indices_end = std::lower_bound(indices_start, indices_end, past_last_index, [](Index_ a, Index_ b) -> bool { return a < b; });
-                    }
+                    refine_primary_limits(indices_start, indices_end, secondary_dim, first_index, past_last_index);
 
                     Index_ num_found = 0;
                     if (indices_start != indices_end) {
@@ -605,7 +620,9 @@ public:
                                     if constexpr(sparse_) {
                                         *ciIt = *x;
                                     } else {
-                                        *ciIt = present;
+                                        // Remember that we +1'd in 'populate_sparse_remap_vector',
+                                        // so we have to undo it here.
+                                        *ciIt = present - 1;
                                     }
                                     ++ciIt;
                                 }
@@ -617,7 +634,7 @@ public:
                         }
 
                         if (this->needs_value && num_found) {
-                            hsize_t new_start = extraction_start + (indices_start - current_cache.index.begin());
+                            hsize_t new_start = extraction_start + (indices_start - index_buffer.begin());
                             this->h5comp->dataspace.selectNone();
                             tatami::process_consecutive_indices<Index_>(found.data(), found.size(),
                                 [&](Index_ start, Index_ length) {
@@ -743,7 +760,9 @@ public:
                         this->h5comp->data_dataset.read(full_value_buffer.data() + dest_offset, define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
                     }
                 });
-            }
+            },
+            needs_value,
+            needs_index
         );
     }
 };
@@ -804,17 +823,9 @@ public:
                         current.mem_offset = dest_offset + post_shift_len;
 
                         auto indices_start = full_index_buffer.begin() + dest_offset + pre_shift_len;
+                        auto original_start = indices_start;
                         auto indices_end = indices_start + current.length;
-                        size_t delta = 0;
-                        if (block_start) {
-                            auto original = indices_start;
-                            // Using a custom comparator to avoid casting problems when CachedIndex_ is of a different type than Index_.
-                            indices_start = std::lower_bound(indices_start, indices_end, block_start, [](Index_ a, Index_ b) -> bool { return a < b; });
-                            delta = indices_start - original;
-                        }
-                        if (block_past_end != secondary_dim) {
-                            indices_end = std::lower_bound(indices_start, indices_end, block_past_end, [](Index_ a, Index_ b) -> bool { return a < b; });
-                        }
+                        refine_primary_limits(indices_start, indices_end, secondary_dim, block_start, block_past_end);
 
                         size_t new_len = indices_end - indices_start;
                         if (new_len) {
@@ -835,7 +846,7 @@ public:
                             }
                             if (needs_value) {
                                 hsize_t len = new_len;
-                                hsize_t src_offset = current.data_offset + delta;
+                                hsize_t src_offset = current.data_offset + (indices_start - original_start);
                                 this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &len, &src_offset);
                             }
                         }
@@ -849,10 +860,12 @@ public:
                         hsize_t new_len = post_shift_len;
                         this->h5comp->memspace.setExtentSimple(1, &new_len);
                         this->h5comp->memspace.selectAll();
-                        this->h5comp->data_dataset.read(full_value_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                        this->h5comp->data_dataset.read(full_value_buffer.data() + dest_offset, define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
                     }
                 });
-            }
+            },
+            needs_value,
+            needs_index
         );
     }
 };
@@ -915,20 +928,13 @@ public:
                         current.mem_offset = dest_offset + post_shift_len;
 
                         auto indices_start = full_index_buffer.begin() + dest_offset + pre_shift_len;
+                        auto original_start = indices_start;
                         auto indices_end = indices_start + current.length;
-                        size_t delta = 0;
-                        if (first_index) {
-                            auto original = indices_start;
-                            // Using a custom comparator to avoid casting problems when CachedIndex_ is of a different type than Index_.
-                            indices_start = std::lower_bound(indices_start, indices_end, first_index, [](Index_ a, Index_ b) -> bool { return a < b; });
-                            delta = indices_start - original;
-                        }
-                        if (past_last_index != secondary_dim) {
-                            indices_end = std::lower_bound(indices_start, indices_end, past_last_index, [](Index_ a, Index_ b) -> bool { return a < b; });
-                        }
+                        refine_primary_limits(indices_start, indices_end, secondary_dim, first_index, past_last_index);
+                        size_t delta = indices_start - original_start;
 
                         Index_ num_found = 0;
-                        if (indices_start == indices_end) {
+                        if (indices_start != indices_end) {
                             size_t counter = delta + current.data_offset;
                             auto ciIt = full_index_buffer.begin() + current.mem_offset;
 
@@ -936,10 +942,15 @@ public:
                                 auto present = remap[*x - first_index];
                                 if (present) {
                                     if (needs_index) {
+                                        // For sparse extraction, we store the index as-is; for
+                                        // dense extraction, we store the position on 'indices',
+                                        // to make life easier when filling up the output vector.
                                         if constexpr(sparse_) {
                                             *ciIt = *x;
                                         } else {
-                                            *ciIt = present;
+                                            // Remember that we +1'd in 'populate_sparse_remap_vector',
+                                            // so we have to undo it here.
+                                            *ciIt = present - 1;
                                         }
                                         ++ciIt;
                                     }
@@ -969,7 +980,9 @@ public:
                         this->h5comp->data_dataset.read(full_value_buffer.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
                     }
                 });
-            }
+            },
+            needs_value,
+            needs_index
         );
     }
 };
