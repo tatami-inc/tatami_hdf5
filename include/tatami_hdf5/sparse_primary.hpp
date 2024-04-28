@@ -114,7 +114,6 @@ private:
     std::shared_ptr<const tatami::Oracle<Index_> > oracle;
     size_t max_cache_elements;
     size_t counter = 0, total = 0, future = 0;
-    bool needs_cached_value, needs_cached_index;
 
 public:
     ContiguousOracleSlabCache(
@@ -135,15 +134,13 @@ public:
                 return std::max(min_elements, proposed);
             } 
         }()),
-        total(oracle->total()), 
-        needs_cached_value(needs_cached_value),
-        needs_cached_index(needs_cached_index) 
+        total(oracle->total())
     {
-        if (needs_cached_index) {
-            full_index_buffer.resize(max_cache_elements);
-        }
         if (needs_cached_value) {
             full_value_buffer.resize(max_cache_elements);
+        }
+        if (needs_cached_index) {
+            full_index_buffer.resize(max_cache_elements);
         }
     }
 
@@ -159,8 +156,16 @@ private:
     }
 
 public:
+    // Note that needs_cached_index in the constructor may not always equal
+    // needs_index. When doing block/indexed extraction, we need the index to
+    // determine the block/index (and thus it needs to be loaded into the cache
+    // at some point, and thus we need to consider it in the cache size
+    // calculations) even if we don't want to report those indices. In those
+    // cases, needs_cached_index=true but we might have needs_index=false,
+    // hence the separate arguments here versus the constructor. We just do the
+    // same for needs_(cached_)value just for consistency.
     template<class Extract_>
-    void populate(Extract_ extract) {
+    void populate(Extract_ extract, bool needs_value, bool needs_index) {
         size_t filled_elements = 0;
         needed.clear();
         present.clear();
@@ -222,11 +227,11 @@ public:
 
                 for (auto p : present) {
                     auto& info = next_cache_data[p];
-                    if (needs_cached_index) {
+                    if (needs_index) {
                         auto isrc = full_index_buffer.begin() + info.mem_offset;
                         std::copy(isrc, isrc + info.length, full_index_buffer.begin() + dest_offset);
                     }
-                    if (needs_cached_value) {
+                    if (needs_value) {
                         auto vsrc = full_value_buffer.begin() + info.mem_offset;
                         std::copy(vsrc, vsrc + info.length, full_value_buffer.begin() + dest_offset); 
                     }
@@ -247,14 +252,10 @@ public:
     }
 
 public:
-    // Note that needs_cached_index may not always equal needs_index,
-    // as we need the index to determine the block/index (and thus
-    // it needs to be loaded into the cache at some point) even if we
-    // don't want to report those indices.
     template<class Extract_>
     Chunk<Index_, CachedValue_, CachedIndex_> next(Extract_&& extract, bool needs_value, bool needs_index) {
         if (counter == future) {
-            populate(std::forward<Extract_>(extract));
+            populate(std::forward<Extract_>(extract), needs_value, needs_index);
         }
         auto current = oracle->get(counter++);
         const auto& info = cache_data[cache_exists.find(current)->second];
