@@ -318,6 +318,46 @@ void populate_sparse_remap_vector(const std::vector<Index_>& indices, SparseRema
     }
 }
 
+template<bool sparse_, typename In_, typename Index_, typename Output_, typename Map_>
+Index_ scan_for_indices_in_remap_vector(
+    In_ indices_start, 
+    In_ indices_end,
+    Index_ first_index,
+    Output_ output, 
+    std::vector<Index_>& found,
+    const std::vector<Map_>& remap,
+    bool needs_value,
+    bool needs_index) 
+{
+    Index_ counter = 0;
+    found.clear();
+    Index_ num_found = 0;
+
+    for (auto x = indices_start; x != indices_end; ++x, ++counter) {
+        auto present = remap[*x - first_index];
+        if (present) {
+            if (needs_index) {
+                if constexpr(sparse_) {
+                    *output = *x;
+                } else {
+                    // For dense extraction, we store the position on 'indices', to
+                    // make life easier when filling up the output vector.
+                    // Remember that we +1'd in 'populate_sparse_remap_vector',
+                    // so we have to undo it here.
+                    *output = present - 1;
+                }
+                ++output;
+            }
+            if (needs_value) {
+                found.push_back(counter);
+            }
+            ++num_found;
+        }
+    }
+
+    return num_found;
+}
+
 /*************************************
  **** Sparse base extractor class ****
  *************************************/
@@ -522,8 +562,7 @@ public:
                         if (this->needs_index) {
                             std::copy(indices_start, indices_end, current_cache.index.begin());
                             if constexpr(!sparse_) {
-                                // For sparse extraction, we store the index as-is; for
-                                // dense extraction, we subtract the block_start 
+                                // For dense extraction, we subtract the block_start 
                                 // to make life easier when filling up the output vector.
                                 for (Index_ i = 0; i < current_cache.length; ++i) {
                                     current_cache.index[i] -= block_start;
@@ -606,34 +645,10 @@ public:
 
                     Index_ num_found = 0;
                     if (indices_start != indices_end) {
-                        Index_ counter = 0;
-                        found.clear();
                         auto ciIt = current_cache.index.begin();
+                        num_found = scan_for_indices_in_remap_vector<sparse_>(indices_start, indices_end, first_index, ciIt, found, remap, this->needs_value, this->needs_index);
 
-                        for (auto x = indices_start; x != indices_end; ++x, ++counter) {
-                            auto present = remap[*x - first_index];
-                            if (present) {
-                                if (this->needs_index) {
-                                    // For sparse extraction, we store the index as-is; for
-                                    // dense extraction, we store the position on 'indices',
-                                    // to make life easier when filling up the output vector.
-                                    if constexpr(sparse_) {
-                                        *ciIt = *x;
-                                    } else {
-                                        // Remember that we +1'd in 'populate_sparse_remap_vector',
-                                        // so we have to undo it here.
-                                        *ciIt = present - 1;
-                                    }
-                                    ++ciIt;
-                                }
-                                if (this->needs_value) {
-                                    found.push_back(counter);
-                                }
-                                ++num_found;
-                            }
-                        }
-
-                        if (this->needs_value && num_found) {
+                        if (this->needs_value && num_found > 0) {
                             hsize_t new_start = extraction_start + (indices_start - index_buffer.begin());
                             this->h5comp->dataspace.selectNone();
                             tatami::process_consecutive_indices<Index_>(found.data(), found.size(),
@@ -643,6 +658,7 @@ public:
                                     this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &count, &offset);
                                 }
                             );
+
                             hsize_t new_len = num_found;
                             this->h5comp->memspace.setExtentSimple(1, &new_len);
                             this->h5comp->memspace.selectAll();
@@ -831,14 +847,15 @@ public:
                         if (new_len) {
                             if (needs_index) {
                                 // Shifting the desired block of indices backwards in the same full_index_buffer,
-                                // to free up some space for the indices outside of the block. For dense extraction,
-                                // we remove the block start so that the resulting indices can be directly used
-                                // to index into the output buffer.
+                                // to free up some space for the indices outside of the block. This should be valid
+                                // for std::copy as long as indices_dest < indices_start. 
                                 auto indices_dest = full_index_buffer.begin() + current.mem_offset;
                                 if (indices_start != indices_dest) {
                                     std::copy(indices_start, indices_end, indices_dest);
                                 }
                                 if constexpr(!sparse_) {
+                                    // For dense extraction, we remove the block start so that the resulting
+                                    // indices can be directly used to index into the output buffer.
                                     for (size_t i = 0; i < new_len; ++i, ++indices_dest) {
                                         *indices_dest -= block_start;
                                     }
@@ -900,7 +917,7 @@ private:
     Index_ secondary_dim;
     Index_ first_index, past_last_index;
     SparseRemapVector<sparse_, Index_> remap;
-    std::vector<size_t> found;
+    std::vector<Index_> found;
     bool needs_value, needs_index;
 
 public:
@@ -921,7 +938,6 @@ public:
                     if (this->needs_value) {
                         this->h5comp->dataspace.selectNone();
                     }
-                    found.clear();
 
                     for (size_t i = 0, num_needed = needed.size(); i < num_needed; ++i) {
                         auto& current = next_cache_data[needed[i]];
@@ -931,34 +947,24 @@ public:
                         auto original_start = indices_start;
                         auto indices_end = indices_start + current.length;
                         refine_primary_limits(indices_start, indices_end, secondary_dim, first_index, past_last_index);
-                        size_t delta = indices_start - original_start;
 
                         Index_ num_found = 0;
                         if (indices_start != indices_end) {
-                            size_t counter = delta + current.data_offset;
-                            auto ciIt = full_index_buffer.begin() + current.mem_offset;
+                            auto fiIt = full_index_buffer.begin() + current.mem_offset;
+                            num_found = scan_for_indices_in_remap_vector<sparse_>(indices_start, indices_end, first_index, fiIt, found, remap, this->needs_value, this->needs_index);
 
-                            for (auto x = indices_start; x != indices_end; ++x, ++counter) {
-                                auto present = remap[*x - first_index];
-                                if (present) {
-                                    if (needs_index) {
-                                        // For sparse extraction, we store the index as-is; for
-                                        // dense extraction, we store the position on 'indices',
-                                        // to make life easier when filling up the output vector.
-                                        if constexpr(sparse_) {
-                                            *ciIt = *x;
-                                        } else {
-                                            // Remember that we +1'd in 'populate_sparse_remap_vector',
-                                            // so we have to undo it here.
-                                            *ciIt = present - 1;
-                                        }
-                                        ++ciIt;
+                            if (this->needs_value && !found.empty()) {
+                                // We fill up the dataspace on each primary element, rather than accumulating
+                                // indices in 'found' across 'needed', to reduce the memory usage of 'found';
+                                // otherwise we grossly exceed the cache limits during extraction.
+                                hsize_t new_start = current.data_offset + (indices_start - original_start);
+                                tatami::process_consecutive_indices<Index_>(found.data(), found.size(),
+                                    [&](Index_ start, Index_ length) {
+                                        hsize_t offset = start + new_start;
+                                        hsize_t count = length;
+                                        this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &count, &offset);
                                     }
-                                    if (needs_value) {
-                                        found.push_back(counter);
-                                    }
-                                    ++num_found;
-                                }
+                                );
                             }
                         }
 
@@ -967,14 +973,8 @@ public:
                         post_shift_len += num_found;
                     }
 
-                    if (this->needs_value && !found.empty()) {
-                        this->h5comp->dataspace.selectNone();
-                        tatami::process_consecutive_indices<size_t>(found.data(), found.size(),
-                            [&](hsize_t start, hsize_t length) {
-                                this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &length, &start);
-                            }
-                        );
-                        hsize_t new_len = found.size();
+                    if (this->needs_value && post_shift_len > 0) {
+                        hsize_t new_len = post_shift_len;
                         this->h5comp->memspace.setExtentSimple(1, &new_len);
                         this->h5comp->memspace.selectAll();
                         this->h5comp->data_dataset.read(full_value_buffer.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
