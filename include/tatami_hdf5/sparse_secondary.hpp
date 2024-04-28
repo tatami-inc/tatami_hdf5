@@ -20,6 +20,18 @@ inline size_t multiply(size_t a, size_t b) {
     return a * b;
 }
 
+template<class IndexIt_, typename Index_>
+void refine_primary_limits(IndexIt_& indices_start, IndexIt_& indices_end, Index_ extent, Index_ smallest, Index_ largest_plus_one) {
+    if (smallest) {
+        // Using custom comparator to ensure that we cast to Index_ for signedness-safe comparisons.
+        indices_start = std::lower_bound(indices_start, indices_end, smallest, [](Index_ a, Index_ b) -> bool { return a < b; });
+    }
+
+    if (largest_plus_one != extent) {
+        indices_end = std::lower_bound(indices_start, indices_end, largest_plus_one, [](Index_ a, Index_ b) -> bool { return a < b; });
+    }
+}
+
 template<typename Index_, typename CachedValue_, typename Value_>
 tatami::SparseRange<Value_, Index_> slab_to_sparse(const tatami::SparseRange<CachedValue_, Index_>& slab, Value_* vbuffer, Index_* ibuffer) {
     tatami::SparseRange<Value_, Index_> output;
