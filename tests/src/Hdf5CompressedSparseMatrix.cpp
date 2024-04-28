@@ -11,6 +11,51 @@
 #include <vector>
 #include <random>
 
+static void dump_to_file(const tatami_test::CompressedSparseDetails<double>& triplets, const std::string& fpath, const std::string& name, int chunk_size) {
+    H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
+    auto ghandle = fhandle.createGroup(name);
+
+    H5::DSetCreatPropList plist(H5::DSetCreatPropList::DEFAULT.getId());
+    if (chunk_size == 0) {
+        plist.setLayout(H5D_CONTIGUOUS);
+    } else {
+        plist.setLayout(H5D_CHUNKED);
+        hsize_t chunkdim = std::min(triplets.value.size(), static_cast<size_t>(chunk_size));
+        plist.setChunk(1, &chunkdim);
+    }
+
+    hsize_t dims = triplets.value.size();
+    H5::DataSpace dspace(1, &dims);
+    {
+        H5::DataType dtype(H5::PredType::NATIVE_DOUBLE);
+        auto dhandle = ghandle.createDataSet("data", dtype, dspace, plist);
+        dhandle.write(triplets.value.data(), H5::PredType::NATIVE_DOUBLE);
+    }
+
+    {
+        H5::DataType dtype(H5::PredType::NATIVE_UINT16);
+        auto dhandle = ghandle.createDataSet("index", dtype, dspace, plist);
+        dhandle.write(triplets.index.data(), H5::PredType::NATIVE_INT);
+    }
+
+    {
+        hsize_t ncp1 = triplets.ptr.size();
+        H5::DataSpace dspace(1, &ncp1);
+        H5::DataType dtype(H5::PredType::NATIVE_UINT64);
+        auto dhandle = ghandle.createDataSet("indptr", dtype, dspace);
+        dhandle.write(triplets.ptr.data(), H5::PredType::NATIVE_LONG);
+    }
+}
+
+static tatami_hdf5::Hdf5Options create_options(size_t NR, size_t NC, double cache_fraction) {
+    // We limit the cache size to ensure that chunk management is not trivial.
+    size_t actual_cache_size = static_cast<double>(NR * NC) * cache_fraction * static_cast<double>(sizeof(double) + sizeof(int));
+    tatami_hdf5::Hdf5Options hopt;
+    hopt.maximum_cache_size = actual_cache_size;
+    hopt.require_minimum_cache = actual_cache_size > 0;
+    return hopt;
+}
+
 class Hdf5SparseMatrixTestCore {
 public:
     typedef std::tuple<int, double> SimulationParameters;
@@ -29,10 +74,6 @@ protected:
 
     inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat, tref, tmat;
 
-    inline static std::string fpath, name;
-
-    inline static tatami_test::CompressedSparseDetails<double> triplets;
-
     static void assemble(const FullSimulationParameters& params) {
         if (ref && params == last_params) {
             return;
@@ -47,50 +88,13 @@ protected:
         auto chunk_size = std::get<0>(sim_params);
         auto cache_fraction = std::get<1>(sim_params);
 
-        triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.05, 0, 100, /* seed = */ NR * NC + chunk_size + 100 * cache_fraction);
+        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.15, 0, 100, /* seed = */ NR * NC + chunk_size + 100 * cache_fraction);
+        auto hopt = create_options(NR, NC, cache_fraction);
 
         // Generating the file.
-        fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
-        H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
-        name = "stuff";
-        auto ghandle = fhandle.createGroup(name);
-
-        H5::DSetCreatPropList plist(H5::DSetCreatPropList::DEFAULT.getId());
-        if (chunk_size == 0) {
-            plist.setLayout(H5D_CONTIGUOUS);
-        } else {
-            plist.setLayout(H5D_CHUNKED);
-            hsize_t chunkdim = std::min(triplets.value.size(), static_cast<size_t>(chunk_size));
-            plist.setChunk(1, &chunkdim);
-        }
-
-        hsize_t dims = triplets.value.size();
-        H5::DataSpace dspace(1, &dims);
-        {
-            H5::DataType dtype(H5::PredType::NATIVE_DOUBLE);
-            auto dhandle = ghandle.createDataSet("data", dtype, dspace, plist);
-            dhandle.write(triplets.value.data(), H5::PredType::NATIVE_DOUBLE);
-        }
-
-        {
-            H5::DataType dtype(H5::PredType::NATIVE_UINT16);
-            auto dhandle = ghandle.createDataSet("index", dtype, dspace, plist);
-            dhandle.write(triplets.index.data(), H5::PredType::NATIVE_INT);
-        }
-
-        {
-            hsize_t ncp1 = triplets.ptr.size();
-            H5::DataSpace dspace(1, &ncp1);
-            H5::DataType dtype(H5::PredType::NATIVE_UINT64);
-            auto dhandle = ghandle.createDataSet("indptr", dtype, dspace);
-            dhandle.write(triplets.ptr.data(), H5::PredType::NATIVE_LONG);
-        }
-
-        // We limit the cache size to ensure that chunk management is not trivial.
-        size_t actual_cache_size = static_cast<double>(NR * NC) * cache_fraction * static_cast<double>(sizeof(double) + sizeof(int));
-        tatami_hdf5::Hdf5Options hopt;
-        hopt.maximum_cache_size = actual_cache_size;
-        hopt.require_minimum_cache = actual_cache_size > 0;
+        auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
+        std::string name = "stuff";
+        dump_to_file(triplets, fpath, name, chunk_size);
 
         mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(
             NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt
@@ -286,7 +290,10 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixReusePrimaryCacheTest : public ::testing::TestWithParam<std::tuple<double, int, int> >, public Hdf5SparseMatrixTestCore {
+class Hdf5SparseMatrixReusePrimaryCacheTest : 
+    public ::testing::TestWithParam<std::tuple<double, int, int> >, 
+    public Hdf5SparseMatrixTestCore 
+{
 protected:
     std::vector<int> predictions;
 
@@ -332,7 +339,7 @@ TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, FullExtent) {
     }
 }
 
-TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, SlicedBounds) {
+TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, Block) {
     auto full = ref->ncol();
     auto cstart = full * 0.25, clen = full * 0.5;
 
@@ -340,6 +347,27 @@ TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, SlicedBounds) {
     auto mwork = mat->dense_row(cstart, clen);
     auto mwork2 = mat->dense_row(std::make_unique<tatami::FixedViewOracle<int> >(predictions.data(), predictions.size()), cstart, clen);
 
+    for (auto i : predictions) {
+        auto expected = tatami_test::fetch(rwork.get(), i, clen);
+        auto observed = tatami_test::fetch(mwork.get(), i, clen);
+        EXPECT_EQ(observed, expected);
+        auto observed2 = tatami_test::fetch(mwork2.get(), clen);
+        EXPECT_EQ(observed2, expected);
+    }
+}
+
+TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, Indexed) {
+    auto full = ref->ncol();
+    std::vector<int> chosen;
+    for (int i = 10; i < full; i += 7) {
+        chosen.push_back(i);
+    }
+
+    auto rwork = ref->dense_row(chosen);
+    auto mwork = mat->dense_row(chosen);
+    auto mwork2 = mat->dense_row(std::make_unique<tatami::FixedViewOracle<int> >(predictions.data(), predictions.size()), chosen);
+
+    int clen = chosen.size();
     for (auto i : predictions) {
         auto expected = tatami_test::fetch(rwork.get(), i, clen);
         auto observed = tatami_test::fetch(mwork.get(), i, clen);
@@ -362,44 +390,59 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> >, public Hdf5SparseMatrixTestCore {};
+class Hdf5SparseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> > {
+protected:
+    inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat;
+
+    void SetUp() {
+        if (ref) {
+            return;
+        }
+
+        int NR = 500;
+        int NC = 200;
+        double cache_fraction = 0.1;
+        int chunk_size = 100;
+
+        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.15, 0, 100, /* seed = */ NR * NC + chunk_size + 100 * cache_fraction);
+        auto hopt = create_options(NR, NC, cache_fraction);
+
+        // Generating the file.
+        auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
+        std::string name = "stuff";
+        dump_to_file(triplets, fpath, name, chunk_size);
+
+        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int, int, uint16_t>(
+            NR,
+            NC,
+            fpath, 
+            name + "/data", 
+            name + "/index", 
+            name + "/indptr", 
+            hopt
+        ));
+
+        std::vector<int> vcasted(triplets.value.begin(), triplets.value.end());
+        std::vector<uint16_t> icasted(triplets.index.begin(), triplets.index.end());
+        ref.reset(new tatami::CompressedSparseMatrix<true, double, int, decltype(vcasted), decltype(icasted), decltype(triplets.ptr)>(
+            NR,
+            NC, 
+            std::move(vcasted),
+            std::move(icasted),
+            triplets.ptr
+        ));
+    }
+};
 
 TEST_P(Hdf5SparseMatrixCacheTypeTest, CastToInt) {
-    int NR = 500;
-    int NC = 200;
-    double cache_fraction = 0.1;
-    assemble({ { NR, NC }, { 100, cache_fraction } });
-
-    tatami_hdf5::Hdf5Options hopt;
-    hopt.maximum_cache_size = static_cast<double>(NR * NC) * cache_fraction * static_cast<double>(sizeof(int) + sizeof(uint16_t));
-    tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int, int, uint16_t> mat(
-        NR,
-        NC,
-        fpath, 
-        name + "/data", 
-        name + "/index", 
-        name + "/indptr", 
-        hopt
-    );
-
-    std::vector<int> vcasted(triplets.value.begin(), triplets.value.end());
-    std::vector<uint16_t> icasted(triplets.index.begin(), triplets.index.end());
-    tatami::CompressedSparseMatrix<true, double, int, decltype(vcasted), decltype(icasted), decltype(triplets.ptr)> ref(
-        NR,
-        NC, 
-        std::move(vcasted),
-        std::move(icasted),
-        triplets.ptr
-    );
-
     tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
     params.use_row = std::get<0>(tparam);
     params.use_oracle = std::get<1>(tparam);
 
-    tatami_test::test_full_access(params, &mat, &ref);
-    tatami_test::test_block_access(params, &mat, &ref, 5, 20);
-    tatami_test::test_indexed_access(params, &mat, &ref, 3, 5);
+    tatami_test::test_full_access(params, mat.get(), ref.get());
+    tatami_test::test_block_access(params, mat.get(), ref.get(), 5, 50);
+    tatami_test::test_indexed_access(params, mat.get(), ref.get(), 3, 5);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -414,7 +457,84 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixParallelTest : public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, bool, bool> >, public Hdf5SparseMatrixTestCore {
+class Hdf5SparseMatrixNearEmptyTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
+protected:
+    inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat;
+
+    inline static std::tuple<double, bool> last_params;
+
+    void SetUp() {
+        auto params = GetParam();
+        double cache_fraction = std::get<0>(params);
+        bool use_row = std::get<1>(params);
+
+        std::tuple<double, bool> copy_params(cache_fraction, use_row);
+        if (ref && last_params == copy_params) {
+            return;
+        }
+        last_params = copy_params;
+
+        // Make a diagnoal matrix with every second element missing.
+        // This checks all the shortcuts when there are no elements
+        // to be extracted for a particular dimension element. If
+        // use_row = false, we reduce the matrix size for faster testing.
+        int NC = use_row ? 200 : 20;
+        int NR = NC;
+
+        tatami_test::CompressedSparseDetails<double> triplets;
+        triplets.ptr.resize(NC + 1);
+        std::mt19937_64 rng(NC * NR * 100 * cache_fraction);
+        std::normal_distribution ndist;
+        for (int i = 1; i < NC; i += 2) {
+            triplets.index.push_back(i);
+            triplets.value.push_back(ndist(rng));
+            ++(triplets.ptr[i]);
+        }
+        for (int p = 1; p <= NC; ++p) {
+            triplets.ptr[p] += triplets.ptr[p - 1];
+        }
+
+        auto hopt = create_options(NR, NC, cache_fraction);
+
+        // Generating the file.
+        auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
+        std::string name = "stuff";
+        dump_to_file(triplets, fpath, name, /* chunk_size = */ 100);
+
+        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt));
+        ref.reset(new tatami::CompressedSparseMatrix<true, double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
+    }
+};
+
+TEST_P(Hdf5SparseMatrixNearEmptyTest, Basic) {
+    tatami_test::TestAccessParameters params;
+    auto tparam = GetParam();
+    params.use_row = std::get<1>(tparam);
+    params.use_oracle = std::get<2>(tparam);
+
+    tatami_test::test_full_access(params, mat.get(), ref.get());
+    auto len = params.use_row ? ref->ncol() : ref->nrow();
+    tatami_test::test_block_access(params, mat.get(), ref.get(), len * 0.17, len * 0.6);
+    tatami_test::test_indexed_access(params, mat.get(), ref.get(), len * 0.33, 3);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5SparseMatrix,
+    Hdf5SparseMatrixNearEmptyTest,
+    ::testing::Combine(
+        ::testing::Values(0, 0.01, 0.1), // cache size
+        ::testing::Values(true, false), // row access
+        ::testing::Values(true, false)  // oracle usage
+    )
+);
+
+/*************************************
+ *************************************/
+
+class Hdf5SparseMatrixParallelTest : 
+    public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, bool, bool> >, 
+    public Hdf5SparseMatrixTestCore 
+{
 protected:
     void SetUp() {
         assemble({ { 100, 200 }, std::get<0>(GetParam()) });

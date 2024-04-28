@@ -105,8 +105,8 @@ private:
 
     std::vector<CachedValue_> full_value_buffer;
     std::vector<CachedIndex_> full_index_buffer;
-    std::unordered_map<Index_, Index_> cache_exists, next_cache_exists;
 
+    std::unordered_map<Index_, Index_> cache_exists, next_cache_exists;
     std::vector<Element> cache_data, next_cache_data;
     std::vector<Index_> needed;
     std::vector<Index_> present;
