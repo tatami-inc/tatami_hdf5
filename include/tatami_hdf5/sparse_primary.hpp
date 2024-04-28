@@ -829,7 +829,6 @@ public:
                     this->prepare_contiguous_index_spaces(dest_offset, needed, next_cache_data);
                     this->h5comp->index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
 
-                    size_t pre_shift_len = 0;
                     size_t post_shift_len = 0;
                     if (needs_value) {
                         this->h5comp->dataspace.selectNone();
@@ -837,9 +836,10 @@ public:
 
                     for (size_t i = 0, num_needed = needed.size(); i < num_needed; ++i) {
                         auto& current = next_cache_data[needed[i]];
+                        auto pre_shift_offset = current.mem_offset;
                         current.mem_offset = dest_offset + post_shift_len;
 
-                        auto indices_start = full_index_buffer.begin() + dest_offset + pre_shift_len;
+                        auto indices_start = full_index_buffer.begin() + pre_shift_offset;
                         auto original_start = indices_start;
                         auto indices_end = indices_start + current.length;
                         refine_primary_limits(indices_start, indices_end, secondary_dim, block_start, block_past_end);
@@ -869,7 +869,6 @@ public:
                             }
                         }
 
-                        pre_shift_len += current.length;
                         current.length = new_len;
                         post_shift_len += new_len;
                     }
@@ -934,7 +933,6 @@ public:
                     this->prepare_contiguous_index_spaces(dest_offset, needed, next_cache_data);
                     this->h5comp->index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), this->h5comp->memspace, this->h5comp->dataspace);
 
-                    size_t pre_shift_len = 0;
                     size_t post_shift_len = 0;
                     if (this->needs_value) {
                         this->h5comp->dataspace.selectNone();
@@ -942,9 +940,10 @@ public:
 
                     for (size_t i = 0, num_needed = needed.size(); i < num_needed; ++i) {
                         auto& current = next_cache_data[needed[i]];
+                        auto pre_shift_offset = current.mem_offset;
                         current.mem_offset = dest_offset + post_shift_len;
 
-                        auto indices_start = full_index_buffer.begin() + dest_offset + pre_shift_len;
+                        auto indices_start = full_index_buffer.begin() + pre_shift_offset;
                         auto original_start = indices_start;
                         auto indices_end = indices_start + current.length;
                         refine_primary_limits(indices_start, indices_end, secondary_dim, first_index, past_last_index);
@@ -969,7 +968,6 @@ public:
                             }
                         }
 
-                        pre_shift_len += current.length;
                         current.length = num_found;
                         post_shift_len += num_found;
                     }
@@ -978,7 +976,7 @@ public:
                         hsize_t new_len = post_shift_len;
                         this->h5comp->memspace.setExtentSimple(1, &new_len);
                         this->h5comp->memspace.selectAll();
-                        this->h5comp->data_dataset.read(full_value_buffer.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+                        this->h5comp->data_dataset.read(full_value_buffer.data() + dest_offset, define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
                     }
                 });
             },
