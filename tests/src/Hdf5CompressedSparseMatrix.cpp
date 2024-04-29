@@ -11,7 +11,7 @@
 #include <vector>
 #include <random>
 
-static void dump_to_file(const tatami_test::CompressedSparseDetails<double>& triplets, const std::string& fpath, const std::string& name, int chunk_size) {
+static void dump_to_file(const tatami_test::CompressedSparseDetails<double>& triplets, const std::string& fpath, const std::string& name, int chunk_size = 50) {
     H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
     auto ghandle = fhandle.createGroup(name);
 
@@ -58,12 +58,11 @@ static tatami_hdf5::Hdf5Options create_options(size_t NR, size_t NC, double cach
 
 class Hdf5SparseMatrixTestCore {
 public:
-    typedef std::tuple<int, double> SimulationParameters;
+    typedef std::tuple<double> SimulationParameters;
 
     static auto create_combinations() {
         return ::testing::Combine(
-            ::testing::Values(0, 100), // chunk size
-            ::testing::Values(0, 0.001, 0.01, 0.1) // cache size
+            ::testing::Values(0, 0.01, 0.1) // cache fraction multiplier
         );
     }
 
@@ -85,16 +84,15 @@ protected:
 
         size_t NR = dimensions.first;
         size_t NC = dimensions.second;
-        auto chunk_size = std::get<0>(sim_params);
-        auto cache_fraction = std::get<1>(sim_params);
+        auto cache_fraction = std::get<0>(sim_params);
 
-        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.15, 0, 100, /* seed = */ NR * NC + chunk_size + 100 * cache_fraction);
+        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.15, 0, 100, /* seed = */ NR * NC + 100 * cache_fraction);
         auto hopt = create_options(NR, NC, cache_fraction);
 
         // Generating the file.
         auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
         std::string name = "stuff";
-        dump_to_file(triplets, fpath, name, chunk_size);
+        dump_to_file(triplets, fpath, name);
 
         mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(
             NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt
@@ -118,7 +116,7 @@ protected:
 
 class Hdf5SparseMatrixUtilsTest : public ::testing::Test, public Hdf5SparseMatrixTestCore {
     void SetUp() {
-        assemble({ {200, 100}, { 50, 0.1 } });
+        assemble({ {200, 100}, { 0.1 } });
     }
 };
 
@@ -164,7 +162,7 @@ TEST_P(Hdf5SparseMatrixFullAccessTest, Primary) {
 
 TEST_P(Hdf5SparseMatrixFullAccessTest, Secondary) {
     auto param = GetParam(); 
-    assemble({ {50, 10}, std::get<0>(param) }); // much smaller for the secondary dimension.
+    assemble({ {50, 40}, std::get<0>(param) }); // smaller for the secondary dimension.
     auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
 
     if (tparams.use_row) {
@@ -208,7 +206,7 @@ TEST_P(Hdf5SparseMatrixBlockAccessTest, Primary) {
 
 TEST_P(Hdf5SparseMatrixBlockAccessTest, Secondary) {
     auto param = GetParam(); 
-    assemble({ {10, 50}, std::get<0>(param) }); // much smaller for the secondary dimension.
+    assemble({ {30, 50}, std::get<0>(param) }); // smaller for the secondary dimension.
     auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
     auto block = std::get<2>(param);
 
@@ -260,7 +258,7 @@ TEST_P(Hdf5SparseMatrixIndexedAccessTest, Primary) {
 
 TEST_P(Hdf5SparseMatrixIndexedAccessTest, Secondary) {
     auto param = GetParam(); 
-    assemble({ {20, 30}, std::get<0>(param) }); // much smaller for the secondary dimension.
+    assemble({ {35, 40}, std::get<0>(param) }); // much smaller for the secondary dimension.
     auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
     auto index_info = std::get<2>(param);
 
@@ -281,8 +279,8 @@ INSTANTIATE_TEST_SUITE_P(
         tatami_test::standard_test_access_parameter_combinations(),
         ::testing::Values(
             std::make_pair(0.3, 5), 
-            std::make_pair(0.322, 8), 
-            std::make_pair(0.455, 9)
+            std::make_pair(0.322, 4), 
+            std::make_pair(0.455, 3)
         )
     )
 );
@@ -301,7 +299,7 @@ protected:
         auto params = GetParam();
         auto cache_fraction = std::get<0>(params);
         int NR = 150, NC = 200;
-        assemble({ { NR, NC }, { 100, cache_fraction } });
+        assemble({ { NR, NC }, { cache_fraction } });
 
         auto interval_jump = std::get<1>(params);
         auto interval_size = std::get<2>(params);
@@ -381,7 +379,7 @@ INSTANTIATE_TEST_SUITE_P(
     Hdf5SparseMatrix,
     Hdf5SparseMatrixReusePrimaryCacheTest,
     ::testing::Combine(
-        ::testing::Values(0, 0.001, 0.01, 0.1), // cache size multiplier
+        ::testing::Values(0, 0.01, 0.1), // cache fraction
         ::testing::Values(1, 3), // jump between intervals
         ::testing::Values(5, 10, 20) // reuse interval size
     )
@@ -390,27 +388,35 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> > {
+class Hdf5SparseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
 protected:
     inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat;
 
+    inline static std::tuple<double, bool> last_params;
+
     void SetUp() {
-        if (ref) {
+        auto params = GetParam();
+        double cache_fraction = std::get<0>(params);
+        bool use_row = std::get<1>(params);
+
+        std::tuple<double, bool> copy_params(cache_fraction, use_row);
+        if (ref && last_params == copy_params) {
             return;
         }
+        last_params = copy_params;
 
-        int NR = 500;
-        int NC = 200;
-        double cache_fraction = 0.1;
-        int chunk_size = 100;
+        // Using a smaller matrix for the secondary extractors, for faster testing;
+        // otherwise this will take a much longer time.
+        int NR = (use_row ? 500 : 41);
+        int NC = (use_row ? 200 : 58);
 
-        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.15, 0, 100, /* seed = */ NR * NC + chunk_size + 100 * cache_fraction);
+        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.15, 0, 100, /* seed = */ NR * NC + 100 * cache_fraction);
         auto hopt = create_options(NR, NC, cache_fraction);
 
         // Generating the file.
         auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
         std::string name = "stuff";
-        dump_to_file(triplets, fpath, name, chunk_size);
+        dump_to_file(triplets, fpath, name);
 
         mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int, int, uint16_t>(
             NR,
@@ -437,18 +443,82 @@ protected:
 TEST_P(Hdf5SparseMatrixCacheTypeTest, CastToInt) {
     tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
-    params.use_row = std::get<0>(tparam);
-    params.use_oracle = std::get<1>(tparam);
+    params.use_row = std::get<1>(tparam);
+    params.use_oracle = std::get<2>(tparam);
 
     tatami_test::test_full_access(params, mat.get(), ref.get());
-    tatami_test::test_block_access(params, mat.get(), ref.get(), 5, 50);
-    tatami_test::test_indexed_access(params, mat.get(), ref.get(), 3, 5);
+
+    auto len = params.use_row ? ref->ncol() : ref->nrow();
+    tatami_test::test_block_access(params, mat.get(), ref.get(), len * 0.25, len * 0.7);
+    tatami_test::test_indexed_access(params, mat.get(), ref.get(), len * 0.1, 4);
 }
 
 INSTANTIATE_TEST_SUITE_P(
     Hdf5SparseMatrix,
     Hdf5SparseMatrixCacheTypeTest,
     ::testing::Combine(
+        ::testing::Values(0, 0.01, 0.1), // cache fraction
+        ::testing::Values(true, false), // row access
+        ::testing::Values(true, false)  // oracle usage
+    )
+);
+
+/*************************************
+ *************************************/
+
+class Hdf5SparseMatrixUncompressedTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
+protected:
+    inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat;
+
+    inline static std::tuple<double, bool> last_params;
+
+    void SetUp() {
+        auto params = GetParam();
+        double cache_fraction = std::get<0>(params);
+        bool use_row = std::get<1>(params);
+
+        std::tuple<double, bool> copy_params(cache_fraction, use_row);
+        if (ref && last_params == copy_params) {
+            return;
+        }
+        last_params = copy_params;
+
+        // Using a smaller matrix for the secondary extractors, for faster testing;
+        // otherwise this will take a much longer time.
+        int NR = (use_row ? 333 : 50);
+        int NC = (use_row ? 444 : 40);
+
+        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.2, 0, 100, /* seed = */ NR * NC + cache_fraction * 100);
+        auto hopt = create_options(NR, NC, cache_fraction);
+
+        // Generating the file; chunk_size = 0 indicates that we want it uncompressed.
+        auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
+        std::string name = "stuff";
+        dump_to_file(triplets, fpath, name, /* chunk_size = */ 0);
+
+        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt));
+        ref.reset(new tatami::CompressedSparseMatrix<true, double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
+    }
+};
+
+TEST_P(Hdf5SparseMatrixUncompressedTest, Basic) {
+    tatami_test::TestAccessParameters params;
+    auto tparam = GetParam();
+    params.use_row = std::get<1>(tparam);
+    params.use_oracle = std::get<2>(tparam);
+
+    tatami_test::test_full_access(params, mat.get(), ref.get());
+
+    auto len = params.use_row ? ref->ncol() : ref->nrow();
+    tatami_test::test_block_access(params, mat.get(), ref.get(), len * 0.12, len * 0.8);
+    tatami_test::test_indexed_access(params, mat.get(), ref.get(), len * 0.05, 2);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Hdf5SparseMatrix,
+    Hdf5SparseMatrixUncompressedTest,
+    ::testing::Combine(
+        ::testing::Values(0, 0.01, 0.1), // cache fraction
         ::testing::Values(true, false), // row access
         ::testing::Values(true, false)  // oracle usage
     )
@@ -474,10 +544,10 @@ protected:
         }
         last_params = copy_params;
 
-        // Make a diagnoal matrix with every second element missing.
-        // This checks all the shortcuts when there are no elements
-        // to be extracted for a particular dimension element. If
-        // use_row = false, we reduce the matrix size for faster testing.
+        // Make a diagonal matrix with every second element missing.  This
+        // checks all the shortcuts when there are no elements to be extracted
+        // for a particular dimension element. If use_row=false, we reduce the
+        // matrix size for faster testing with the slow secondary extractors.
         int NC = use_row ? 200 : 20;
         int NR = NC;
 
@@ -499,7 +569,7 @@ protected:
         // Generating the file.
         auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
         std::string name = "stuff";
-        dump_to_file(triplets, fpath, name, /* chunk_size = */ 100);
+        dump_to_file(triplets, fpath, name);
 
         mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt));
         ref.reset(new tatami::CompressedSparseMatrix<true, double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
@@ -513,6 +583,7 @@ TEST_P(Hdf5SparseMatrixNearEmptyTest, Basic) {
     params.use_oracle = std::get<2>(tparam);
 
     tatami_test::test_full_access(params, mat.get(), ref.get());
+
     auto len = params.use_row ? ref->ncol() : ref->nrow();
     tatami_test::test_block_access(params, mat.get(), ref.get(), len * 0.17, len * 0.6);
     tatami_test::test_indexed_access(params, mat.get(), ref.get(), len * 0.33, 3);
@@ -522,7 +593,7 @@ INSTANTIATE_TEST_SUITE_P(
     Hdf5SparseMatrix,
     Hdf5SparseMatrixNearEmptyTest,
     ::testing::Combine(
-        ::testing::Values(0, 0.01, 0.1), // cache size
+        ::testing::Values(0, 0.01, 0.1), // cache fraction
         ::testing::Values(true, false), // row access
         ::testing::Values(true, false)  // oracle usage
     )
