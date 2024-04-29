@@ -167,6 +167,9 @@ private:
     void extract_and_append(Index_ primary, Index_ secondary_start, Index_ secondary_length, Index_ primary_to_add) {
         hsize_t left = pointers[primary], right = pointers[primary + 1];
         hsize_t count = right - left;
+        if (count == 0) {
+            return;
+        }
         index_buffer.resize(count);
 
         this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
@@ -282,14 +285,21 @@ protected:
         Index_ number = 0;
     };
     tatami_chunked::OracleSlabCache<Index_, Index_, Slab> cache;
-    std::vector<Slab*> slab_ptrs;
 
-    std::vector<Index_> index_buffer;
-    std::vector<CachedValue_> data_buffer;
-
+    // Contiguous data stores for the Slabs to point to. This avoids
+    // the overhead of allocating a lot of little vectors.
     std::vector<Index_> cache_index;
     std::vector<CachedValue_> cache_data;
     size_t counter = 0;
+
+    // Temporary buffers for the HDF5 library to read in values/indices for each dimension element.
+    std::vector<Index_> index_buffer;
+    std::vector<CachedValue_> data_buffer;
+
+    // Some account-keeping intermediates to move data from the buffers to the cache.
+    std::vector<Slab*> slab_ptrs;
+    std::vector<CachedValue_*> value_ptrs;
+    std::vector<Index_> found;
 
 private:
     template<class Extract_>
@@ -337,6 +347,9 @@ private:
     void extract_and_append(Index_ primary, Index_ secondary_first, Index_ secondary_last_plus_one, Index_ primary_to_add) {
         hsize_t left = pointers[primary], right = pointers[primary + 1];
         hsize_t count = right - left;
+        if (count == 0) {
+            return;
+        }
         index_buffer.resize(count);
 
         this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
@@ -347,41 +360,47 @@ private:
         auto start = index_buffer.begin(), end = index_buffer.end();
         refine_primary_limits(start, end, secondary_dim, secondary_first, secondary_last_plus_one);
 
-        if (needs_index) {
-            for (auto x = start; x != end; ++x) {
-                auto slab_ptr = slab_ptrs[*x];
-                if (slab_ptr != NULL) {
-                    slab_ptr->index[slab_ptr->number] = primary_to_add;
-                }
-            }
+        if (needs_value) {
+            value_ptrs.clear();
+            found.clear();
         }
 
-        if (start != end && needs_value) {
-            hsize_t better_left = left + (start - index_buffer.begin());
-            hsize_t better_count = end - start;
-            this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &better_count, &better_left);
-            this->h5comp->memspace.setExtentSimple(1, &better_count);
-            this->h5comp->memspace.selectAll();
-
-            data_buffer.resize(better_count);
-            this->h5comp->data_dataset.read(data_buffer.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
-
-            size_t y = 0;
-            for (auto x = start; x != end; ++x, ++y) {
-                auto slab_ptr = slab_ptrs[*x];
-                if (slab_ptr != NULL) {
-                    slab_ptr->value[slab_ptr->number] = data_buffer[y];
-                }
-            }
-        }
-
-        for (auto x = start; x != end; ++x) {
+        Index_ counter = 0;
+        for (auto x = start; x != end; ++x, ++counter) {
             auto slab_ptr = slab_ptrs[*x];
             if (slab_ptr != NULL) {
+                if (needs_index) {
+                    slab_ptr->index[slab_ptr->number] = primary_to_add;
+                }
+                if (needs_value) {
+                    value_ptrs.push_back(slab_ptr->value + slab_ptr->number);
+                    found.push_back(counter);
+                }
                 ++(slab_ptr->number);
             }
         }
 
+        if (!found.empty()) {
+            hsize_t new_start = left + (start - index_buffer.begin());
+            this->h5comp->dataspace.selectNone();
+            tatami::process_consecutive_indices<Index_>(found.data(), found.size(),
+                [&](Index_ start, Index_ length) {
+                    hsize_t offset = start + new_start;
+                    hsize_t count = length;
+                    this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &count, &offset);
+                }
+            );
+
+            hsize_t new_len = found.size();
+            this->h5comp->memspace.setExtentSimple(1, &new_len);
+            this->h5comp->memspace.selectAll();
+
+            data_buffer.resize(new_len);
+            this->h5comp->data_dataset.read(data_buffer.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+            for (hsize_t i = 0; i < new_len; ++i) {
+                *(value_ptrs[i]) = data_buffer[i];
+            }
+        }
     }
 
 public:
