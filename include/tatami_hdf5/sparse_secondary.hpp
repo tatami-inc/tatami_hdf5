@@ -50,12 +50,20 @@ void slab_to_dense(const tatami::SparseRange<CachedValue_, Index_>& slab, Value_
 }
 
 struct SecondaryBase {
-    SecondaryBase(const std::string& file_name, const std::string& data_name, const std::string& index_name) {
+    template<typename Index_>
+    SecondaryBase(const MatrixDetails<Index_>& details) {
         serialize([&]() -> void {
             h5comp.reset(new Components);
-            h5comp->file.openFile(file_name, H5F_ACC_RDONLY);
-            h5comp->data_dataset = h5comp->file.openDataSet(data_name);
-            h5comp->index_dataset = h5comp->file.openDataSet(index_name);
+
+            // Using some kinda-big prime number as the number of slots. This
+            // doesn't really matter too much as we only intend to store two
+            // chunks at most - see Hdf5CompressedSparseMatrix.hpp for the rationale.
+            H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
+            fapl.setCache(0, 511, details.h5_chunk_cache_size, 0);
+
+            h5comp->file.openFile(details.file_name, H5F_ACC_RDONLY);
+            h5comp->data_dataset = h5comp->file.openDataSet(details.data_name);
+            h5comp->index_dataset = h5comp->file.openDataSet(details.index_name);
             h5comp->dataspace = h5comp->data_dataset.getSpace();
         });
     }
@@ -77,25 +85,20 @@ template<typename Index_, typename CachedValue_>
 class MyopicSecondaryBase : public SecondaryBase {
 public:
     MyopicSecondaryBase(
-        const std::string& file_name, 
-        const std::string& data_name, 
-        const std::string& index_name, 
-        const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
+        const MatrixDetails<Index_>& details,
         bool, // oracle: for consistency with the oracular constructor.
         Index_ extract_length,
-        size_t cache_size,
         bool needs_value,
         bool needs_index) :
-        SecondaryBase(file_name, data_name, index_name),
-        pointers(ptrs),
+        SecondaryBase(details),
+        pointers(details.pointers),
         sec_dim_stats(
-            secondary_dim,
+            details.secondary_dim,
             std::max(
                 static_cast<size_t>(1),
                 static_cast<size_t>(
                     // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford. 
-                    (cache_size / Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true)) / extract_length
+                    (details.our_cache_size / Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true)) / extract_length
                 )
             ) 
         ),
@@ -238,19 +241,14 @@ template<typename Index_, typename CachedValue_>
 class OracularSecondaryBase : public SecondaryBase {
 public:
     OracularSecondaryBase(
-        const std::string& file_name, 
-        const std::string& data_name, 
-        const std::string& index_name, 
-        const std::vector<hsize_t>& ptrs, 
-        Index_ secondary_dim,
+        const MatrixDetails<Index_>& details,
         std::shared_ptr<const tatami::Oracle<Index_> > oracle, 
         Index_ extract_length,
-        size_t cache_size,
         bool needs_value,
         bool needs_index) :
-        SecondaryBase(file_name, data_name, index_name),
-        pointers(ptrs),
-        secondary_dim(secondary_dim),
+        SecondaryBase(details),
+        pointers(details.pointers),
+        secondary_dim(details.secondary_dim),
         extract_length(extract_length),
         needs_value(needs_value),
         needs_index(needs_index),
@@ -258,7 +256,7 @@ public:
             std::move(oracle),
             std::max(
                 static_cast<size_t>(1),
-                static_cast<size_t>((cache_size / Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true)) / extract_length)
+                static_cast<size_t>((details.our_cache_size / Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true)) / extract_length)
             )
         )
     {
@@ -445,30 +443,9 @@ struct SecondaryFullSparse :
     public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
     public tatami::SparseExtractor<oracle_, Value_, Index_> 
 {
-    SecondaryFullSparse(
-        const std::string& file_name, 
-        const std::string& data_name, 
-        const std::string& index_name, 
-        const std::vector<hsize_t>& ptrs, 
-        Index_ secondary_dim,
-        Index_ primary_dim,
-        tatami::MaybeOracle<oracle_, Index_> oracle, 
-        size_t cache_size, 
-        bool needs_value,
-        bool needs_index) : 
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(
-            file_name, 
-            data_name, 
-            index_name, 
-            ptrs, 
-            secondary_dim,
-            std::move(oracle), 
-            primary_dim,
-            cache_size, 
-            needs_value,
-            needs_index
-        ),
-        primary_dim(primary_dim)
+    SecondaryFullSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, bool needs_value, bool needs_index) : 
+        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), details.primary_dim, needs_value, needs_index),
+        primary_dim(details.primary_dim)
     {}
 
     tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
@@ -485,28 +462,9 @@ struct SecondaryFullDense :
     public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
     public tatami::DenseExtractor<oracle_, Value_, Index_> 
 {
-    SecondaryFullDense(
-        const std::string& file_name, 
-        const std::string& data_name, 
-        const std::string& index_name, 
-        const std::vector<hsize_t>& ptrs, 
-        Index_ secondary_dim,
-        Index_ primary_dim,
-        tatami::MaybeOracle<oracle_, Index_> oracle, 
-        size_t cache_size) :
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(
-            file_name, 
-            data_name, 
-            index_name, 
-            ptrs, 
-            secondary_dim,
-            std::move(oracle), 
-            primary_dim,
-            cache_size,
-            true,
-            true
-        ),
-        primary_dim(primary_dim)
+    SecondaryFullDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle) :
+        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), details.primary_dim, true, true),
+        primary_dim(details.primary_dim)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
@@ -528,30 +486,8 @@ struct SecondaryBlockSparse :
     public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
     public tatami::SparseExtractor<oracle_, Value_, Index_> 
 {
-    SecondaryBlockSparse(
-        const std::string& file_name,
-        const std::string& data_name,
-        const std::string& index_name,
-        const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
-        tatami::MaybeOracle<oracle_, Index_> oracle,
-        Index_ block_start,
-        Index_ block_length,
-        size_t cache_size,
-        bool needs_value, 
-        bool needs_index) : 
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(
-            file_name, 
-            data_name, 
-            index_name, 
-            ptrs, 
-            secondary_dim,
-            std::move(oracle), 
-            block_length, 
-            cache_size, 
-            needs_value,
-            needs_index
-        ),
+    SecondaryBlockSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length, bool needs_value, bool needs_index) : 
+        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), block_length, needs_value, needs_index),
         block_start(block_start),
         block_length(block_length)
     {}
@@ -571,28 +507,8 @@ struct SecondaryBlockDense :
     public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
     public tatami::DenseExtractor<oracle_, Value_, Index_> 
 {
-    SecondaryBlockDense(
-        const std::string& file_name,
-        const std::string& data_name,
-        const std::string& index_name,
-        const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
-        tatami::MaybeOracle<oracle_, Index_> oracle,
-        Index_ block_start,
-        Index_ block_length,
-        size_t cache_size) :
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(
-            file_name, 
-            data_name, 
-            index_name, 
-            ptrs, 
-            secondary_dim,
-            std::move(oracle), 
-            block_length,
-            cache_size, 
-            true,
-            true
-        ),
+    SecondaryBlockDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length) :
+        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), block_length, true, true),
         block_start(block_start),
         block_length(block_length)
     {}
@@ -617,29 +533,8 @@ struct SecondaryIndexSparse :
     public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
     public tatami::SparseExtractor<oracle_, Value_, Index_> 
 {
-    SecondaryIndexSparse(
-        const std::string& file_name, 
-        const std::string& data_name, 
-        const std::string& index_name, 
-        const std::vector<hsize_t>& ptrs, 
-        Index_ secondary_dim,
-        tatami::MaybeOracle<oracle_, Index_> oracle, 
-        tatami::VectorPtr<Index_> idx_ptr,
-        size_t cache_size, 
-        bool needs_value,
-        bool needs_index) : 
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(
-            file_name, 
-            data_name, 
-            index_name, 
-            ptrs, 
-            secondary_dim,
-            std::move(oracle), 
-            idx_ptr->size(),
-            cache_size, 
-            needs_value,
-            needs_index
-        ),
+    SecondaryIndexSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> idx_ptr, bool needs_value, bool needs_index) : 
+        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), idx_ptr->size(), needs_value, needs_index),
         indices_ptr(std::move(idx_ptr)),
         needs_index(needs_index)
     {}
@@ -659,27 +554,8 @@ struct SecondaryIndexDense :
     public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
     public tatami::DenseExtractor<oracle_, Value_, Index_> 
 {
-    SecondaryIndexDense(
-        const std::string& file_name,
-        const std::string& data_name,
-        const std::string& index_name,
-        const std::vector<hsize_t>& ptrs,
-        Index_ secondary_dim,
-        tatami::MaybeOracle<oracle_, Index_> oracle,
-        tatami::VectorPtr<Index_> idx_ptr,
-        size_t cache_size) :
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(
-            file_name, 
-            data_name, 
-            index_name, 
-            ptrs, 
-            secondary_dim,
-            std::move(oracle), 
-            idx_ptr->size(),
-            cache_size, 
-            true,
-            true
-        ),
+    SecondaryIndexDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> idx_ptr) :
+        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), idx_ptr->size(), true, true),
         indices_ptr(std::move(idx_ptr))
     {}
 

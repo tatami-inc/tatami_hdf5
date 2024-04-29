@@ -60,8 +60,11 @@ class Hdf5CompressedSparseMatrix : public tatami::Matrix<Value_, Index_> {
     std::string data_name, index_name;
     std::vector<hsize_t> pointers;
 
-    size_t cache_size_limit;
-    Index_ max_non_zeros;
+    // We distinguish between our own cache of dimension elements
+    // versus HDF5's cache of uncompressed chunks.
+    size_t our_cache_size;
+    size_t max_non_zeros;
+    size_t h5_chunk_cache_size;
 
 public:
     /**
@@ -81,7 +84,7 @@ public:
         file_name(std::move(file)), 
         data_name(std::move(vals)), 
         index_name(std::move(idx)), 
-        cache_size_limit(options.maximum_cache_size)
+        our_cache_size(options.maximum_cache_size)
     {
         serialize([&]() -> void {
             H5::H5File file_handle(file_name, H5F_ACC_RDONLY);
@@ -100,6 +103,34 @@ public:
                 throw std::runtime_error("'ptr' dataset should have length equal to the number of " + (row_ ? std::string("rows") : std::string("columns")) + " plus 1");
             }
 
+            // We aim to store two chunks in HDF5's chunk cache; one
+            // overlapping the start of the primary dimension element's range,
+            // and one overlapping the end, so that we don't re-read the
+            // content for the new primary dimension element. To simplify
+            // matters, we just read the chunk sizes (in bytes) for both
+            // datasets and use the larger chunk size for both datasets.
+            // Hopefully the chunks are not too big...
+            hsize_t dchunk_length = 0;
+            hsize_t dchunk_element_size = 0;
+            auto dparms = dhandle.getCreatePlist();
+            if (dparms.getLayout() == H5D_CHUNKED) {
+                dparms.getChunk(1, &dchunk_length);
+                dchunk_element_size = dhandle.getDataType().getSize();
+            }
+
+            hsize_t ichunk_length = 0;
+            hsize_t ichunk_element_size = 0;
+            auto iparms = ihandle.getCreatePlist();
+            if (iparms.getLayout() == H5D_CHUNKED) {
+                iparms.getChunk(1, &ichunk_length);
+                ichunk_element_size = ihandle.getDataType().getSize();
+            }
+
+            h5_chunk_cache_size = std::max(
+                std::min(ichunk_length * 2, nonzeros) * ichunk_element_size, 
+                std::min(dchunk_length * 2, nonzeros) * dchunk_element_size
+            );
+
             // Checking the contents of the index pointers.
             pointers.resize(dim_p1);
             phandle.read(pointers.data(), H5::PredType::NATIVE_HSIZE);
@@ -113,7 +144,7 @@ public:
 
         max_non_zeros = 0;
         for (size_t i = 1; i < pointers.size(); ++i) {
-            Index_ diff = pointers[i] - pointers[i-1];
+            hsize_t diff = pointers[i] - pointers[i-1];
             if (diff > max_non_zeros) {
                 max_non_zeros = diff;
             }
@@ -182,31 +213,29 @@ public:
      ************ Myopic dense ************
      **************************************/
 private:
-    Index_ primary_extent() const {
-        if constexpr(row_) {
-            return nrows;
-        } else {
-            return ncols;
-        }
-    }
-
-    Index_ secondary_extent() const {
-        if constexpr(row_) {
-            return ncols;
-        } else {
-            return nrows;
-        }
+    Hdf5CompressedSparseMatrix_internal::MatrixDetails<Index_> details() const {
+        return Hdf5CompressedSparseMatrix_internal::MatrixDetails<Index_>(
+            file_name, 
+            data_name, 
+            index_name, 
+            (row_ ? nrows : ncols),
+            (row_ ? ncols : nrows),
+            pointers, 
+            our_cache_size,
+            max_non_zeros,
+            h5_chunk_cache_size
+        );
     }
 
     template<bool oracle_>
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, const tatami::Options&) const {
         if (row == row_) {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryFullDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
-                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), cache_size_limit, max_non_zeros
+                details(), std::move(oracle)
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryFullDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, secondary_extent(), primary_extent(), std::move(oracle), cache_size_limit
+                details(), std::move(oracle)
             );
         }
     }
@@ -215,11 +244,11 @@ private:
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length, const tatami::Options&) const {
         if (row == row_) {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryBlockDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
-                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), block_start, block_length, cache_size_limit, max_non_zeros
+                details(), std::move(oracle), block_start, block_length
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryBlockDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), block_start, block_length, cache_size_limit
+                details(), std::move(oracle), block_start, block_length
             );
         }
     }
@@ -228,11 +257,11 @@ private:
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options&) const {
         if (row == row_) {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryIndexDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
-                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), std::move(indices_ptr), cache_size_limit, max_non_zeros
+                details(), std::move(oracle), std::move(indices_ptr)
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryIndexDense<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, data_name, index_name, pointers, secondary_extent(), std::move(oracle), std::move(indices_ptr), cache_size_limit
+                details(), std::move(oracle), std::move(indices_ptr)
             );
         }
     }
@@ -258,29 +287,11 @@ private:
     std::unique_ptr<tatami::SparseExtractor<oracle_, Value_, Index_> > populate_sparse(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, const tatami::Options& opt) const {
         if (row == row_) {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryFullSparse<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
-                file_name,
-                data_name, 
-                index_name, 
-                pointers, 
-                secondary_extent(),
-                std::move(oracle), 
-                cache_size_limit, 
-                max_non_zeros, 
-                opt.sparse_extract_value, 
-                opt.sparse_extract_index
+                details(), std::move(oracle), opt.sparse_extract_value, opt.sparse_extract_index
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryFullSparse<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, 
-                data_name, 
-                index_name, 
-                pointers, 
-                secondary_extent(), 
-                primary_extent(),
-                std::move(oracle), 
-                cache_size_limit, 
-                opt.sparse_extract_value, 
-                opt.sparse_extract_index
+                details(), std::move(oracle), opt.sparse_extract_value, opt.sparse_extract_index
             );
         }
     }
@@ -289,32 +300,11 @@ private:
     std::unique_ptr<tatami::SparseExtractor<oracle_, Value_, Index_> > populate_sparse(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
         if (row == row_) {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryBlockSparse<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
-                file_name, 
-                data_name, 
-                index_name, 
-                pointers, 
-                secondary_extent(),
-                std::move(oracle), 
-                block_start, 
-                block_length, 
-                cache_size_limit, 
-                max_non_zeros, 
-                opt.sparse_extract_value, 
-                opt.sparse_extract_index
+                details(), std::move(oracle), block_start, block_length, opt.sparse_extract_value, opt.sparse_extract_index
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryBlockSparse<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, 
-                data_name, 
-                index_name, 
-                pointers, 
-                secondary_extent(), 
-                std::move(oracle), 
-                block_start, 
-                block_length, 
-                cache_size_limit, 
-                opt.sparse_extract_value, 
-                opt.sparse_extract_index
+                details(), std::move(oracle), block_start, block_length, opt.sparse_extract_value, opt.sparse_extract_index
             );
         }
     }
@@ -323,30 +313,11 @@ private:
     std::unique_ptr<tatami::SparseExtractor<oracle_, Value_, Index_> > populate_sparse(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options& opt) const {
         if (row == row_) {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::PrimaryIndexSparse<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
-                file_name, 
-                data_name, 
-                index_name, 
-                pointers, 
-                secondary_extent(),
-                std::move(oracle), 
-                std::move(indices_ptr), 
-                cache_size_limit, 
-                max_non_zeros,
-                opt.sparse_extract_value, 
-                opt.sparse_extract_index
+                details(), std::move(oracle), std::move(indices_ptr), opt.sparse_extract_value, opt.sparse_extract_index
             );
         } else {
             return std::make_unique<Hdf5CompressedSparseMatrix_internal::SecondaryIndexSparse<oracle_, Value_, Index_, CachedValue_> >(
-                file_name, 
-                data_name, 
-                index_name, 
-                pointers, 
-                secondary_extent(), 
-                std::move(oracle), 
-                std::move(indices_ptr), 
-                cache_size_limit, 
-                opt.sparse_extract_value, 
-                opt.sparse_extract_index
+                details(), std::move(oracle), std::move(indices_ptr), opt.sparse_extract_value, opt.sparse_extract_index
             );
         }
     }
