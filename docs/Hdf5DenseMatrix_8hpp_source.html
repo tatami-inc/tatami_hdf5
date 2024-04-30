@@ -163,8 +163,8 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span> </div>
 <div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span><span class="comment">// &#39;cache&#39; is assumed to be row-major with &#39;actual_dim&#39; columns and</span></div>
 <div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span><span class="comment">// &#39;extract_length&#39; rows. On output, it will be column-major instead.</span></div>
-<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span><span class="keyword">template</span>&lt;<span class="keyword">typename</span> CachedValue_, <span class="keyword">typename</span> Index_&gt;</div>
-<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span><span class="keywordtype">void</span> transpose(std::vector&lt;CachedValue_&gt;&amp; cache, std::vector&lt;CachedValue_&gt;&amp; buffer, Index_ actual_dim, Index_ extract_length) {</div>
+<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span><span class="keyword">template</span>&lt;<span class="keyword">typename</span> CachedValue_&gt;</div>
+<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span><span class="keywordtype">void</span> transpose(std::vector&lt;CachedValue_&gt;&amp; cache, std::vector&lt;CachedValue_&gt;&amp; buffer, <span class="keywordtype">size_t</span> actual_dim, <span class="keywordtype">size_t</span> extract_length) {</div>
 <div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>    <span class="keywordflow">if</span> (actual_dim == 1 || extract_length == 1) {</div>
 <div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>    }</div>
@@ -173,21 +173,21 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span> </div>
 <div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>    <span class="comment">// Using a blockwise strategy to perform the transposition,</span></div>
 <div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span>    <span class="comment">// in order to be more cache-friendly.</span></div>
-<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>    <span class="keyword">constexpr</span> Index_ block = 16;</div>
-<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>    <span class="keywordflow">for</span> (Index_ xstart = 0; xstart &lt; actual_dim; xstart += block) {</div>
-<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>        Index_ xend = xstart + std::min(block, actual_dim - xstart);</div>
+<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>    <span class="keyword">constexpr</span> <span class="keywordtype">size_t</span> block = 16;</div>
+<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> xstart = 0; xstart &lt; actual_dim; xstart += block) {</div>
+<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>        <span class="keywordtype">size_t</span> xend = xstart + std::min(block, actual_dim - xstart);</div>
 <div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span> </div>
-<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>        <span class="keywordflow">for</span> (Index_ ystart = 0; ystart &lt; extract_length; ystart += block) {</div>
-<div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span>            Index_ yend = ystart + std::min(block, extract_length - ystart);</div>
+<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> ystart = 0; ystart &lt; extract_length; ystart += block) {</div>
+<div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span>            <span class="keywordtype">size_t</span> yend = ystart + std::min(block, extract_length - ystart);</div>
 <div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span> </div>
 <div class="line"><a id="l00107" name="l00107"></a><span class="lineno">  107</span>            <span class="keyword">auto</span> in = cache.data() + xstart + ystart * actual_dim;</div>
 <div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span>            <span class="keyword">auto</span> output = buffer.data() + xstart * extract_length + ystart;</div>
 <div class="line"><a id="l00109" name="l00109"></a><span class="lineno">  109</span> </div>
-<div class="line"><a id="l00110" name="l00110"></a><span class="lineno">  110</span>            <span class="keywordflow">for</span> (Index_ x = xstart; x &lt; xend; ++x, ++in, output += extract_length) {</div>
+<div class="line"><a id="l00110" name="l00110"></a><span class="lineno">  110</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> x = xstart; x &lt; xend; ++x, ++in, output += extract_length) {</div>
 <div class="line"><a id="l00111" name="l00111"></a><span class="lineno">  111</span>                <span class="keyword">auto</span> in_copy = in;</div>
 <div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span>                <span class="keyword">auto</span> output_copy = output;</div>
 <div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span> </div>
-<div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span>                <span class="keywordflow">for</span> (Index_ y = ystart; y &lt; yend; ++y, in_copy += actual_dim, ++output_copy) {</div>
+<div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> y = ystart; y &lt; yend; ++y, in_copy += actual_dim, ++output_copy) {</div>
 <div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>                    *output_copy = *in_copy;</div>
 <div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span>                }</div>
 <div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span>            }</div>
@@ -286,7 +286,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00210" name="l00210"></a><span class="lineno">  210</span>                }</div>
 <div class="line"><a id="l00211" name="l00211"></a><span class="lineno">  211</span>            );</div>
 <div class="line"><a id="l00212" name="l00212"></a><span class="lineno">  212</span> </div>
-<div class="line"><a id="l00213" name="l00213"></a><span class="lineno">  213</span>            ptr = info.first-&gt;data() + extract_length * info.second;</div>
+<div class="line"><a id="l00213" name="l00213"></a><span class="lineno">  213</span>            ptr = info.first-&gt;data() + <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(extract_length) * <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(info.second); <span class="comment">// cast to size_t to avoid overflow</span></div>
 <div class="line"><a id="l00214" name="l00214"></a><span class="lineno">  214</span> </div>
 <div class="line"><a id="l00215" name="l00215"></a><span class="lineno">  215</span>        } <span class="keywordflow">else</span> {</div>
 <div class="line"><a id="l00216" name="l00216"></a><span class="lineno">  216</span>            <span class="keyword">auto</span> chunk = i / dim_stats.chunk_length;</div>
@@ -310,7 +310,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00234" name="l00234"></a><span class="lineno">  234</span>                }</div>
 <div class="line"><a id="l00235" name="l00235"></a><span class="lineno">  235</span>            );</div>
 <div class="line"><a id="l00236" name="l00236"></a><span class="lineno">  236</span> </div>
-<div class="line"><a id="l00237" name="l00237"></a><span class="lineno">  237</span>            ptr = info.data() + index * extract_length;</div>
+<div class="line"><a id="l00237" name="l00237"></a><span class="lineno">  237</span>            ptr = info.data() + <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(extract_length) * <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(index); <span class="comment">// cast to size_t to avoid overflow</span></div>
 <div class="line"><a id="l00238" name="l00238"></a><span class="lineno">  238</span>        }</div>
 <div class="line"><a id="l00239" name="l00239"></a><span class="lineno">  239</span> </div>
 <div class="line"><a id="l00240" name="l00240"></a><span class="lineno">  240</span>        std::copy_n(ptr, extract_length, buffer);</div>

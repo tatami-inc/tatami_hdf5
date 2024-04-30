@@ -154,7 +154,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span>    <span class="keyword">auto</span> dhandle = open_and_check_dataset&lt;false&gt;(fhandle, name);</div>
 <div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span> </div>
 <div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span>    <span class="keyword">auto</span> dims = get_array_dimensions&lt;2&gt;(dhandle, name);</div>
-<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>    ValueStorage_ values(dims[0] * dims[1]);</div>
+<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>    ValueStorage_ values(<span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(dims[0]) * <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(dims[1])); <span class="comment">// cast just in case hsize_t is something silly...</span></div>
 <div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span>    dhandle.read(values.data(), define_mem_type&lt;Stored&lt;ValueStorage_&gt; &gt;());</div>
 <div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span> </div>
 <div class="line"><a id="l00118" name="l00118"></a><span class="lineno">  118</span>    <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(transpose_) {</div>

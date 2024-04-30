@@ -242,7 +242,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00157" name="l00157"></a><span class="lineno">  157</span>            <span class="keywordflow">if</span> (elsize == 0) {</div>
 <div class="line"><a id="l00158" name="l00158"></a><span class="lineno">  158</span>                <span class="keywordflow">return</span> min_elements;</div>
 <div class="line"><a id="l00159" name="l00159"></a><span class="lineno">  159</span>            } <span class="keywordflow">else</span> {</div>
-<div class="line"><a id="l00160" name="l00160"></a><span class="lineno">  160</span>                <span class="keyword">auto</span> proposed = cache_size / elsize;</div>
+<div class="line"><a id="l00160" name="l00160"></a><span class="lineno">  160</span>                <span class="keywordtype">size_t</span> proposed = cache_size / elsize;</div>
 <div class="line"><a id="l00161" name="l00161"></a><span class="lineno">  161</span>                <span class="keywordflow">return</span> std::max(min_elements, proposed);</div>
 <div class="line"><a id="l00162" name="l00162"></a><span class="lineno">  162</span>            } </div>
 <div class="line"><a id="l00163" name="l00163"></a><span class="lineno">  163</span>        }()),</div>
@@ -547,12 +547,12 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00462" name="l00462"></a><span class="lineno">  462</span>                <span class="keywordflow">return</span> 1;</div>
 <div class="line"><a id="l00463" name="l00463"></a><span class="lineno">  463</span>            }</div>
 <div class="line"><a id="l00464" name="l00464"></a><span class="lineno">  464</span> </div>
-<div class="line"><a id="l00465" name="l00465"></a><span class="lineno">  465</span>            <span class="keyword">auto</span> elsize = size_of_cached_element&lt;CachedValue_, CachedIndex_&gt;(needs_value, needs_index);</div>
+<div class="line"><a id="l00465" name="l00465"></a><span class="lineno">  465</span>            <span class="keywordtype">size_t</span> elsize = size_of_cached_element&lt;CachedValue_, CachedIndex_&gt;(needs_value, needs_index);</div>
 <div class="line"><a id="l00466" name="l00466"></a><span class="lineno">  466</span>            <span class="keywordflow">if</span> (elsize == 0) {</div>
 <div class="line"><a id="l00467" name="l00467"></a><span class="lineno">  467</span>                <span class="keywordflow">return</span> 1;</div>
 <div class="line"><a id="l00468" name="l00468"></a><span class="lineno">  468</span>            }</div>
 <div class="line"><a id="l00469" name="l00469"></a><span class="lineno">  469</span> </div>
-<div class="line"><a id="l00470" name="l00470"></a><span class="lineno">  470</span>            <span class="keyword">auto</span> num_slabs = details.our_cache_size / (max_non_zeros * elsize);</div>
+<div class="line"><a id="l00470" name="l00470"></a><span class="lineno">  470</span>            <span class="keywordtype">size_t</span> num_slabs = (details.our_cache_size / max_non_zeros) / elsize;</div>
 <div class="line"><a id="l00471" name="l00471"></a><span class="lineno">  471</span>            <span class="keywordflow">if</span> (num_slabs == 0) {</div>
 <div class="line"><a id="l00472" name="l00472"></a><span class="lineno">  472</span>                <span class="keywordflow">return</span> 1;</div>
 <div class="line"><a id="l00473" name="l00473"></a><span class="lineno">  473</span>            }</div>
