@@ -111,7 +111,7 @@ public:
             // datasets and use the larger chunk size for both datasets.
             // Hopefully the chunks are not too big...
             hsize_t dchunk_length = 0;
-            hsize_t dchunk_element_size = 0;
+            size_t dchunk_element_size = 0;
             auto dparms = dhandle.getCreatePlist();
             if (dparms.getLayout() == H5D_CHUNKED) {
                 dparms.getChunk(1, &dchunk_length);
@@ -119,16 +119,26 @@ public:
             }
 
             hsize_t ichunk_length = 0;
-            hsize_t ichunk_element_size = 0;
+            size_t ichunk_element_size = 0;
             auto iparms = ihandle.getCreatePlist();
             if (iparms.getLayout() == H5D_CHUNKED) {
                 iparms.getChunk(1, &ichunk_length);
                 ichunk_element_size = ihandle.getDataType().getSize();
             }
 
+            auto non_overflow_double_min = [nonzeros](hsize_t chunk_length) -> size_t {
+                // Basically computes std::min(chunk_length * 2, nonzeros) without
+                // overflowing hsize_t, for a potentially silly choice of hsize_t...
+                if (chunk_length < nonzeros) {
+                    return nonzeros;
+                } else {
+                    return chunk_length + std::min(chunk_length, nonzeros - chunk_length);
+                }
+            };
+
             h5_chunk_cache_size = std::max(
-                std::min(ichunk_length * 2, nonzeros) * ichunk_element_size, 
-                std::min(dchunk_length * 2, nonzeros) * dchunk_element_size
+                non_overflow_double_min(ichunk_length) * ichunk_element_size, 
+                non_overflow_double_min(dchunk_length) * dchunk_element_size
             );
 
             // Checking the contents of the index pointers.

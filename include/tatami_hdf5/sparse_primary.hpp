@@ -157,7 +157,7 @@ public:
             if (elsize == 0) {
                 return min_elements;
             } else {
-                auto proposed = cache_size / elsize;
+                size_t proposed = cache_size / elsize;
                 return std::max(min_elements, proposed);
             } 
         }()),
@@ -462,12 +462,12 @@ public:
                 return 1;
             }
 
-            auto elsize = size_of_cached_element<CachedValue_, CachedIndex_>(needs_value, needs_index);
+            size_t elsize = size_of_cached_element<CachedValue_, CachedIndex_>(needs_value, needs_index);
             if (elsize == 0) {
                 return 1;
             }
 
-            auto num_slabs = details.our_cache_size / (max_non_zeros * elsize);
+            size_t num_slabs = details.our_cache_size / (max_non_zeros * elsize);
             if (num_slabs == 0) {
                 return 1;
             }

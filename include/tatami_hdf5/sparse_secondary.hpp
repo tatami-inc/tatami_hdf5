@@ -15,11 +15,6 @@ namespace tatami_hdf5 {
 
 namespace Hdf5CompressedSparseMatrix_internal {
 
-inline size_t multiply(size_t a, size_t b) {
-    // Use size_t to avoid overflow for pointers and such.
-    return a * b;
-}
-
 template<typename Index_, typename CachedValue_, typename Value_>
 tatami::SparseRange<Value_, Index_> slab_to_sparse(const tatami::SparseRange<CachedValue_, Index_>& slab, Value_* vbuffer, Index_* ibuffer) {
     tatami::SparseRange<Value_, Index_> output;
@@ -39,7 +34,7 @@ tatami::SparseRange<Value_, Index_> slab_to_sparse(const tatami::SparseRange<Cac
 }
 
 template<typename Index_, typename CachedValue_, typename Value_>
-void slab_to_dense(const tatami::SparseRange<CachedValue_, Index_>& slab, Value_* buffer, Index_ extract_length) {
+void slab_to_dense(const tatami::SparseRange<CachedValue_, Index_>& slab, Value_* buffer, size_t extract_length) {
     std::fill_n(buffer, extract_length, 0);
     auto valptr = slab.value;
     auto idxptr = slab.index;
@@ -96,18 +91,16 @@ public:
             details.secondary_dim,
             std::max(
                 static_cast<size_t>(1),
-                static_cast<size_t>(
-                    // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford. 
-                    (details.our_cache_size / Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true)) / extract_length
-                )
-            ) 
+                // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford. 
+                static_cast<size_t>(details.our_cache_size / (Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true) * extract_length))
+            )
         ),
         extract_length(extract_length),
         needs_value(needs_value),
         needs_index(needs_index)
     {
         cache_count.resize(sec_dim_stats.chunk_length);
-        size_t cache_size_in_elements = multiply(sec_dim_stats.chunk_length, extract_length);
+        size_t cache_size_in_elements = static_cast<size_t>(sec_dim_stats.chunk_length) * extract_length; // cast to avoid overflow.
         cache_index.resize(cache_size_in_elements);
         if (needs_value) {
             cache_data.resize(cache_size_in_elements);
@@ -124,7 +117,7 @@ public:
 private:
     const std::vector<hsize_t>& pointers;
     tatami_chunked::ChunkDimensionStats<Index_> sec_dim_stats;
-    Index_ extract_length;
+    size_t extract_length; // store as a size_t to avoid overflow in offset calculations.
     bool needs_value;
     bool needs_index;
 
@@ -156,7 +149,7 @@ private:
         }
 
         tatami::SparseRange<CachedValue_, Index_> output(cache_count[chunk_offset]);
-        size_t offset = multiply(chunk_offset, extract_length);
+        size_t offset = static_cast<size_t>(chunk_offset) * extract_length; // cast to avoid overflow.
         if (needs_value) {
             output.value = cache_data.data() + offset;
         }
@@ -260,7 +253,7 @@ public:
             )
         )
     {
-        size_t alloc = multiply(cache.get_max_slabs(), extract_length);
+        size_t alloc = static_cast<size_t>(cache.get_max_slabs()) * extract_length; // cast to avoid overflow.
         if (needs_index) {
             cache_index.resize(alloc);
         }
@@ -273,7 +266,7 @@ public:
 protected:
     const std::vector<hsize_t>& pointers;
     Index_ secondary_dim;
-    Index_ extract_length;
+    size_t extract_length; // store this as a size_t to avoid overflow when computing offsets.
     bool needs_value;
     bool needs_index;
 
@@ -308,7 +301,7 @@ private:
             }, 
             /* create = */ [&]() -> Slab {
                 Slab latest;
-                size_t offset = multiply(counter, extract_length);
+                size_t offset = counter * extract_length;
                 if (needs_value) {
                     latest.value = cache_data.data() + offset;
                 }

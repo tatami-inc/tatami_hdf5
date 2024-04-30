@@ -87,8 +87,8 @@ void extract_indices(Index_ cache_start, Index_ cache_length, const std::vector<
 
 // 'cache' is assumed to be row-major with 'actual_dim' columns and
 // 'extract_length' rows. On output, it will be column-major instead.
-template<typename CachedValue_, typename Index_>
-void transpose(std::vector<CachedValue_>& cache, std::vector<CachedValue_>& buffer, Index_ actual_dim, Index_ extract_length) {
+template<typename CachedValue_>
+void transpose(std::vector<CachedValue_>& cache, std::vector<CachedValue_>& buffer, size_t actual_dim, size_t extract_length) {
     if (actual_dim == 1 || extract_length == 1) {
         return;
     }
@@ -97,21 +97,21 @@ void transpose(std::vector<CachedValue_>& cache, std::vector<CachedValue_>& buff
 
     // Using a blockwise strategy to perform the transposition,
     // in order to be more cache-friendly.
-    constexpr Index_ block = 16;
-    for (Index_ xstart = 0; xstart < actual_dim; xstart += block) {
-        Index_ xend = xstart + std::min(block, actual_dim - xstart);
+    constexpr size_t block = 16;
+    for (size_t xstart = 0; xstart < actual_dim; xstart += block) {
+        size_t xend = xstart + std::min(block, actual_dim - xstart);
 
-        for (Index_ ystart = 0; ystart < extract_length; ystart += block) {
-            Index_ yend = ystart + std::min(block, extract_length - ystart);
+        for (size_t ystart = 0; ystart < extract_length; ystart += block) {
+            size_t yend = ystart + std::min(block, extract_length - ystart);
 
             auto in = cache.data() + xstart + ystart * actual_dim;
             auto output = buffer.data() + xstart * extract_length + ystart;
 
-            for (Index_ x = xstart; x < xend; ++x, ++in, output += extract_length) {
+            for (size_t x = xstart; x < xend; ++x, ++in, output += extract_length) {
                 auto in_copy = in;
                 auto output_copy = output;
 
-                for (Index_ y = ystart; y < yend; ++y, in_copy += actual_dim, ++output_copy) {
+                for (size_t y = ystart; y < yend; ++y, in_copy += actual_dim, ++output_copy) {
                     *output_copy = *in_copy;
                 }
             }
@@ -210,7 +210,7 @@ public:
                 }
             );
 
-            ptr = info.first->data() + extract_length * info.second;
+            ptr = info.first->data() + static_cast<size_t>(extract_length) * static_cast<size_t>(info.second); // cast to size_t to avoid overflow
 
         } else {
             auto chunk = i / dim_stats.chunk_length;
@@ -234,7 +234,7 @@ public:
                 }
             );
 
-            ptr = info.data() + index * extract_length;
+            ptr = info.data() + static_cast<size_t>(extract_length) * static_cast<size_t>(index); // cast to size_t to avoid overflow
         }
 
         std::copy_n(ptr, extract_length, buffer);
