@@ -121,14 +121,14 @@ TEST(LoadHDF5MatrixTest, Dense) {
 
     // Basic load as a row-major matrix. 
     {
-        auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int>(fpath, name);
+        auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int>(fpath, name, false);
         tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
         tatami_test::test_simple_row_access(&mat, &ref);
     }
 
     // Pretending it's a column-major matrix.
     {
-        auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int, std::vector<double>, true>(fpath, name);
+        auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int, std::vector<double> >(fpath, name, true);
         tatami::DenseColumnMatrix<double, int> ref(NC, NR, values);
         tatami_test::test_simple_column_access(&mat, &ref);
     }

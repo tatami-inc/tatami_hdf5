@@ -116,7 +116,11 @@ tatami::DenseMatrix<Value_, Index_, ValueStorage_> load_hdf5_dense_matrix(const 
     ValueStorage_ values(static_cast<size_t>(dims[0]) * static_cast<size_t>(dims[1])); // cast just in case hsize_t is something silly...
     dhandle.read(values.data(), define_mem_type<Stored<ValueStorage_> >());
 
-    return tatami::DenseMatrix<Value_, Index_, ValueStorage_>(dims[1], dims[0], std::move(values), !transpose);
+    if (transpose) {
+        return tatami::DenseMatrix<Value_, Index_, ValueStorage_>(dims[1], dims[0], std::move(values), false);
+    } else {
+        return tatami::DenseMatrix<Value_, Index_, ValueStorage_>(dims[0], dims[1], std::move(values), true);
+    }
 }
 
 /**
