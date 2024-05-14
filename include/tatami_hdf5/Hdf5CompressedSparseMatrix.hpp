@@ -185,14 +185,11 @@ public:
         return ncols;
     }
 
-    /**
-     * @return `true`.
-     */
-    bool sparse() const {
+    bool is_sparse() const {
         return true;
     }
 
-    double sparse_proportion() const { 
+    double is_sparse_proportion() const { 
         return 1;
     }
 
