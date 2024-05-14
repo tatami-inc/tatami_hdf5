@@ -48,8 +48,7 @@ TEST(LoadHDF5MatrixTest, Sparse) {
     // Basic load as a CSR matrix (as rows are the primary dimension in this simulation)
     {
         auto mat = tatami_hdf5::load_hdf5_compressed_sparse_matrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr");
-        tatami::CompressedSparseMatrix<
-            true, 
+        tatami::CompressedSparseRowMatrix<
             double, 
             int, 
             decltype(triplets.value), 
@@ -63,8 +62,7 @@ TEST(LoadHDF5MatrixTest, Sparse) {
     // Pretending it's a CSC matrix.
     {
         auto mat = tatami_hdf5::load_hdf5_compressed_sparse_matrix<false, double, int>(NC, NR, fpath, name + "/data", name + "/index", name + "/indptr");
-        tatami::CompressedSparseMatrix<
-            false, 
+        tatami::CompressedSparseColumnMatrix<
             double, 
             int, 
             decltype(triplets.value), 
@@ -91,8 +89,7 @@ TEST(LoadHDF5MatrixTest, Sparse) {
             x = std::trunc(x);
         }
 
-        tatami::CompressedSparseMatrix<
-            true, 
+        tatami::CompressedSparseRowMatrix<
             double, 
             int, 
             decltype(truncated), 
@@ -124,14 +121,14 @@ TEST(LoadHDF5MatrixTest, Dense) {
 
     // Basic load as a row-major matrix. 
     {
-        auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int>(fpath, name);
+        auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int>(fpath, name, false);
         tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
         tatami_test::test_simple_row_access(&mat, &ref);
     }
 
     // Pretending it's a column-major matrix.
     {
-        auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int, std::vector<double>, true>(fpath, name);
+        auto mat = tatami_hdf5::load_hdf5_dense_matrix<double, int, std::vector<double> >(fpath, name, true);
         tatami::DenseColumnMatrix<double, int> ref(NC, NR, values);
         tatami_test::test_simple_column_access(&mat, &ref);
     }
