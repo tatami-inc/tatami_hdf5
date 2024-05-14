@@ -247,10 +247,14 @@ public:
         needs_index(needs_index),
         cache(
             std::move(oracle),
-            std::max(
-                static_cast<size_t>(1),
-                static_cast<size_t>((details.our_cache_size / Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true)) / extract_length)
-            )
+            tatami_chunked::SlabCacheStats(
+                /* target_length = */ 1,
+                /* non_target_length = */ extract_length,
+                /* target_num_chunks = */ secondary_dim,
+                /* cache_size_in_bytes = */ details.our_cache_size,
+                /* element_size = */ Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true),
+                /* require_minimum_cache = */ true
+            ).num_slabs_in_cache
         )
     {
         size_t alloc = static_cast<size_t>(cache.get_max_slabs()) * extract_length; // cast to avoid overflow.
@@ -275,7 +279,7 @@ protected:
         Index_* index = NULL;
         Index_ number = 0;
     };
-    tatami_chunked::OracleSlabCache<Index_, Index_, Slab> cache;
+    tatami_chunked::OracularSlabCache<Index_, Index_, Slab> cache;
 
     // Contiguous data stores for the Slabs to point to. This avoids
     // the overhead of allocating a lot of little vectors.

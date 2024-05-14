@@ -136,7 +136,7 @@ public:
         });
     }
 
-    virtual ~Base() {
+    ~Base() {
         serialize([&]() -> void {
             h5comp.reset();
         });
@@ -626,8 +626,7 @@ public:
     }
 
     bool uses_oracle(bool) const {
-        // A non-zero cache is necessary (but not sufficient) for oracle usage.
-        return cache_size_in_elements > 0;
+        return true;
     }
 
     bool is_sparse() const {
@@ -646,32 +645,26 @@ private:
     template<bool oracle_, template<bool, bool, bool, typename, typename, typename> class Extractor_, typename ... Args_>
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, Args_&& ... args) const {
         if (row != transpose) {
-            const auto& chunk_stats = firstdim_stats;
-            auto other = seconddim_stats.dimension_extent;
-            tatami_chunked::SlabCacheStats slab_stats(chunk_stats.chunk_length, other, cache_size_in_elements, require_minimum_cache);
-
+            tatami_chunked::SlabCacheStats slab_stats(firstdim_stats.chunk_length, seconddim_stats.dimension_extent, firstdim_stats.num_chunks, cache_size_in_elements, require_minimum_cache);
             if (slab_stats.num_slabs_in_cache > 0) {
                 return std::make_unique<Extractor_<true, false, oracle_, Value_, Index_, CachedValue_> >(
-                    file_name, dataset_name, chunk_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
+                    file_name, dataset_name, firstdim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
                 );
             } else {
                 return std::make_unique<Extractor_<true, true, oracle_, Value_, Index_, CachedValue_> >(
-                    file_name, dataset_name, chunk_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
+                    file_name, dataset_name, firstdim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
                 );
             }
 
         } else {
-            const auto& chunk_stats = seconddim_stats;
-            auto other = firstdim_stats.dimension_extent;
-            tatami_chunked::SlabCacheStats slab_stats(chunk_stats.chunk_length, other, cache_size_in_elements, require_minimum_cache);
-
+            tatami_chunked::SlabCacheStats slab_stats(seconddim_stats.chunk_length, firstdim_stats.dimension_extent, seconddim_stats.num_chunks, cache_size_in_elements, require_minimum_cache);
             if (slab_stats.num_slabs_in_cache > 0) {
                 return std::make_unique<Extractor_<false, false, oracle_, Value_, Index_, CachedValue_> >(
-                    file_name, dataset_name, chunk_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
+                    file_name, dataset_name, seconddim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
                 );
             } else {
                 return std::make_unique<Extractor_<false, true, oracle_, Value_, Index_, CachedValue_> >(
-                    file_name, dataset_name, chunk_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
+                    file_name, dataset_name, seconddim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
                 );
             }
         }

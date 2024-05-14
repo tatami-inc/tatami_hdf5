@@ -94,19 +94,19 @@ protected:
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name);
 
-        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(
-            NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt
+        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int>(
+            NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt
         )); 
-        ref.reset(new tatami::CompressedSparseMatrix<true, double, int, decltype(triplets.value), decltype(triplets.index), decltype(triplets.ptr)>(
+        ref.reset(new tatami::CompressedSparseRowMatrix<double, int, decltype(triplets.value), decltype(triplets.index), decltype(triplets.ptr)>(
             NR, NC, triplets.value, triplets.index, triplets.ptr
         ));
 
         // Creating the transposed versions as well.
-        tmat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<false, double, int>(
-            NC, NR, fpath, name + "/data", name + "/index", name + "/indptr", hopt
+        tmat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int>(
+            NC, NR, fpath, name + "/data", name + "/index", name + "/indptr", false, hopt
         )); 
-        tref.reset(new tatami::CompressedSparseMatrix<false, double, int, decltype(triplets.value), decltype(triplets.index), decltype(triplets.ptr)>(
-            NC, NR, triplets.value, triplets.index, triplets.ptr
+        tref.reset(new tatami::CompressedSparseColumnMatrix<double, int, decltype(triplets.value), decltype(triplets.index), decltype(triplets.ptr)>(
+            NC, NR, triplets.value, triplets.index, triplets.ptr, false
         ));
     }
 };
@@ -418,19 +418,20 @@ protected:
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name);
 
-        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int, int, uint16_t>(
+        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int, int, uint16_t>(
             NR,
             NC,
             fpath, 
             name + "/data", 
             name + "/index", 
             name + "/indptr", 
+            true,
             hopt
         ));
 
         std::vector<int> vcasted(triplets.value.begin(), triplets.value.end());
         std::vector<uint16_t> icasted(triplets.index.begin(), triplets.index.end());
-        ref.reset(new tatami::CompressedSparseMatrix<true, double, int, decltype(vcasted), decltype(icasted), decltype(triplets.ptr)>(
+        ref.reset(new tatami::CompressedSparseRowMatrix<double, int, decltype(vcasted), decltype(icasted), decltype(triplets.ptr)>(
             NR,
             NC, 
             std::move(vcasted),
@@ -496,8 +497,8 @@ protected:
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name, /* chunk_size = */ 0);
 
-        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt));
-        ref.reset(new tatami::CompressedSparseMatrix<true, double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
+        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt));
+        ref.reset(new tatami::CompressedSparseRowMatrix<double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
     }
 };
 
@@ -571,8 +572,8 @@ protected:
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name);
 
-        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", hopt));
-        ref.reset(new tatami::CompressedSparseMatrix<true, double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
+        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt));
+        ref.reset(new tatami::CompressedSparseRowMatrix<double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
     }
 };
 
