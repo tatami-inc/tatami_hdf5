@@ -151,9 +151,9 @@ struct SoloBase : public Base {
     SoloBase(
         const std::string& file_name,
         const std::string& dataset_name, 
-        [[maybe_unused]] tatami_chunked::ChunkDimensionStats<Index_> primary_dim_stats, // only listed here for compatibility with the other constructors.
+        [[maybe_unused]] tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats, // only listed here for compatibility with the other constructors.
         tatami::MaybeOracle<oracle_, Index_> ora, 
-        [[maybe_unused]] Index_ secondary_length, 
+        [[maybe_unused]] Index_ non_target_length, 
         [[maybe_unused]] size_t slab_size,
         [[maybe_unused]] size_t max_slabs) :
         Base(file_name, dataset_name),
@@ -193,14 +193,14 @@ struct MyopicBase : public Base {
     MyopicBase(
         const std::string& file_name,
         const std::string& dataset_name, 
-        tatami_chunked::ChunkDimensionStats<Index_> primary_dim_stats,
+        tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats,
         [[maybe_unused]] tatami::MaybeOracle<false, Index_>, // for consistency with the oracular version.
-        Index_ secondary_length, 
+        Index_ non_target_length, 
         size_t slab_size,
         size_t max_slabs) :
         Base(file_name, dataset_name), 
-        dim_stats(std::move(primary_dim_stats)),
-        extract_length(secondary_length),
+        dim_stats(std::move(target_dim_stats)),
+        extract_length(non_target_length),
         factory(slab_size, max_slabs), 
         cache(max_slabs)
     {
@@ -278,19 +278,20 @@ struct OracularBase : public Base {
     OracularBase(
         const std::string& file_name,
         const std::string& dataset_name, 
-        tatami_chunked::ChunkDimensionStats<Index_> primary_dim_stats,
+        tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats,
         tatami::MaybeOracle<true, Index_> ora, 
-        Index_ secondary_length, 
+        Index_ non_target_length, 
         size_t slab_size,
         size_t max_slabs) :
         Base(file_name, dataset_name), 
-        dim_stats(std::move(primary_dim_stats)),
-        extract_length(secondary_length),
+        dim_stats(std::move(target_dim_stats)),
+        extract_length(non_target_length),
         factory(slab_size, max_slabs), 
         cache(std::move(ora), max_slabs)
     {
         if constexpr(!by_h5_row_) {
             transposition_buffer.resize(slab_size);
+            transposition_buffer_ptr = transposition_buffer.data();
             cache_transpose_info.reserve(max_slabs);
         }
     }
@@ -529,7 +530,7 @@ public:
         file_name(std::move(file)), 
         dataset_name(std::move(name)),
         transpose(transpose),
-        cache_size_in_elements(static_cast<double>(options.maximum_cache_size) / sizeof(CachedValue_)),
+        cache_size_in_elements(options.maximum_cache_size / sizeof(CachedValue_)),
         require_minimum_cache(options.require_minimum_cache)
     {
         serialize([&]() -> void {
@@ -643,9 +644,9 @@ public:
 
 private:
     template<bool oracle_, template<bool, bool, bool, typename, typename, typename> class Extractor_, typename ... Args_>
-    std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, Args_&& ... args) const {
+    std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate(bool row, Index_ non_target_length, tatami::MaybeOracle<oracle_, Index_> oracle, Args_&& ... args) const {
         if (row != transpose) {
-            tatami_chunked::SlabCacheStats slab_stats(firstdim_stats.chunk_length, seconddim_stats.dimension_extent, firstdim_stats.num_chunks, cache_size_in_elements, require_minimum_cache);
+            tatami_chunked::SlabCacheStats slab_stats(firstdim_stats.chunk_length, non_target_length, firstdim_stats.num_chunks, cache_size_in_elements, require_minimum_cache);
             if (slab_stats.num_slabs_in_cache > 0) {
                 return std::make_unique<Extractor_<true, false, oracle_, Value_, Index_, CachedValue_> >(
                     file_name, dataset_name, firstdim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
@@ -657,7 +658,7 @@ private:
             }
 
         } else {
-            tatami_chunked::SlabCacheStats slab_stats(seconddim_stats.chunk_length, firstdim_stats.dimension_extent, seconddim_stats.num_chunks, cache_size_in_elements, require_minimum_cache);
+            tatami_chunked::SlabCacheStats slab_stats(seconddim_stats.chunk_length, non_target_length, seconddim_stats.num_chunks, cache_size_in_elements, require_minimum_cache);
             if (slab_stats.num_slabs_in_cache > 0) {
                 return std::make_unique<Extractor_<false, false, oracle_, Value_, Index_, CachedValue_> >(
                     file_name, dataset_name, seconddim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
@@ -675,16 +676,17 @@ private:
      ********************/
 public:
     std::unique_ptr<tatami::MyopicDenseExtractor<Value_, Index_> > dense(bool row, const tatami::Options&) const {
-        Index_ secondary = (row ? ncol_internal() : nrow_internal());
-        return populate<false, Hdf5DenseMatrix_internal::Full>(row, false, secondary);
+        Index_ full_non_target = (row ? ncol_internal() : nrow_internal());
+        return populate<false, Hdf5DenseMatrix_internal::Full>(row, full_non_target, false, full_non_target);
     }
 
     std::unique_ptr<tatami::MyopicDenseExtractor<Value_, Index_> > dense(bool row, Index_ block_start, Index_ block_length, const tatami::Options&) const {
-        return populate<false, Hdf5DenseMatrix_internal::Block>(row, false, block_start, block_length);
+        return populate<false, Hdf5DenseMatrix_internal::Block>(row, block_length, false, block_start, block_length);
     }
 
     std::unique_ptr<tatami::MyopicDenseExtractor<Value_, Index_> > dense(bool row, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options&) const {
-        return populate<false, Hdf5DenseMatrix_internal::Index>(row, false, std::move(indices_ptr));
+        auto nidx = indices_ptr->size();
+        return populate<false, Hdf5DenseMatrix_internal::Index>(row, nidx, false, std::move(indices_ptr));
     }
 
     /*********************
@@ -692,8 +694,8 @@ public:
      *********************/
 public:
     std::unique_ptr<tatami::MyopicSparseExtractor<Value_, Index_> > sparse(bool row, const tatami::Options& opt) const {
-        Index_ secondary = (row ? ncol_internal() : nrow_internal());
-        return std::make_unique<tatami::FullSparsifiedWrapper<false, Value_, Index_> >(dense(row, opt), secondary, opt);
+        Index_ full_non_target = (row ? ncol_internal() : nrow_internal());
+        return std::make_unique<tatami::FullSparsifiedWrapper<false, Value_, Index_> >(dense(row, opt), full_non_target, opt);
     }
 
     std::unique_ptr<tatami::MyopicSparseExtractor<Value_, Index_> > sparse(bool row, Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
@@ -714,8 +716,8 @@ public:
         std::shared_ptr<const tatami::Oracle<Index_> > oracle,
         const tatami::Options&) 
     const {
-        Index_ secondary = (row ? ncol_internal() : nrow_internal());
-        return populate<true, Hdf5DenseMatrix_internal::Full>(row, std::move(oracle), secondary);
+        Index_ full_non_target = (row ? ncol_internal() : nrow_internal());
+        return populate<true, Hdf5DenseMatrix_internal::Full>(row, full_non_target, std::move(oracle), full_non_target);
     }
 
     std::unique_ptr<tatami::OracularDenseExtractor<Value_, Index_> > dense(
@@ -725,7 +727,7 @@ public:
         Index_ block_length, 
         const tatami::Options&) 
     const {
-        return populate<true, Hdf5DenseMatrix_internal::Block>(row, std::move(oracle), block_start, block_length);
+        return populate<true, Hdf5DenseMatrix_internal::Block>(row, block_length, std::move(oracle), block_start, block_length);
     }
 
     std::unique_ptr<tatami::OracularDenseExtractor<Value_, Index_> > dense(
@@ -734,7 +736,8 @@ public:
         tatami::VectorPtr<Index_> indices_ptr, 
         const tatami::Options&) 
     const {
-        return populate<true, Hdf5DenseMatrix_internal::Index>(row, std::move(oracle), std::move(indices_ptr));
+        auto nidx = indices_ptr->size();
+        return populate<true, Hdf5DenseMatrix_internal::Index>(row, nidx, std::move(oracle), std::move(indices_ptr));
     }
 
     /***********************
@@ -746,8 +749,8 @@ public:
         std::shared_ptr<const tatami::Oracle<Index_> > oracle, 
         const tatami::Options& opt) 
     const {
-        Index_ secondary = (row ? ncol_internal() : nrow_internal());
-        return std::make_unique<tatami::FullSparsifiedWrapper<true, Value_, Index_> >(dense(row, std::move(oracle), opt), secondary, opt);
+        Index_ full_non_target = (row ? ncol_internal() : nrow_internal());
+        return std::make_unique<tatami::FullSparsifiedWrapper<true, Value_, Index_> >(dense(row, std::move(oracle), opt), full_non_target, opt);
     }
 
     std::unique_ptr<tatami::OracularSparseExtractor<Value_, Index_> > sparse(

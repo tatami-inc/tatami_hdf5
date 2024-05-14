@@ -252,7 +252,7 @@ public:
                 /* non_target_length = */ extract_length,
                 /* target_num_chunks = */ secondary_dim,
                 /* cache_size_in_bytes = */ details.our_cache_size,
-                /* element_size = */ Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true),
+                /* element_size = */ size_of_cached_element<Index_, CachedValue_>(needs_value, true),
                 /* require_minimum_cache = */ true
             ).num_slabs_in_cache
         )
