@@ -49,7 +49,6 @@
   <compound kind="class">
     <name>tatami_hdf5::Hdf5CompressedSparseMatrix</name>
     <filename>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</filename>
-    <templarg>bool row_</templarg>
     <templarg>typename Value_</templarg>
     <templarg>typename Index_</templarg>
     <templarg>typename CachedValue_</templarg>
@@ -59,29 +58,15 @@
       <type></type>
       <name>Hdf5CompressedSparseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
-      <anchor>af8253455457ec3fdfcfb5be707d92c3e</anchor>
-      <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, const Hdf5Options &amp;options)</arglist>
+      <anchor>a7408dbf906962c45306da1741f1286c1</anchor>
+      <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, bool row, const Hdf5Options &amp;options)</arglist>
     </member>
     <member kind="function">
       <type></type>
       <name>Hdf5CompressedSparseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
-      <anchor>a49f8b44c00b690ade286e05407e1e52b</anchor>
-      <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr)</arglist>
-    </member>
-    <member kind="function">
-      <type>bool</type>
-      <name>sparse</name>
-      <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
-      <anchor>a7346b17999e5462c5b693367fd534837</anchor>
-      <arglist>() const</arglist>
-    </member>
-    <member kind="function">
-      <type>bool</type>
-      <name>prefer_rows</name>
-      <anchorfile>classtatami__hdf5_1_1Hdf5CompressedSparseMatrix.html</anchorfile>
-      <anchor>a388dff91348c274fb58bf09948c886a0</anchor>
-      <arglist>() const</arglist>
+      <anchor>a418b3cabe02dab5ec3826a735bf17192</anchor>
+      <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, bool row)</arglist>
     </member>
   </compound>
   <compound kind="class">
@@ -89,28 +74,27 @@
     <filename>classtatami__hdf5_1_1Hdf5DenseMatrix.html</filename>
     <templarg>typename Value_</templarg>
     <templarg>typename Index_</templarg>
-    <templarg>bool transpose_</templarg>
     <templarg>typename CachedValue_</templarg>
     <base>Matrix&lt; Value_, Index_ &gt;</base>
     <member kind="function">
       <type></type>
       <name>Hdf5DenseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5DenseMatrix.html</anchorfile>
-      <anchor>ad7615b97a6358cba07d061b29a85dfcf</anchor>
-      <arglist>(std::string file, std::string name, const Hdf5Options &amp;options)</arglist>
+      <anchor>a63b660d5981096d4494d0d4e1a17ba0f</anchor>
+      <arglist>(std::string file, std::string name, bool transpose, const Hdf5Options &amp;options)</arglist>
     </member>
     <member kind="function">
       <type></type>
       <name>Hdf5DenseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5DenseMatrix.html</anchorfile>
-      <anchor>ae57c4a2e0004c2bdb85b543ce06bc15a</anchor>
-      <arglist>(std::string file, std::string name)</arglist>
+      <anchor>a1c9b483244c13efe8a0c29a7192163f2</anchor>
+      <arglist>(std::string file, std::string name, bool transpose)</arglist>
     </member>
     <member kind="function">
       <type>bool</type>
       <name>prefer_rows</name>
       <anchorfile>classtatami__hdf5_1_1Hdf5DenseMatrix.html</anchorfile>
-      <anchor>a48c68747e848e3e3625f511d6383664e</anchor>
+      <anchor>aa870c1fa640bc83f1a88cd4291b61b7a</anchor>
       <arglist>() const</arglist>
     </member>
   </compound>
@@ -239,18 +223,18 @@
     <class kind="struct">tatami_hdf5::Hdf5Options</class>
     <class kind="struct">tatami_hdf5::WriteSparseMatrixToHdf5Parameters</class>
     <member kind="function">
-      <type>tatami::CompressedSparseMatrix&lt; row_, Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_ &gt;</type>
+      <type>tatami::CompressedSparseMatrix&lt; Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_ &gt;</type>
       <name>load_hdf5_compressed_sparse_matrix</name>
       <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>acf08ac352e8f0caa63483d0967ea88a3</anchor>
-      <arglist>(size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr)</arglist>
+      <anchor>af2d70be02eb01cff564fb8642e375c92</anchor>
+      <arglist>(size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr, bool row)</arglist>
     </member>
     <member kind="function">
-      <type>tatami::DenseMatrix&lt;!transpose_, Value_, Index_, ValueStorage_ &gt;</type>
+      <type>tatami::DenseMatrix&lt; Value_, Index_, ValueStorage_ &gt;</type>
       <name>load_hdf5_dense_matrix</name>
       <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>a9c60ce93385d89902f042f3c43fae5bb</anchor>
-      <arglist>(const std::string &amp;file, const std::string &amp;name)</arglist>
+      <anchor>af378dd184432fe61f8e1040b4066e597</anchor>
+      <arglist>(const std::string &amp;file, const std::string &amp;name, bool transpose)</arglist>
     </member>
     <member kind="function">
       <type>void</type>

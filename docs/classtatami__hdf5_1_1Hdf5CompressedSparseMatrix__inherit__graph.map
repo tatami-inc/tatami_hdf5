@@ -1,5 +1,5 @@
-<map id="tatami_hdf5::Hdf5CompressedSparseMatrix&lt; row_, Value_, Index_, CachedValue_, CachedIndex_ &gt;" name="tatami_hdf5::Hdf5CompressedSparseMatrix&lt; row_, Value_, Index_, CachedValue_, CachedIndex_ &gt;">
-<area shape="rect" id="Node000001" title="Compressed sparse matrix in a HDF5 file." alt="" coords="5,94,270,150"/>
-<area shape="rect" id="Node000002" href="/github/workspace/docs/tatami.tag$classtatami_1_1Matrix.html" title=" " alt="" coords="66,5,209,46"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="140,61,140,93,135,93,135,61"/>
+<map id="tatami_hdf5::Hdf5CompressedSparseMatrix&lt; Value_, Index_, CachedValue_, CachedIndex_ &gt;" name="tatami_hdf5::Hdf5CompressedSparseMatrix&lt; Value_, Index_, CachedValue_, CachedIndex_ &gt;">
+<area shape="rect" id="Node000001" title="Compressed sparse matrix in a HDF5 file." alt="" coords="5,94,225,150"/>
+<area shape="rect" id="Node000002" href="/github/workspace/docs/tatami.tag$classtatami_1_1Matrix.html" title=" " alt="" coords="44,5,186,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="118,61,118,93,112,93,112,61"/>
 </map>
