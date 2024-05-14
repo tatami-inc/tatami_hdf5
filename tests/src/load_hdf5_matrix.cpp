@@ -48,8 +48,7 @@ TEST(LoadHDF5MatrixTest, Sparse) {
     // Basic load as a CSR matrix (as rows are the primary dimension in this simulation)
     {
         auto mat = tatami_hdf5::load_hdf5_compressed_sparse_matrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr");
-        tatami::CompressedSparseMatrix<
-            true, 
+        tatami::CompressedSparseRowMatrix<
             double, 
             int, 
             decltype(triplets.value), 
@@ -63,8 +62,7 @@ TEST(LoadHDF5MatrixTest, Sparse) {
     // Pretending it's a CSC matrix.
     {
         auto mat = tatami_hdf5::load_hdf5_compressed_sparse_matrix<false, double, int>(NC, NR, fpath, name + "/data", name + "/index", name + "/indptr");
-        tatami::CompressedSparseMatrix<
-            false, 
+        tatami::CompressedSparseColumnMatrix<
             double, 
             int, 
             decltype(triplets.value), 
@@ -91,8 +89,7 @@ TEST(LoadHDF5MatrixTest, Sparse) {
             x = std::trunc(x);
         }
 
-        tatami::CompressedSparseMatrix<
-            true, 
+        tatami::CompressedSparseRowMatrix<
             double, 
             int, 
             decltype(truncated), 

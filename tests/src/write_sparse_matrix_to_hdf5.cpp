@@ -20,7 +20,7 @@ class WriteSparseMatrixToHdf5BasicTest : public ::testing::TestWithParam<int> {}
 TEST_P(WriteSparseMatrixToHdf5BasicTest, SparseColumn) {
     const size_t NR = 200, NC = 100;
     auto triplets = tatami_test::simulate_sparse_compressed<double>(NC, NR, 0.05, 0, 100);
-    tatami::CompressedSparseMatrix<false, double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
 
     tatami_hdf5::WriteSparseMatrixToHdf5Parameters param_core;
     param_core.num_threads = GetParam();
@@ -86,7 +86,7 @@ TEST_P(WriteSparseMatrixToHdf5BasicTest, SparseColumn) {
 TEST_P(WriteSparseMatrixToHdf5BasicTest, SparseRow) {
     const size_t NR = 200, NC = 100;
     auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.05, 0, 100);
-    tatami::CompressedSparseMatrix<true, double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    tatami::CompressedSparseRowMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
 
     tatami_hdf5::WriteSparseMatrixToHdf5Parameters param_core;
     param_core.num_threads = GetParam();
@@ -207,7 +207,7 @@ TEST_P(WriteSparseMatrixToHdf5UnsignedDataTypeTest, Check) {
             x *= 1000;
         }
     }
-    tatami::CompressedSparseMatrix<false, double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
 
     tatami_hdf5::WriteSparseMatrixToHdf5Parameters param_core;
     param_core.num_threads = nthreads;
@@ -297,7 +297,7 @@ TEST_P(WriteSparseMatrixToHdf5SignedDataTypeTest, Check) {
             x *= 1000;
         }
     }
-    tatami::CompressedSparseMatrix<false, double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
 
     // Dumping it.
     auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
@@ -363,7 +363,7 @@ TEST_P(WriteSparseMatrixToHdf5IndexTypeTest, Check) {
     }
 
     auto triplets = tatami_test::simulate_sparse_compressed<double>(NC, NR, 0.05, -100, 100);
-    tatami::CompressedSparseMatrix<false, double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
 
     // Dumping it.
     auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");

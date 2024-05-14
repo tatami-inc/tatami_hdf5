@@ -12,41 +12,6 @@
 #include <random>
 #include <algorithm>
 
-class TransposeDenseTest : public ::testing::TestWithParam<std::tuple<int, int> > {};
-
-TEST_P(TransposeDenseTest, Basic) {
-    auto params = GetParam();
-    auto NR = std::get<0>(params);
-    auto NC = std::get<1>(params);
-
-    auto values = tatami_test::simulate_dense_vector<double>(NR * NC, 0, 100, /* seed = */ NR * 10 + NC);
-    tatami::DenseRowMatrix<double, int> original(NR, NC, values);
-
-    std::vector<double> buffer(NR * NC);
-    tatami_hdf5::Hdf5DenseMatrix_internal::transpose(values, buffer, NC, NR);
-    tatami::DenseColumnMatrix<double, int> flipped(NR, NC, values);
-
-    auto oext = original.dense_row();
-    auto fext = flipped.dense_row();
-    for (int r = 0; r < NR; ++r) {
-        auto oout = tatami_test::fetch(oext.get(), r, NC);
-        auto fout = tatami_test::fetch(fext.get(), r, NC);
-        ASSERT_EQ(oout, fout);
-    }
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    Hdf5DenseMatrix,
-    TransposeDenseTest,
-    ::testing::Combine(
-        ::testing::Values(10, 20, 40, 80), // number of rows
-        ::testing::Values(10, 20, 40, 80)  // number of columns
-    )
-);
-
-/*************************************
- *************************************/
-
 class Hdf5DenseMatrixTestCore {
 public:
     static constexpr size_t NR = 200, NC = 100;
@@ -117,8 +82,8 @@ protected:
         opt.maximum_cache_size = sizeof(double) * cache_size;
         opt.require_minimum_cache = (cache_size > 0);
 
-        mat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int, false>(fpath, name, opt));
-        tmat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int, true>(fpath, name, opt));
+        mat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int>(fpath, name, false, opt));
+        tmat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int>(fpath, name, true, opt));
         return;
     }
 };
@@ -133,8 +98,8 @@ TEST_F(Hdf5DenseMatrixUtilsTest, Basic) {
         assemble(SimulationParameters(std::pair(10, 10), 10));
         EXPECT_EQ(mat->nrow(), NR);
         EXPECT_EQ(mat->ncol(), NC);
-        EXPECT_FALSE(mat->sparse());
-        EXPECT_EQ(mat->sparse_proportion(), 0);
+        EXPECT_FALSE(mat->is_sparse());
+        EXPECT_EQ(mat->is_sparse_proportion(), 0);
         EXPECT_TRUE(mat->prefer_rows());
         EXPECT_EQ(mat->prefer_rows_proportion(), 1);
 
@@ -282,8 +247,8 @@ class Hdf5DenseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<
 TEST_P(Hdf5DenseMatrixCacheTypeTest, CastToInt) {
     assemble(SimulationParameters(std::make_pair(9, 13), 1));
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int, false, int> mat(fpath, name);
-    auto altref = tatami::convert_to_dense<true, double, int, int>(ref.get());
+    tatami_hdf5::Hdf5DenseMatrix<double, int, int> mat(fpath, name, false);
+    auto altref = tatami::convert_to_dense<double, int, int>(ref.get(), true);
 
     tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
