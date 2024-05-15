@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['type_0',['Type',['https://tatami-inc.github.io/tatami/structtatami_1_1SomeNumericArray.html#a6e23ba528d0302095fd423e7777455bd',1,'tatami::SomeNumericArray']]]
+  ['writestoragelayout_0',['WriteStorageLayout',['../namespacetatami__hdf5.html#a6265ac39e6f87118435c505451caa604',1,'tatami_hdf5']]],
+  ['writestoragetype_1',['WriteStorageType',['../namespacetatami__hdf5.html#a6ae3b5a86584169d643af24097ea6cf5',1,'tatami_hdf5']]]
 ];

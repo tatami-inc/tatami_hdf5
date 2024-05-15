@@ -66,7 +66,7 @@ var searchData=
   ['matrix_2ehpp_63',['Matrix.hpp',['https://tatami-inc.github.io/tatami/Matrix_8hpp.html',1,'']]],
   ['matrix_3c_20value_5f_2c_20index_5f_20_3e_64',['Matrix&lt; Value_, Index_ &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
   ['matrix_3c_20valueout_5f_2c_20indexout_5f_20_3e_65',['Matrix&lt; ValueOut_, IndexOut_ &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html',1,'tatami']]],
-  ['maximum_5fcache_5fsize_66',['maximum_cache_size',['../structtatami__hdf5_1_1Hdf5Options.html#ad72096e3a430f73a05a6c2e7a6a5d3a3',1,'tatami_hdf5::Hdf5Options']]],
+  ['maximum_5fcache_5fsize_66',['maximum_cache_size',['../structtatami__hdf5_1_1DenseMatrixOptions.html#aad0d50678510fe9a6bcb5376dfdbf903',1,'tatami_hdf5::DenseMatrixOptions::maximum_cache_size'],['../structtatami__hdf5_1_1CompressedSparseMatrixOptions.html#a56d6478cda41ee0de98e28b71e012046',1,'tatami_hdf5::CompressedSparseMatrixOptions::maximum_cache_size']]],
   ['maybeoracle_67',['MaybeOracle',['https://tatami-inc.github.io/tatami/namespacetatami.html#aab9d426a238a93d02635b4172c725808',1,'tatami']]],
   ['mock_5fhelpers_2ehpp_68',['mock_helpers.hpp',['https://tatami-inc.github.io/tatami/unary_2mock__helpers_8hpp.html',1,'(Global Namespace)'],['https://tatami-inc.github.io/tatami/binary_2mock__helpers_8hpp.html',1,'(Global Namespace)']]],
   ['myopicdenseextractor_69',['MyopicDenseExtractor',['https://tatami-inc.github.io/tatami/structtatami_1_1MyopicDenseExtractor.html',1,'tatami']]],

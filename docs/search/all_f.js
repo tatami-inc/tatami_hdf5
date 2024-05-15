@@ -14,7 +14,5 @@ var searchData=
   ['sparseextractor_11',['SparseExtractor',['https://tatami-inc.github.io/tatami/namespacetatami.html#a9a542a16a6a2c2c1efdc7b6e9eae9040',1,'tatami']]],
   ['sparserange_12',['sparserange',['https://tatami-inc.github.io/tatami/structtatami_1_1SparseRange.html#af2711e7bdfa4cd93da0255b1d8c95e7a',1,'tatami::SparseRange::SparseRange(Index n, const Value *v=NULL, const Index *i=NULL)'],['https://tatami-inc.github.io/tatami/structtatami_1_1SparseRange.html#a469d0435e9a8da9818dbd7cbc122faf9',1,'tatami::SparseRange::SparseRange()'],['https://tatami-inc.github.io/tatami/structtatami_1_1SparseRange.html',1,'tatami::SparseRange&lt; typename Value, typename Index &gt;']]],
   ['sparserange_2ehpp_13',['SparseRange.hpp',['https://tatami-inc.github.io/tatami/SparseRange_8hpp.html',1,'']]],
-  ['sparsifiedwrapper_2ehpp_14',['SparsifiedWrapper.hpp',['https://tatami-inc.github.io/tatami/SparsifiedWrapper_8hpp.html',1,'']]],
-  ['storagelayout_15',['StorageLayout',['../structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html#ac90ad45811fb4d93ef54a32f023a5f36',1,'tatami_hdf5::WriteSparseMatrixToHdf5Parameters']]],
-  ['storagetype_16',['StorageType',['../structtatami__hdf5_1_1WriteSparseMatrixToHdf5Parameters.html#aab612e11d67a1447772ea32f42a2291a',1,'tatami_hdf5::WriteSparseMatrixToHdf5Parameters']]]
+  ['sparsifiedwrapper_2ehpp_14',['SparsifiedWrapper.hpp',['https://tatami-inc.github.io/tatami/SparsifiedWrapper_8hpp.html',1,'']]]
 ];
