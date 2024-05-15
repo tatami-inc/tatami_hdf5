@@ -3,7 +3,7 @@
 
 #include "H5Cpp.h"
 #include "tatami/tatami.hpp"
-#include "tatami_hdf5/Hdf5CompressedSparseMatrix.hpp"
+#include "tatami_hdf5/CompressedSparseMatrix.hpp"
 
 #include "tatami_test/tatami_test.hpp"
 #include "tatami_test/temp_file_path.hpp"
@@ -47,16 +47,16 @@ static void dump_to_file(const tatami_test::CompressedSparseDetails<double>& tri
     }
 }
 
-static tatami_hdf5::Hdf5Options create_options(size_t NR, size_t NC, double cache_fraction) {
+static tatami_hdf5::Options create_options(size_t NR, size_t NC, double cache_fraction) {
     // We limit the cache size to ensure that chunk management is not trivial.
     size_t actual_cache_size = static_cast<double>(NR * NC) * cache_fraction * static_cast<double>(sizeof(double) + sizeof(int));
-    tatami_hdf5::Hdf5Options hopt;
+    tatami_hdf5::Options hopt;
     hopt.maximum_cache_size = actual_cache_size;
     hopt.require_minimum_cache = actual_cache_size > 0;
     return hopt;
 }
 
-class Hdf5SparseMatrixTestCore {
+class SparseMatrixTestCore {
 public:
     typedef std::tuple<double> SimulationParameters;
 
@@ -94,7 +94,7 @@ protected:
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name);
 
-        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int>(
+        mat.reset(new tatami_hdf5::CompressedSparseMatrix<double, int>(
             NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt
         )); 
         ref.reset(new tatami::CompressedSparseRowMatrix<double, int, decltype(triplets.value), decltype(triplets.index), decltype(triplets.ptr)>(
@@ -102,7 +102,7 @@ protected:
         ));
 
         // Creating the transposed versions as well.
-        tmat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int>(
+        tmat.reset(new tatami_hdf5::CompressedSparseMatrix<double, int>(
             NC, NR, fpath, name + "/data", name + "/index", name + "/indptr", false, hopt
         )); 
         tref.reset(new tatami::CompressedSparseColumnMatrix<double, int, decltype(triplets.value), decltype(triplets.index), decltype(triplets.ptr)>(
@@ -114,13 +114,13 @@ protected:
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixUtilsTest : public ::testing::Test, public Hdf5SparseMatrixTestCore {
+class SparseMatrixUtilsTest : public ::testing::Test, public SparseMatrixTestCore {
     void SetUp() {
         assemble({ {200, 100}, { 0.1 } });
     }
 };
 
-TEST_F(Hdf5SparseMatrixUtilsTest, Basic) {
+TEST_F(SparseMatrixUtilsTest, Basic) {
     auto dimensions = std::get<0>(last_params);
     size_t NR = dimensions.first;
     size_t NC = dimensions.second;
@@ -143,12 +143,12 @@ TEST_F(Hdf5SparseMatrixUtilsTest, Basic) {
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixFullAccessTest : 
-    public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters> >, 
-    public Hdf5SparseMatrixTestCore
+class SparseMatrixFullAccessTest : 
+    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters> >, 
+    public SparseMatrixTestCore
 {};
 
-TEST_P(Hdf5SparseMatrixFullAccessTest, Primary) {
+TEST_P(SparseMatrixFullAccessTest, Primary) {
     auto param = GetParam(); 
     assemble({ {200, 100}, std::get<0>(param) });
     auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
@@ -160,7 +160,7 @@ TEST_P(Hdf5SparseMatrixFullAccessTest, Primary) {
     }
 }
 
-TEST_P(Hdf5SparseMatrixFullAccessTest, Secondary) {
+TEST_P(SparseMatrixFullAccessTest, Secondary) {
     auto param = GetParam(); 
     assemble({ {50, 40}, std::get<0>(param) }); // smaller for the secondary dimension.
     auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
@@ -173,10 +173,10 @@ TEST_P(Hdf5SparseMatrixFullAccessTest, Secondary) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5SparseMatrix,
-    Hdf5SparseMatrixFullAccessTest,
+    SparseMatrix,
+    SparseMatrixFullAccessTest,
     ::testing::Combine(
-        Hdf5SparseMatrixTestCore::create_combinations(),
+        SparseMatrixTestCore::create_combinations(),
         tatami_test::standard_test_access_parameter_combinations()
     )
 );
@@ -184,12 +184,12 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixBlockAccessTest : 
-    public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, double> > >, 
-    public Hdf5SparseMatrixTestCore
+class SparseMatrixBlockAccessTest : 
+    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, double> > >, 
+    public SparseMatrixTestCore
 {};
 
-TEST_P(Hdf5SparseMatrixBlockAccessTest, Primary) {
+TEST_P(SparseMatrixBlockAccessTest, Primary) {
     auto param = GetParam(); 
     assemble({ {128, 256}, std::get<0>(param) });
     auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
@@ -204,7 +204,7 @@ TEST_P(Hdf5SparseMatrixBlockAccessTest, Primary) {
     }
 }
 
-TEST_P(Hdf5SparseMatrixBlockAccessTest, Secondary) {
+TEST_P(SparseMatrixBlockAccessTest, Secondary) {
     auto param = GetParam(); 
     assemble({ {30, 50}, std::get<0>(param) }); // smaller for the secondary dimension.
     auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
@@ -220,10 +220,10 @@ TEST_P(Hdf5SparseMatrixBlockAccessTest, Secondary) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5SparseMatrix,
-    Hdf5SparseMatrixBlockAccessTest,
+    SparseMatrix,
+    SparseMatrixBlockAccessTest,
     ::testing::Combine(
-        Hdf5SparseMatrixTestCore::create_combinations(),
+        SparseMatrixTestCore::create_combinations(),
         tatami_test::standard_test_access_parameter_combinations(),
         ::testing::Values(
             std::make_pair(0.0, 0.333), 
@@ -236,12 +236,12 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixIndexedAccessTest :
-    public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, int> > >, 
-    public Hdf5SparseMatrixTestCore
+class SparseMatrixIndexedAccessTest :
+    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, int> > >, 
+    public SparseMatrixTestCore
 {};
 
-TEST_P(Hdf5SparseMatrixIndexedAccessTest, Primary) {
+TEST_P(SparseMatrixIndexedAccessTest, Primary) {
     auto param = GetParam(); 
     assemble({ {197, 125}, std::get<0>(param) });
     auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
@@ -256,7 +256,7 @@ TEST_P(Hdf5SparseMatrixIndexedAccessTest, Primary) {
     }
 }
 
-TEST_P(Hdf5SparseMatrixIndexedAccessTest, Secondary) {
+TEST_P(SparseMatrixIndexedAccessTest, Secondary) {
     auto param = GetParam(); 
     assemble({ {35, 40}, std::get<0>(param) }); // much smaller for the secondary dimension.
     auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
@@ -272,10 +272,10 @@ TEST_P(Hdf5SparseMatrixIndexedAccessTest, Secondary) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5SparseMatrix,
-    Hdf5SparseMatrixIndexedAccessTest,
+    SparseMatrix,
+    SparseMatrixIndexedAccessTest,
     ::testing::Combine(
-        Hdf5SparseMatrixTestCore::create_combinations(),
+        SparseMatrixTestCore::create_combinations(),
         tatami_test::standard_test_access_parameter_combinations(),
         ::testing::Values(
             std::make_pair(0.3, 5), 
@@ -288,9 +288,9 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixReusePrimaryCacheTest : 
+class SparseMatrixReusePrimaryCacheTest : 
     public ::testing::TestWithParam<std::tuple<double, int, int> >, 
-    public Hdf5SparseMatrixTestCore 
+    public SparseMatrixTestCore 
 {
 protected:
     std::vector<int> predictions;
@@ -322,7 +322,7 @@ protected:
     }
 };
 
-TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, FullExtent) {
+TEST_P(SparseMatrixReusePrimaryCacheTest, FullExtent) {
     auto rwork = ref->dense_row();
     auto mwork = mat->dense_row();
     auto mwork2 = mat->dense_row(std::make_unique<tatami::FixedViewOracle<int> >(predictions.data(), predictions.size()));
@@ -337,7 +337,7 @@ TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, FullExtent) {
     }
 }
 
-TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, Block) {
+TEST_P(SparseMatrixReusePrimaryCacheTest, Block) {
     auto full = ref->ncol();
     auto cstart = full * 0.25, clen = full * 0.5;
 
@@ -354,7 +354,7 @@ TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, Block) {
     }
 }
 
-TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, Indexed) {
+TEST_P(SparseMatrixReusePrimaryCacheTest, Indexed) {
     auto full = ref->ncol();
     std::vector<int> chosen;
     for (int i = 10; i < full; i += 7) {
@@ -376,8 +376,8 @@ TEST_P(Hdf5SparseMatrixReusePrimaryCacheTest, Indexed) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5SparseMatrix,
-    Hdf5SparseMatrixReusePrimaryCacheTest,
+    SparseMatrix,
+    SparseMatrixReusePrimaryCacheTest,
     ::testing::Combine(
         ::testing::Values(0, 0.01, 0.1), // cache fraction
         ::testing::Values(1, 3), // jump between intervals
@@ -388,7 +388,7 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
+class SparseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
 protected:
     inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat;
 
@@ -418,7 +418,7 @@ protected:
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name);
 
-        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int, int, uint16_t>(
+        mat.reset(new tatami_hdf5::CompressedSparseMatrix<double, int, int, uint16_t>(
             NR,
             NC,
             fpath, 
@@ -441,7 +441,7 @@ protected:
     }
 };
 
-TEST_P(Hdf5SparseMatrixCacheTypeTest, CastToInt) {
+TEST_P(SparseMatrixCacheTypeTest, CastToInt) {
     tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
     params.use_row = std::get<1>(tparam);
@@ -455,8 +455,8 @@ TEST_P(Hdf5SparseMatrixCacheTypeTest, CastToInt) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5SparseMatrix,
-    Hdf5SparseMatrixCacheTypeTest,
+    SparseMatrix,
+    SparseMatrixCacheTypeTest,
     ::testing::Combine(
         ::testing::Values(0, 0.01, 0.1), // cache fraction
         ::testing::Values(true, false), // row access
@@ -467,7 +467,7 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixUncompressedTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
+class SparseMatrixUncompressedTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
 protected:
     inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat;
 
@@ -497,12 +497,12 @@ protected:
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name, /* chunk_size = */ 0);
 
-        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt));
+        mat.reset(new tatami_hdf5::CompressedSparseMatrix<double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt));
         ref.reset(new tatami::CompressedSparseRowMatrix<double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
     }
 };
 
-TEST_P(Hdf5SparseMatrixUncompressedTest, Basic) {
+TEST_P(SparseMatrixUncompressedTest, Basic) {
     tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
     params.use_row = std::get<1>(tparam);
@@ -516,8 +516,8 @@ TEST_P(Hdf5SparseMatrixUncompressedTest, Basic) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5SparseMatrix,
-    Hdf5SparseMatrixUncompressedTest,
+    SparseMatrix,
+    SparseMatrixUncompressedTest,
     ::testing::Combine(
         ::testing::Values(0, 0.01, 0.1), // cache fraction
         ::testing::Values(true, false), // row access
@@ -528,7 +528,7 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixNearEmptyTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
+class SparseMatrixNearEmptyTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
 protected:
     inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat;
 
@@ -572,12 +572,12 @@ protected:
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name);
 
-        mat.reset(new tatami_hdf5::Hdf5CompressedSparseMatrix<double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt));
+        mat.reset(new tatami_hdf5::CompressedSparseMatrix<double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt));
         ref.reset(new tatami::CompressedSparseRowMatrix<double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
     }
 };
 
-TEST_P(Hdf5SparseMatrixNearEmptyTest, Basic) {
+TEST_P(SparseMatrixNearEmptyTest, Basic) {
     tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
     params.use_row = std::get<1>(tparam);
@@ -591,8 +591,8 @@ TEST_P(Hdf5SparseMatrixNearEmptyTest, Basic) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5SparseMatrix,
-    Hdf5SparseMatrixNearEmptyTest,
+    SparseMatrix,
+    SparseMatrixNearEmptyTest,
     ::testing::Combine(
         ::testing::Values(0, 0.01, 0.1), // cache fraction
         ::testing::Values(true, false), // row access
@@ -603,9 +603,9 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5SparseMatrixParallelTest : 
-    public ::testing::TestWithParam<std::tuple<Hdf5SparseMatrixTestCore::SimulationParameters, bool, bool> >, 
-    public Hdf5SparseMatrixTestCore 
+class SparseMatrixParallelTest : 
+    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, bool, bool> >, 
+    public SparseMatrixTestCore 
 {
 protected:
     void SetUp() {
@@ -649,7 +649,7 @@ protected:
     }
 };
 
-TEST_P(Hdf5SparseMatrixParallelTest, Simple) {
+TEST_P(SparseMatrixParallelTest, Simple) {
     auto param = GetParam();
     bool row = std::get<1>(param);
     bool oracle = std::get<2>(param);
@@ -664,10 +664,10 @@ TEST_P(Hdf5SparseMatrixParallelTest, Simple) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5SparseMatrix,
-    Hdf5SparseMatrixParallelTest,
+    SparseMatrix,
+    SparseMatrixParallelTest,
     ::testing::Combine(
-        Hdf5SparseMatrixTestCore::create_combinations(),
+        SparseMatrixTestCore::create_combinations(),
         ::testing::Values(true, false), // row access
         ::testing::Values(true, false)  // oracle usage
     )

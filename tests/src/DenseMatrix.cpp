@@ -3,7 +3,7 @@
 
 #include "H5Cpp.h"
 #include "tatami/tatami.hpp"
-#include "tatami_hdf5/Hdf5DenseMatrix.hpp"
+#include "tatami_hdf5/DenseMatrix.hpp"
 
 #include "tatami_test/tatami_test.hpp"
 #include "tatami_test/temp_file_path.hpp"
@@ -12,7 +12,7 @@
 #include <random>
 #include <algorithm>
 
-class Hdf5DenseMatrixTestCore {
+class DenseMatrixTestCore {
 public:
     static constexpr size_t NR = 200, NC = 100;
 
@@ -78,12 +78,12 @@ protected:
         ref.reset(new tatami::DenseRowMatrix<double, int>(NR, NC, std::move(values)));
         tref.reset(new tatami::DelayedTranspose<double, int>(ref));
 
-        tatami_hdf5::Hdf5Options opt;
+        tatami_hdf5::Options opt;
         opt.maximum_cache_size = sizeof(double) * cache_size;
         opt.require_minimum_cache = (cache_size > 0);
 
-        mat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int>(fpath, name, false, opt));
-        tmat.reset(new tatami_hdf5::Hdf5DenseMatrix<double, int>(fpath, name, true, opt));
+        mat.reset(new tatami_hdf5::DenseMatrix<double, int>(fpath, name, false, opt));
+        tmat.reset(new tatami_hdf5::DenseMatrix<double, int>(fpath, name, true, opt));
         return;
     }
 };
@@ -91,9 +91,9 @@ protected:
 /*************************************
  *************************************/
 
-class Hdf5DenseMatrixUtilsTest : public ::testing::Test, public Hdf5DenseMatrixTestCore {};
+class DenseMatrixUtilsTest : public ::testing::Test, public DenseMatrixTestCore {};
 
-TEST_F(Hdf5DenseMatrixUtilsTest, Basic) {
+TEST_F(DenseMatrixUtilsTest, Basic) {
     {
         assemble(SimulationParameters(std::pair(10, 10), 10));
         EXPECT_EQ(mat->nrow(), NR);
@@ -127,26 +127,26 @@ TEST_F(Hdf5DenseMatrixUtilsTest, Basic) {
 /*************************************
  *************************************/
 
-class Hdf5DenseMatrixAccessFullTest :
-    public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters> >,
-    public Hdf5DenseMatrixTestCore {
+class DenseMatrixAccessFullTest :
+    public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters> >,
+    public DenseMatrixTestCore {
 protected:
     void SetUp() {
         assemble(std::get<0>(GetParam()));
     }
 };
 
-TEST_P(Hdf5DenseMatrixAccessFullTest, Basic) {
+TEST_P(DenseMatrixAccessFullTest, Basic) {
     auto params = tatami_test::convert_access_parameters(std::get<1>(GetParam()));
     tatami_test::test_full_access(params, mat.get(), ref.get());
     tatami_test::test_full_access(params, tmat.get(), tref.get());
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5DenseMatrix,
-    Hdf5DenseMatrixAccessFullTest,
+    DenseMatrix,
+    DenseMatrixAccessFullTest,
     ::testing::Combine(
-        Hdf5DenseMatrixTestCore::create_combinations(), 
+        DenseMatrixTestCore::create_combinations(), 
         tatami_test::standard_test_access_parameter_combinations()
     )
 );
@@ -154,16 +154,16 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5DenseSlicedTest : 
-    public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, double> > >,
-    public Hdf5DenseMatrixTestCore {
+class DenseSlicedTest : 
+    public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, double> > >,
+    public DenseMatrixTestCore {
 protected:
     void SetUp() {
         assemble(std::get<0>(GetParam()));
     }
 };
 
-TEST_P(Hdf5DenseSlicedTest, Basic) {
+TEST_P(DenseSlicedTest, Basic) {
     auto tparam = GetParam();
     auto params = tatami_test::convert_access_parameters(std::get<1>(tparam));
     auto block = std::get<2>(tparam);
@@ -182,10 +182,10 @@ TEST_P(Hdf5DenseSlicedTest, Basic) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5DenseMatrix,
-    Hdf5DenseSlicedTest,
+    DenseMatrix,
+    DenseSlicedTest,
     ::testing::Combine(
-        Hdf5DenseMatrixTestCore::create_combinations(), 
+        DenseMatrixTestCore::create_combinations(), 
         tatami_test::standard_test_access_parameter_combinations(),
         ::testing::Values(
             std::make_pair(0.0, 0.5), 
@@ -198,16 +198,16 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5DenseIndexedTest : 
-    public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, int> > >,
-    public Hdf5DenseMatrixTestCore {
+class DenseIndexedTest : 
+    public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, int> > >,
+    public DenseMatrixTestCore {
 protected:
     void SetUp() {
         assemble(std::get<0>(GetParam()));
     }
 };
   
-TEST_P(Hdf5DenseIndexedTest, Basic) {
+TEST_P(DenseIndexedTest, Basic) {
     auto tparam = GetParam();
     auto params = tatami_test::convert_access_parameters(std::get<1>(tparam));
     auto index = std::get<2>(tparam);
@@ -226,10 +226,10 @@ TEST_P(Hdf5DenseIndexedTest, Basic) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5DenseMatrix,
-    Hdf5DenseIndexedTest,
+    DenseMatrix,
+    DenseIndexedTest,
     ::testing::Combine(
-        Hdf5DenseMatrixTestCore::create_combinations(), 
+        DenseMatrixTestCore::create_combinations(), 
         tatami_test::standard_test_access_parameter_combinations(),
         ::testing::Values(
             std::make_pair(0.3, 5), 
@@ -242,12 +242,12 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5DenseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> >, public Hdf5DenseMatrixTestCore {};
+class DenseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> >, public DenseMatrixTestCore {};
 
-TEST_P(Hdf5DenseMatrixCacheTypeTest, CastToInt) {
+TEST_P(DenseMatrixCacheTypeTest, CastToInt) {
     assemble(SimulationParameters(std::make_pair(9, 13), 1));
 
-    tatami_hdf5::Hdf5DenseMatrix<double, int, int> mat(fpath, name, false);
+    tatami_hdf5::DenseMatrix<double, int, int> mat(fpath, name, false);
     auto altref = tatami::convert_to_dense<double, int, int>(ref.get(), true);
 
     tatami_test::TestAccessParameters params;
@@ -261,8 +261,8 @@ TEST_P(Hdf5DenseMatrixCacheTypeTest, CastToInt) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5DenseMatrix,
-    Hdf5DenseMatrixCacheTypeTest,
+    DenseMatrix,
+    DenseMatrixCacheTypeTest,
     ::testing::Combine(
         ::testing::Values(true, false), // row access
         ::testing::Values(true, false)  // oracle usage
@@ -272,7 +272,7 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class Hdf5DenseMatrixParallelTest : public ::testing::TestWithParam<std::tuple<Hdf5DenseMatrixTestCore::SimulationParameters, bool, bool> >, public Hdf5DenseMatrixTestCore {
+class DenseMatrixParallelTest : public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, bool, bool> >, public DenseMatrixTestCore {
 protected:
     void SetUp() {
         assemble(std::get<0>(GetParam()));
@@ -314,7 +314,7 @@ protected:
     }
 };
 
-TEST_P(Hdf5DenseMatrixParallelTest, Simple) {
+TEST_P(DenseMatrixParallelTest, Simple) {
     auto param = GetParam();
     bool row = std::get<1>(param);
     bool oracle = std::get<2>(param);
@@ -329,10 +329,10 @@ TEST_P(Hdf5DenseMatrixParallelTest, Simple) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Hdf5DenseMatrix,
-    Hdf5DenseMatrixParallelTest,
+    DenseMatrix,
+    DenseMatrixParallelTest,
     ::testing::Combine(
-        Hdf5DenseMatrixTestCore::create_combinations(),
+        DenseMatrixTestCore::create_combinations(),
         ::testing::Values(true, false), // row access
         ::testing::Values(true, false)  // oracle usage
     )
