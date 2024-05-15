@@ -9,7 +9,7 @@
 #include "utils.hpp"
 
 /**
- * @file load_sparse_matrix.hpp
+ * @file load_compressed_sparse_matrix.hpp
  *
  * @brief Load a HDF5 group into a sparse in-memory matrix.
  */
@@ -39,7 +39,7 @@ namespace tatami_hdf5 {
  * If false, the matrix is assumed to be stored in compressed sparse column format.
  *
  * @return Pointer to a `tatami::CompressedSparseMatrix` containing all values and indices in memory.
- * This differs from a `tatami_hdf5::ompressedSparseMatrix`, where the loading of data is deferred until requested.
+ * This differs from a `tatami_hdf5::CompressedSparseMatrix`, where the loading of data is deferred until requested.
  */
 template<typename Value_, typename Index_, class ValueStorage_ = std::vector<Value_>, class IndexStorage_ = std::vector<Index_>, class PointerStorage_ = std::vector<size_t> >
 std::shared_ptr<tatami::Matrix<Value_, Index_> > load_hdf5_compressed_sparse_matrix(
@@ -57,14 +57,14 @@ std::shared_ptr<tatami::Matrix<Value_, Index_> > load_hdf5_compressed_sparse_mat
     const size_t nonzeros = get_array_dimensions<1>(dhandle, "vals")[0];
 
     ValueStorage_ x(nonzeros);
-    dhandle.read(x.data(), define_mem_type<Stored<ValueStorage_> >());
+    dhandle.read(x.data(), define_mem_type<tatami::ElementType<ValueStorage_> >());
     
     auto ihandle = open_and_check_dataset<true>(file_handle, idx);
     if (get_array_dimensions<1>(ihandle, "idx")[0] != nonzeros) {
         throw std::runtime_error("number of non-zero elements is not consistent between 'data' and 'idx'");
     }
     IndexStorage_ i(nonzeros);
-    ihandle.read(i.data(), define_mem_type<Stored<IndexStorage_> >());
+    ihandle.read(i.data(), define_mem_type<tatami::ElementType<IndexStorage_> >());
 
     auto phandle = open_and_check_dataset<true>(file_handle, ptr);
     const size_t ptr_size = get_array_dimensions<1>(phandle, "ptr")[0];
@@ -74,7 +74,7 @@ std::shared_ptr<tatami::Matrix<Value_, Index_> > load_hdf5_compressed_sparse_mat
 
     // Because HDF5 doesn't have a native type for size_t.
     PointerStorage_ p(ptr_size);
-    if constexpr(std::is_same<size_t, Stored<PointerStorage_> >::value) {
+    if constexpr(std::is_same<size_t, tatami::ElementType<PointerStorage_> >::value) {
         if constexpr(std::is_same<size_t, hsize_t>::value) {
             phandle.read(p.data(), H5::PredType::NATIVE_HSIZE);
         } else {
@@ -83,7 +83,7 @@ std::shared_ptr<tatami::Matrix<Value_, Index_> > load_hdf5_compressed_sparse_mat
             std::copy(p0.begin(), p0.end(), p.begin());
         }
     } else {
-        phandle.read(p.data(), define_mem_type<Stored<PointerStorage_> >());
+        phandle.read(p.data(), define_mem_type<tatami::ElementType<PointerStorage_> >());
     }
 
     return std::make_shared<tatami::CompressedSparseMatrix<Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_> >(nr, nc, std::move(x), std::move(i), std::move(p), row);

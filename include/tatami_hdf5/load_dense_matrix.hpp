@@ -32,7 +32,7 @@ namespace tatami_hdf5 {
  * where preserving the data layout between memory and disk is more efficient (see, e.g., the **rhdf5** Bioconductor package).
  *
  * @return Pointer to a `tatami::DenseMatrix` where all values are in memory.
- * This differs from a `tatami_chunked::DenseMatrix`, where the loading of data is deferred until requested.
+ * This differs from a `tatami_hdf5::DenseMatrix`, where the loading of data is deferred until requested.
  */
 template<typename Value_, typename Index_, class ValueStorage_ = std::vector<Value_> >
 std::shared_ptr<tatami::Matrix<Value_, Index_, ValueStorage_> > load_dense_matrix(const std::string& file, const std::string& name, bool transpose) {
@@ -41,7 +41,7 @@ std::shared_ptr<tatami::Matrix<Value_, Index_, ValueStorage_> > load_dense_matri
 
     auto dims = get_array_dimensions<2>(dhandle, name);
     ValueStorage_ values(static_cast<size_t>(dims[0]) * static_cast<size_t>(dims[1])); // cast just in case hsize_t is something silly...
-    dhandle.read(values.data(), define_mem_type<Stored<ValueStorage_> >());
+    dhandle.read(values.data(), define_mem_type<tatami::ElementType<ValueStorage_> >());
 
     if (transpose) {
         return std::make_shared<tatami::DenseMatrix<Value_, Index_, ValueStorage_> >(dims[1], dims[0], std::move(values), false);

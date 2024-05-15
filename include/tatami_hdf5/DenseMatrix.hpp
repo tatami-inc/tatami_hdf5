@@ -584,7 +584,7 @@ public:
     }
 
     /**
-     * Overload that uses the defaults for `Hdf5Options`.
+     * Overload that uses the default `DenseMatrixOptions`.
      * @param file Path to the file.
      * @param name Path to the dataset inside the file.
      * @param transpose Whether the dataset is transposed in its storage order.

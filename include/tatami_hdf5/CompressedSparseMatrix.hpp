@@ -180,7 +180,7 @@ public:
     }
 
     /**
-     * Overload that uses the defaults for `Hdf5Options`.
+     * Overload that uses the default `CompressedSparseMatrixOptions`.
      * @param nr Number of rows in the matrix.
      * @param nc Number of columns in the matrix.
      * @param file Path to the file.
