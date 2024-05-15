@@ -52,7 +52,7 @@ struct CompressedSparseMatrixOptions {
  *
  * Callers should follow the `prefer_rows()` suggestion when extracting data,
  * as this tries to minimize the number of chunks that need to be read per access request.
- * This recommendation is even stronger than for the `Hdf5DenseMatrix`,
+ * This recommendation is even stronger than for the `DenseMatrix`,
  * as the access pattern on disk for the non-preferred dimension is very suboptimal.
  *
  * As the HDF5 library is not generally thread-safe, the HDF5-related operations should only be run in a single thread.

@@ -19,34 +19,40 @@ or in an _ad hoc_ compressed sparse format with a 1-dimensional dataset for each
 #include "tatami_hdf5/tatami_hdf5.hpp"
 
 // Dense HDF5 datasets.
-tatami_hdf5::Hdf5DenseMatrix<double, int> dense_mat("some_file.h5", "dataset_name");
+tatami_hdf5::DenseMatrix<double, int> dense_mat(
+    "some_file.h5",
+    "dataset_name", 
+    /* transposed = */ false
+);
 
 // Compressed sparse data stored in an ad hoc group.
-tatami_hdf5::Hdf5CompressedSparseMatrix<false, double, int> sparse_mat(
+tatami_hdf5::CompressedSparseMatrix<double, int> sparse_mat(
     nrow,
     ncol,
     "some_file.h5", 
     "group_name/data",
     "group_name/index",
-    "group_name/ptrs"
+    "group_name/ptrs",
+    /* csr = */ true
 );
 ```
 
 In cases where performance is more important than memory consumption, we also provide some utilities to quickly create in-memory **tatami** matrices from their HDF5 representations:
 
 ```cpp
-auto dense_mat_mem = tatami_hdf5::load_hdf5_dense_matrix<double, int>(
+auto dense_mat_mem = tatami_hdf5::load_dense_matrix<double, int>(
     "some_file.h5", 
     "dataset_name"
 );
 
-auto sparse_mat_mem = tatami_hdf5::load_hdf5_compressed_sparse_matrix<false, double>(
+auto sparse_mat_mem = tatami_hdf5::load_compressed_sparse_matrix<double, int>(
     nrow,
     ncol,
     "some_file.h5", 
     "group_name/data",
     "group_name/index",
-    "group_name/ptrs"
+    "group_name/ptrs",
+    /* csr = */ true
 );
 ```
 
@@ -55,7 +61,7 @@ We can also write a **tatami** sparse matrix into a HDF5 file:
 ```cpp
 H5::H5File fhandle("some_file2.h5", H5F_ACC_TRUNC);
 auto ghandle = fhandle.createGroup("group_name");
-tatami_hdf5::write_sparse_matrix_to_hdf5(&sparse_mat_mem, ghandle); 
+tatami_hdf5::write_compressed_sparse_matrix(&sparse_mat_mem, ghandle); 
 ```
 
 Check out the [reference documentation](https://tatami-inc.github.io/tatami_hdf5) for more details.
