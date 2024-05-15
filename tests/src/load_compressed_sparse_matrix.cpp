@@ -47,7 +47,7 @@ TEST(LoadCompressedSparseMatrixTest, Basic) {
 
     // Basic load as a CSR matrix (as rows are the primary dimension in this simulation)
     {
-        auto mat = tatami_hdf5::load_compressed_sparse_matrix<true, double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr");
+        auto mat = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true);
         tatami::CompressedSparseRowMatrix<
             double, 
             int, 
@@ -61,7 +61,7 @@ TEST(LoadCompressedSparseMatrixTest, Basic) {
 
     // Pretending it's a CSC matrix.
     {
-        auto mat = tatami_hdf5::load_compressed_sparse_matrix<false, double, int>(NC, NR, fpath, name + "/data", name + "/index", name + "/indptr");
+        auto mat = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NC, NR, fpath, name + "/data", name + "/index", name + "/indptr", false);
         tatami::CompressedSparseColumnMatrix<
             double, 
             int, 
@@ -76,13 +76,12 @@ TEST(LoadCompressedSparseMatrixTest, Basic) {
     // Trying a variety of storage types.
     {
         auto mat = tatami_hdf5::load_compressed_sparse_matrix<
-            true, 
             double, 
             int,
             std::vector<uint16_t>,
             std::vector<uint32_t>,
             std::vector<uint64_t>
-        >(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr");
+        >(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true);
 
         std::vector<double> truncated = triplets.value;
         for (auto& x : truncated) {

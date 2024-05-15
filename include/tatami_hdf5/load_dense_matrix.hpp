@@ -35,7 +35,7 @@ namespace tatami_hdf5 {
  * This differs from a `tatami_hdf5::DenseMatrix`, where the loading of data is deferred until requested.
  */
 template<typename Value_, typename Index_, class ValueStorage_ = std::vector<Value_> >
-std::shared_ptr<tatami::Matrix<Value_, Index_, ValueStorage_> > load_dense_matrix(const std::string& file, const std::string& name, bool transpose) {
+std::shared_ptr<tatami::Matrix<Value_, Index_> > load_dense_matrix(const std::string& file, const std::string& name, bool transpose) {
     H5::H5File fhandle(file, H5F_ACC_RDONLY);
     auto dhandle = open_and_check_dataset<false>(fhandle, name);
 

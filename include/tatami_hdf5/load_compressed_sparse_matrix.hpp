@@ -42,7 +42,7 @@ namespace tatami_hdf5 {
  * This differs from a `tatami_hdf5::CompressedSparseMatrix`, where the loading of data is deferred until requested.
  */
 template<typename Value_, typename Index_, class ValueStorage_ = std::vector<Value_>, class IndexStorage_ = std::vector<Index_>, class PointerStorage_ = std::vector<size_t> >
-std::shared_ptr<tatami::Matrix<Value_, Index_> > load_hdf5_compressed_sparse_matrix(
+std::shared_ptr<tatami::Matrix<Value_, Index_> > load_compressed_sparse_matrix(
     size_t nr, 
     size_t nc, 
     const std::string& file, 

@@ -47,12 +47,11 @@ static void dump_to_file(const tatami_test::CompressedSparseDetails<double>& tri
     }
 }
 
-static tatami_hdf5::Options create_options(size_t NR, size_t NC, double cache_fraction) {
+static tatami_hdf5::CompressedSparseMatrixOptions create_options(size_t NR, size_t NC, double cache_fraction) {
     // We limit the cache size to ensure that chunk management is not trivial.
     size_t actual_cache_size = static_cast<double>(NR * NC) * cache_fraction * static_cast<double>(sizeof(double) + sizeof(int));
-    tatami_hdf5::Options hopt;
+    tatami_hdf5::CompressedSparseMatrixOptions hopt;
     hopt.maximum_cache_size = actual_cache_size;
-    hopt.require_minimum_cache = actual_cache_size > 0;
     return hopt;
 }
 

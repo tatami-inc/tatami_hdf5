@@ -14,7 +14,7 @@
 
 namespace tatami_hdf5 {
 
-namespace Hdf5CompressedSparseMatrix_internal {
+namespace CompressedSparseMatrix_internal {
 
 template<typename Index_, typename CachedValue_, typename Value_>
 tatami::SparseRange<Value_, Index_> slab_to_sparse(const tatami::SparseRange<CachedValue_, Index_>& slab, Value_* vbuffer, Index_* ibuffer) {
@@ -53,7 +53,7 @@ struct SecondaryBase {
 
             // Using some kinda-big prime number as the number of slots. This
             // doesn't really matter too much as we only intend to store two
-            // chunks at most - see Hdf5CompressedSparseMatrix.hpp for the rationale.
+            // chunks at most - see CompressedSparseMatrix.hpp for the rationale.
             H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
             fapl.setCache(0, 511, details.h5_chunk_cache_size, 0);
 
@@ -93,7 +93,7 @@ public:
             std::max(
                 static_cast<size_t>(1),
                 // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford. 
-                static_cast<size_t>(details.our_cache_size / (Hdf5CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true) * extract_length))
+                static_cast<size_t>(details.our_cache_size / (CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true) * extract_length))
             )
         ),
         extract_length(extract_length),

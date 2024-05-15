@@ -44,7 +44,7 @@ TEST(LoadDenseMatrixTest, Basic) {
 
     // Trying a different storage type.
     {
-        auto mat = tatami_hdf5::load_dense_matrix<double, int, std::vector<int32_t> >(fpath, name);
+        auto mat = tatami_hdf5::load_dense_matrix<double, int, std::vector<int32_t> >(fpath, name, false);
 
         std::vector<double> truncated = values;
         for (auto& x : truncated) {

@@ -78,7 +78,7 @@ protected:
         ref.reset(new tatami::DenseRowMatrix<double, int>(NR, NC, std::move(values)));
         tref.reset(new tatami::DelayedTranspose<double, int>(ref));
 
-        tatami_hdf5::Options opt;
+        tatami_hdf5::DenseMatrixOptions opt;
         opt.maximum_cache_size = sizeof(double) * cache_size;
         opt.require_minimum_cache = (cache_size > 0);
 
