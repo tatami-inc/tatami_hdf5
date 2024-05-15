@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
+#include <type_traits>
 
 #include "tatami/tatami.hpp"
 #include "tatami_chunked/tatami_chunked.hpp"
@@ -13,7 +14,7 @@
 
 namespace tatami_hdf5 {
 
-namespace Hdf5CompressedSparseMatrix_internal {
+namespace CompressedSparseMatrix_internal {
 
 /***************************
  **** General utitities ****
@@ -206,7 +207,7 @@ public:
 
             // Using some kinda-big prime number as the number of slots. This
             // doesn't really matter too much as we only intend to store two
-            // chunks at most - see Hdf5CompressedSparseMatrix.hpp for the rationale.
+            // chunks at most - see CompressedSparseMatrix.hpp for the rationale.
             H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
             fapl.setCache(0, 511, details.h5_chunk_cache_size, 0);
 

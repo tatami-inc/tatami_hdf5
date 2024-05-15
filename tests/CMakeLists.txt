@@ -24,10 +24,11 @@ include(GoogleTest)
 macro(create_h5test target)
     add_executable(
         ${target} 
-        src/load_hdf5_matrix.cpp
-        src/write_sparse_matrix_to_hdf5.cpp
-        src/Hdf5DenseMatrix.cpp
-        src/Hdf5CompressedSparseMatrix.cpp
+        src/load_dense_matrix.cpp
+        src/load_compressed_sparse_matrix.cpp
+        src/write_compressed_sparse_matrix.cpp
+        src/DenseMatrix.cpp
+        src/CompressedSparseMatrix.cpp
     )
     target_compile_definitions(${target} PRIVATE DEBUG=1)
 
