@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <type_traits>
 
 #include "tatami/tatami.hpp"
 #include "tatami_chunked/tatami_chunked.hpp"

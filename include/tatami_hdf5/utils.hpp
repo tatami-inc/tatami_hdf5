@@ -19,37 +19,18 @@
 namespace tatami_hdf5 {
 
 /**
- * @brief Options for HDF5 extraction.
+ * Layout to use when saving the matrix inside the HDF5 group.
  */
-struct Hdf5Options {
-    /**
-     * Size of the in-memory cache in bytes.
-     *
-     * We cache all chunks required to read a row/column during a `tatami::DenseExtractor::fetch()` or `tatami::SparseExtractor::fetch()` call.
-     * This allows us to re-use the cached chunks when adjacent rows/columns are requested, rather than re-reading them from disk.
-     *
-     * Larger caches improve access speed at the cost of memory usage.
-     * Small values may be ignored if `require_minimum_cache` is `true`.
-     */
-    size_t maximum_cache_size = 100000000;
+enum class WriteStorageLayout { AUTOMATIC, COLUMN, ROW };
 
-    /**
-     * Whether to automatically enforce a minimum size for the cache, regardless of `maximum_cache_size`.
-     * This minimum is chosen to ensure that all chunks overlapping one row (or a slice/subset thereof) can be retained in memory,
-     * so that the same chunks are not repeatedly re-read from disk when iterating over consecutive rows/columns of the matrix.
-     *
-     * Note that this option is only relevant used for `Hdf5DenseMatrix` caching.
-     * The cache memory usage for compressed sparse matrices is less predictable, so we always require a minimal cache size in that case.
-     */
-    bool require_minimum_cache = true;
-};
+/**
+ * Numeric type for writing data into a HDF5 dataset.
+ */
+enum class WriteStorageType { AUTOMATIC, INT8, UINT8, INT16, UINT16, INT32, UINT32, DOUBLE };
 
 /**
  * @cond
  */
-template<class Storage_>
-using Stored = typename std::remove_reference<decltype(std::declval<Storage_>()[0])>::type;
-
 template<typename T>
 const H5::PredType& define_mem_type() {
     if constexpr(std::is_same<int, T>::value) {

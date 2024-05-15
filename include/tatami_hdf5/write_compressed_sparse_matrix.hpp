@@ -13,20 +13,20 @@
 #include <limits>
 
 /**
- * @file write_sparse_matrix_to_hdf5.hpp
- * @brief Write a sparse matrix into a HDF5 file.
+ * @file write_compressed_sparse_matrix.hpp
+ * @brief Write a compressed sparse matrix into a HDF5 file.
  */
 
 namespace tatami_hdf5 {
 
 /**
- * @brief Parameters for `write_sparse_matrix_to_hdf5()`.
+ * @brief Parameters for `write_compressed_sparse_matrix()`.
  */
-struct WriteSparseMatrixToHdf5Parameters {
+struct WriteCompressedSparseMatrixOptions {
     /**
      * @cond
      */
-    WriteSparseMatrixToHdf5Parameters() : data_name("data"), index_name("indices"), ptr_name("indptr") {}
+    WriteCompressedSparseMatrixOptions() : data_name("data"), index_name("indices"), ptr_name("indptr") {}
     /**
      * @endcond
      */
@@ -50,26 +50,16 @@ struct WriteSparseMatrixToHdf5Parameters {
     std::string ptr_name;
 
     /**
-     * Layout to use for saving the matrix inside the HDF5 group.
-     */
-    enum class StorageLayout { AUTOMATIC, COLUMN, ROW };
-
-    /**
      * Whether to save in the compressed sparse column layout.
      * If `false`, this is determined from the layout of the input matrix.
      */
-    StorageLayout columnar = StorageLayout::AUTOMATIC;
-
-    /**
-     * Numeric type for storage inside a HDF5 dataset.
-     */
-    enum class StorageType { AUTOMATIC, INT8, UINT8, INT16, UINT16, INT32, UINT32, DOUBLE };
+    WriteStorageLayout columnar = WriteStorageLayout::AUTOMATIC;
 
     /**
      * Storage type for the data values.
      * If `AUTOMATIC`, it is automatically determined from the range and integralness of the data in the input matrix.
      */
-    StorageType data_type = StorageType::AUTOMATIC;
+    WriteStorageType data_type = WriteStorageType::AUTOMATIC;
 
     /**
      * Whether to force non-integer floating point values into an integer storage mode.
@@ -83,7 +73,7 @@ struct WriteSparseMatrixToHdf5Parameters {
      * Storage type for the data values.
      * If `AUTOMATIC`, it is automatically determined from the range of the indices in the input matrix.
      */
-    StorageType index_type = StorageType::AUTOMATIC;
+    WriteStorageType index_type = WriteStorageType::AUTOMATIC;
 
     /**
      * Compression level.
@@ -122,28 +112,28 @@ inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, const 
     return location.createDataSet(name, dtype, dspace, plist);
 }
 
-inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteSparseMatrixToHdf5Parameters::StorageType type, const std::string& name, hsize_t length, int deflate_level, hsize_t chunk) {
+inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteStorageType type, const std::string& name, hsize_t length, int deflate_level, hsize_t chunk) {
     const H5::PredType* dtype;
     switch (type) {
-        case WriteSparseMatrixToHdf5Parameters::StorageType::INT8:
+        case WriteStorageType::INT8:
             dtype = &(H5::PredType::NATIVE_INT8);
             break;
-        case WriteSparseMatrixToHdf5Parameters::StorageType::UINT8:
+        case WriteStorageType::UINT8:
             dtype = &(H5::PredType::NATIVE_UINT8);
             break;
-        case WriteSparseMatrixToHdf5Parameters::StorageType::INT16:
+        case WriteStorageType::INT16:
             dtype = &(H5::PredType::NATIVE_INT16);
             break;
-        case WriteSparseMatrixToHdf5Parameters::StorageType::UINT16:
+        case WriteStorageType::UINT16:
             dtype = &(H5::PredType::NATIVE_UINT16);
             break;
-        case WriteSparseMatrixToHdf5Parameters::StorageType::INT32:
+        case WriteStorageType::INT32:
             dtype = &(H5::PredType::NATIVE_INT32);
             break;
-        case WriteSparseMatrixToHdf5Parameters::StorageType::UINT32:
+        case WriteStorageType::UINT32:
             dtype = &(H5::PredType::NATIVE_UINT32);
             break;
-        case WriteSparseMatrixToHdf5Parameters::StorageType::DOUBLE:
+        case WriteStorageType::DOUBLE:
             dtype = &(H5::PredType::NATIVE_DOUBLE);
             break;
         default:
@@ -315,35 +305,35 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
  * @param params Parameters to use when writing the matrix.
  */
 template<typename Value_, typename Index_>
-void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::Group& location, const WriteSparseMatrixToHdf5Parameters& params) {
+void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>* mat, H5::Group& location, const WriteCompressedSparseMatrixOptions& params) {
     auto data_type = params.data_type;
     auto index_type = params.index_type;
-    auto use_auto_data_type = (data_type == WriteSparseMatrixToHdf5Parameters::StorageType::AUTOMATIC);
-    auto use_auto_index_type = (index_type == WriteSparseMatrixToHdf5Parameters::StorageType::AUTOMATIC);
+    auto use_auto_data_type = (data_type == WriteStorageType::AUTOMATIC);
+    auto use_auto_index_type = (index_type == WriteStorageType::AUTOMATIC);
     auto stats = write_sparse_hdf5_statistics(mat, use_auto_data_type, use_auto_index_type, params.num_threads);
 
     // Choosing the types.
     if (use_auto_data_type) {
         if (stats.non_integer && !params.force_integer) {
-            data_type = WriteSparseMatrixToHdf5Parameters::StorageType::DOUBLE;
+            data_type = WriteStorageType::DOUBLE;
         } else {
             auto lower_data = stats.lower_data;
             auto upper_data = stats.upper_data;
             if (lower_data < 0) {
                 if (fits_lower_limit<int8_t>(lower_data) && fits_upper_limit<int8_t>(upper_data)) {
-                    data_type = WriteSparseMatrixToHdf5Parameters::StorageType::INT8;
+                    data_type = WriteStorageType::INT8;
                 } else if (fits_lower_limit<int16_t>(lower_data) && fits_upper_limit<int16_t>(upper_data)) {
-                    data_type = WriteSparseMatrixToHdf5Parameters::StorageType::INT16;
+                    data_type = WriteStorageType::INT16;
                 } else {
-                    data_type = WriteSparseMatrixToHdf5Parameters::StorageType::INT32;
+                    data_type = WriteStorageType::INT32;
                 }
             } else {
                 if (fits_upper_limit<uint8_t>(upper_data)) {
-                    data_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT8;
+                    data_type = WriteStorageType::UINT8;
                 } else if (fits_upper_limit<uint16_t>(upper_data)) {
-                    data_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT16;
+                    data_type = WriteStorageType::UINT16;
                 } else {
-                    data_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT32;
+                    data_type = WriteStorageType::UINT32;
                 }
             }
         }
@@ -352,21 +342,21 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::
     if (use_auto_index_type) {
         auto upper_index = stats.upper_index;
         if (fits_upper_limit<uint8_t>(upper_index)) {
-            index_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT8;
+            index_type = WriteStorageType::UINT8;
         } else if (fits_upper_limit<uint16_t>(upper_index)) {
-            index_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT16;
+            index_type = WriteStorageType::UINT16;
         } else {
-            index_type = WriteSparseMatrixToHdf5Parameters::StorageType::UINT32;
+            index_type = WriteStorageType::UINT32;
         }
     }
 
     // Choosing the layout.
     auto layout = params.columnar;
-    if (layout == WriteSparseMatrixToHdf5Parameters::StorageLayout::AUTOMATIC) {
+    if (layout == WriteStorageLayout::AUTOMATIC) {
         if (mat->prefer_rows()) {
-            layout = WriteSparseMatrixToHdf5Parameters::StorageLayout::ROW;
+            layout = WriteStorageLayout::ROW;
         } else {
-            layout = WriteSparseMatrixToHdf5Parameters::StorageLayout::COLUMN;
+            layout = WriteStorageLayout::COLUMN;
         }
     }
 
@@ -394,7 +384,7 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::
     };
 
     if (mat->sparse()) {
-        if (layout == WriteSparseMatrixToHdf5Parameters::StorageLayout::ROW) {
+        if (layout == WriteStorageLayout::ROW) {
             ptrs.resize(NR + 1);
             std::vector<Value_> xbuffer(NC);
             std::vector<Index_> ibuffer(NC);
@@ -437,7 +427,7 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::
             return count;
         };
 
-        if (layout == WriteSparseMatrixToHdf5Parameters::StorageLayout::ROW) {
+        if (layout == WriteStorageLayout::ROW) {
             ptrs.resize(NR + 1);
             std::vector<Value_> dbuffer(NC);
             auto wrk = tatami::consecutive_extractor<false>(mat, true, static_cast<Index_>(0), static_cast<Index_>(NR));
@@ -480,9 +470,9 @@ void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::
  * @param location Handle to a HDF5 group in which to write the matrix contents.
  */
 template<typename Value_, typename Index_>
-void write_sparse_matrix_to_hdf5(const tatami::Matrix<Value_, Index_>* mat, H5::Group& location) {
-    WriteSparseMatrixToHdf5Parameters params;
-    write_sparse_matrix_to_hdf5(mat, location, params);
+void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>* mat, H5::Group& location) {
+    WriteCompressedSparseMatrixOptions params;
+    write_compressed_sparse_matrix(mat, location, params);
     return;
 }
 

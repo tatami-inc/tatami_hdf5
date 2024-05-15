@@ -12,9 +12,10 @@
  */
 namespace tatami_hdf5 {}
 
-#include "Hdf5CompressedSparseMatrix.hpp"
-#include "Hdf5DenseMatrix.hpp"
-#include "load_hdf5_matrix.hpp"
-#include "write_sparse_matrix_to_hdf5.hpp"
+#include "CompressedSparseMatrix.hpp"
+#include "DenseMatrix.hpp"
+#include "load_dense_matrix.hpp"
+#include "load_compressed_sparse_matrix.hpp"
+#include "write_compressed_sparse_matrix.hpp"
 
 #endif
