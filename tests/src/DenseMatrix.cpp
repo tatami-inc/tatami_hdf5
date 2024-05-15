@@ -16,7 +16,7 @@ class DenseMatrixTestCore {
 public:
     static constexpr size_t NR = 200, NC = 100;
 
-    typedef std::tuple<std::pair<int, int>, int> SimulationParameters;
+    typedef std::tuple<std::pair<int, int>, double> SimulationParameters;
 
     inline static SimulationParameters last_params;
 
@@ -31,7 +31,7 @@ public:
                 std::make_pair(11, 11),
                 std::make_pair(0, 0)
             ),
-            ::testing::Values(0, 1, 1000, 10000) // cache size, in elements.
+            ::testing::Values(0, 0.01, 0.1) // cache fraction multiplier
         );
     }
 
@@ -47,7 +47,7 @@ protected:
         last_params = params;
 
         auto chunk_sizes = std::get<0>(params);
-        auto cache_size = std::get<1>(params);
+        auto cache_fraction = std::get<1>(params);
 
         fpath = tatami_test::temp_file_path("tatami-dense-test.h5");
         tatami_test::remove_file_path(fpath);
@@ -72,15 +72,15 @@ protected:
 
         name = "stuff";
         auto dhandle = fhandle.createDataSet(name, dtype, dspace, plist);
-        auto values = tatami_test::simulate_dense_vector<double>(NR * NC, 0, 100, /* seed = */ chunk_sizes.first * chunk_sizes.second + cache_size);
+        auto values = tatami_test::simulate_dense_vector<double>(NR * NC, 0, 100, /* seed = */ chunk_sizes.first * chunk_sizes.second + 100 * cache_fraction);
         dhandle.write(values.data(), H5::PredType::NATIVE_DOUBLE);
 
         ref.reset(new tatami::DenseRowMatrix<double, int>(NR, NC, std::move(values)));
         tref.reset(new tatami::DelayedTranspose<double, int>(ref));
 
         tatami_hdf5::DenseMatrixOptions opt;
-        opt.maximum_cache_size = sizeof(double) * cache_size;
-        opt.require_minimum_cache = (cache_size > 0);
+        opt.maximum_cache_size = static_cast<double>(NR * NC) * cache_fraction * static_cast<double>(sizeof(double));
+        opt.require_minimum_cache = (cache_fraction > 0);
 
         mat.reset(new tatami_hdf5::DenseMatrix<double, int>(fpath, name, false, opt));
         tmat.reset(new tatami_hdf5::DenseMatrix<double, int>(fpath, name, true, opt));
