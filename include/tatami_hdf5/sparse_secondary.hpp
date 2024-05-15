@@ -255,7 +255,7 @@ public:
                 /* cache_size_in_bytes = */ details.our_cache_size,
                 /* element_size = */ size_of_cached_element<Index_, CachedValue_>(needs_value, true),
                 /* require_minimum_cache = */ true
-            ).num_slabs_in_cache
+            ).max_slabs_in_cache
         )
     {
         size_t alloc = static_cast<size_t>(cache.get_max_slabs()) * extract_length; // cast to avoid overflow.

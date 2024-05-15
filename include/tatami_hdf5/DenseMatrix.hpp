@@ -106,34 +106,6 @@ void extract_indices(Index_ cache_start, Index_ cache_length, const std::vector<
     comp.dataset.read(buffer, define_mem_type<OutputValue_>(), comp.memspace, comp.dataspace);
 }
 
-template<class CachedValue_>
-struct DenseSlabFactory {
-    DenseSlabFactory(size_t slab_size, size_t max_slabs) : slab_size(slab_size), pool(slab_size * max_slabs) {}
-
-    // Deleting copy constructors as we're handling out pointers.
-    DenseSlabFactory(const DenseSlabFactory&) = delete;
-    DenseSlabFactory& operator=(const DenseSlabFactory&) = delete;
-    DenseSlabFactory(DenseSlabFactory&&) = default;
-    DenseSlabFactory& operator=(DenseSlabFactory&&) = default;
-
-public:
-    struct Slab {
-        CachedValue_* data;
-    };
-
-    Slab create() {
-        Slab output;
-        output.data = pool.data() + offset;
-        offset += slab_size;
-        return output;
-    }
-
-private:
-    size_t slab_size;
-    std::vector<CachedValue_> pool;
-    size_t offset = 0;
-};
-
 /************************
  *** Abstract classes ***
  ************************/
@@ -234,8 +206,8 @@ private:
     tatami_chunked::ChunkDimensionStats<Index_> dim_stats;
     Index_ extract_length;
 
-    DenseSlabFactory<CachedValue_> factory;
-    typedef typename DenseSlabFactory<CachedValue_>::Slab Slab;
+    tatami_chunked::DenseSlabFactory<CachedValue_> factory;
+    typedef typename decltype(factory)::Slab Slab;
     tatami_chunked::LruSlabCache<Index_, Slab> cache;
 
     typename std::conditional<by_h5_row_, bool, std::vector<CachedValue_> >::type transposition_buffer;
@@ -321,8 +293,8 @@ private:
     tatami_chunked::ChunkDimensionStats<Index_> dim_stats;
     Index_ extract_length;
 
-    DenseSlabFactory<CachedValue_> factory;
-    typedef typename DenseSlabFactory<CachedValue_>::Slab Slab;
+    tatami_chunked::DenseSlabFactory<CachedValue_> factory;
+    typedef typename decltype(factory)::Slab Slab;
     tatami_chunked::OracularSlabCache<Index_, Index_, Slab> cache;
 
     typename std::conditional<by_h5_row_, bool, std::vector<CachedValue_> >::type transposition_buffer;
@@ -671,25 +643,25 @@ private:
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate(bool row, Index_ non_target_length, tatami::MaybeOracle<oracle_, Index_> oracle, Args_&& ... args) const {
         if (row != transpose) {
             tatami_chunked::SlabCacheStats slab_stats(firstdim_stats.chunk_length, non_target_length, firstdim_stats.num_chunks, cache_size_in_elements, require_minimum_cache);
-            if (slab_stats.num_slabs_in_cache > 0) {
+            if (slab_stats.max_slabs_in_cache > 0) {
                 return std::make_unique<Extractor_<true, false, oracle_, Value_, Index_, CachedValue_> >(
-                    file_name, dataset_name, firstdim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
+                    file_name, dataset_name, firstdim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.max_slabs_in_cache
                 );
             } else {
                 return std::make_unique<Extractor_<true, true, oracle_, Value_, Index_, CachedValue_> >(
-                    file_name, dataset_name, firstdim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
+                    file_name, dataset_name, firstdim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.max_slabs_in_cache
                 );
             }
 
         } else {
             tatami_chunked::SlabCacheStats slab_stats(seconddim_stats.chunk_length, non_target_length, seconddim_stats.num_chunks, cache_size_in_elements, require_minimum_cache);
-            if (slab_stats.num_slabs_in_cache > 0) {
+            if (slab_stats.max_slabs_in_cache > 0) {
                 return std::make_unique<Extractor_<false, false, oracle_, Value_, Index_, CachedValue_> >(
-                    file_name, dataset_name, seconddim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
+                    file_name, dataset_name, seconddim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.max_slabs_in_cache
                 );
             } else {
                 return std::make_unique<Extractor_<false, true, oracle_, Value_, Index_, CachedValue_> >(
-                    file_name, dataset_name, seconddim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.num_slabs_in_cache
+                    file_name, dataset_name, seconddim_stats, std::move(oracle), std::forward<Args_>(args)..., slab_stats.slab_size_in_elements, slab_stats.max_slabs_in_cache
                 );
             }
         }
