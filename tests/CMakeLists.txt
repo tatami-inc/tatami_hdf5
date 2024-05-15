@@ -21,15 +21,16 @@ set(CODE_COVERAGE OFF CACHE BOOL "Enable coverage testing")
 
 include(GoogleTest)
 
-macro(create_h5test target)
-    add_executable(
-        ${target} 
-        src/load_dense_matrix.cpp
-        src/load_compressed_sparse_matrix.cpp
-        src/write_compressed_sparse_matrix.cpp
-        src/DenseMatrix.cpp
-        src/CompressedSparseMatrix.cpp
-    )
+add_executable(
+    libtest 
+    src/load_dense_matrix.cpp
+    src/load_compressed_sparse_matrix.cpp
+    src/write_compressed_sparse_matrix.cpp
+    src/DenseMatrix.cpp
+    src/CompressedSparseMatrix.cpp
+)
+
+macro(decorate_test target)
     target_compile_definitions(${target} PRIVATE DEBUG=1)
 
     target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
@@ -48,10 +49,18 @@ macro(create_h5test target)
     gtest_discover_tests(${target})
 endmacro()
 
-create_h5test(libtest)
+decorate_test(libtest)
 
 find_package(OpenMP)
 if(OpenMP_FOUND)
-    create_h5test(omptest)
+    add_executable(
+        omptest
+        src/write_compressed_sparse_matrix.cpp
+        src/DenseMatrix.cpp
+        src/CompressedSparseMatrix.cpp
+    )
+
+    decorate_test(omptest)
     target_link_libraries(omptest OpenMP::OpenMP_CXX)
+    target_compile_definitions(omptest PRIVATE TATAMI_HDF5_TEST_PARALLEL_ONLY=1)
 endif()

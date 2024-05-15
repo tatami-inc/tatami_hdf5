@@ -110,6 +110,7 @@ protected:
     }
 };
 
+#ifndef TATAMI_HDF5_TEST_PARALLEL_ONLY
 /*************************************
  *************************************/
 
@@ -601,6 +602,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 /*************************************
  *************************************/
+#endif
 
 class SparseMatrixParallelTest : 
     public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, bool, bool> >, 

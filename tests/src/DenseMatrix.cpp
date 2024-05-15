@@ -88,6 +88,7 @@ protected:
     }
 };
 
+#ifndef TATAMI_HDF5_TEST_PARALLEL_ONLY
 /*************************************
  *************************************/
 
@@ -271,6 +272,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 /*************************************
  *************************************/
+#endif
 
 class DenseMatrixParallelTest : public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, bool, bool> >, public DenseMatrixTestCore {
 protected:
