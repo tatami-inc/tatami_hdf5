@@ -285,7 +285,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00224" name="l00224"></a><span class="lineno">  224</span>                <span class="keywordflow">return</span> factory.create();</div>
 <div class="line"><a id="l00225" name="l00225"></a><span class="lineno">  225</span>            },</div>
 <div class="line"><a id="l00226" name="l00226"></a><span class="lineno">  226</span>            <span class="comment">/* populate = */</span> [&amp;](Index_ id, Slab&amp; contents) -&gt; <span class="keywordtype">void</span> {</div>
-<div class="line"><a id="l00227" name="l00227"></a><span class="lineno">  227</span>                <span class="keyword">auto</span> curdim = dim_stats.get_chunk_length(<span class="keywordtype">id</span>);</div>
+<div class="line"><a id="l00227" name="l00227"></a><span class="lineno">  227</span>                <span class="keyword">auto</span> curdim = tatami_chunked::get_chunk_length(dim_stats, <span class="keywordtype">id</span>);</div>
 <div class="line"><a id="l00228" name="l00228"></a><span class="lineno">  228</span>                <span class="keyword">auto</span> output = [&amp;](){</div>
 <div class="line"><a id="l00229" name="l00229"></a><span class="lineno">  229</span>                    <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(!by_h5_row_) {</div>
 <div class="line"><a id="l00230" name="l00230"></a><span class="lineno">  230</span>                        <span class="keywordflow">return</span> transposition_buffer.data();</div>
@@ -379,7 +379,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00318" name="l00318"></a><span class="lineno">  318</span> </div>
 <div class="line"><a id="l00319" name="l00319"></a><span class="lineno">  319</span>                <a class="code hl_function" href="namespacetatami__hdf5.html#a7e77c93d845d11169165ed14249970fd">serialize</a>([&amp;]() -&gt; <span class="keywordtype">void</span> {</div>
 <div class="line"><a id="l00320" name="l00320"></a><span class="lineno">  320</span>                    <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span>&amp; c : chunks) {</div>
-<div class="line"><a id="l00321" name="l00321"></a><span class="lineno">  321</span>                        <span class="keyword">auto</span> curdim = dim_stats.get_chunk_length(c.first);</div>
+<div class="line"><a id="l00321" name="l00321"></a><span class="lineno">  321</span>                        <span class="keyword">auto</span> curdim = tatami_chunked::get_chunk_length(dim_stats, c.first);</div>
 <div class="line"><a id="l00322" name="l00322"></a><span class="lineno">  322</span>                        extract(c.first * dim_stats.chunk_length, curdim, c.second-&gt;data);</div>
 <div class="line"><a id="l00323" name="l00323"></a><span class="lineno">  323</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(!by_h5_row_) {</div>
 <div class="line"><a id="l00324" name="l00324"></a><span class="lineno">  324</span>                            cache_transpose_info.emplace_back(c.second, curdim);</div>
@@ -728,7 +728,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00709" name="l00709"></a><span class="lineno">  709</span><span class="keyword">public</span>:</div>
 <div class="line"><a id="l00710" name="l00710"></a><span class="lineno">  710</span>    std::unique_ptr&lt;tatami::OracularDenseExtractor&lt;Value_, Index_&gt; &gt; dense(</div>
 <div class="line"><a id="l00711" name="l00711"></a><span class="lineno">  711</span>        <span class="keywordtype">bool</span> row,</div>
-<div class="line"><a id="l00712" name="l00712"></a><span class="lineno">  712</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle,</div>
+<div class="line"><a id="l00712" name="l00712"></a><span class="lineno">  712</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle,</div>
 <div class="line"><a id="l00713" name="l00713"></a><span class="lineno">  713</span>        <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp;)<span class="keyword"> </span></div>
 <div class="line"><a id="l00714" name="l00714"></a><span class="lineno">  714</span><span class="keyword">    const </span>{</div>
 <div class="line"><a id="l00715" name="l00715"></a><span class="lineno">  715</span>        Index_ full_non_target = (row ? ncol_internal() : nrow_internal());</div>
@@ -737,7 +737,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00718" name="l00718"></a><span class="lineno">  718</span> </div>
 <div class="line"><a id="l00719" name="l00719"></a><span class="lineno">  719</span>    std::unique_ptr&lt;tatami::OracularDenseExtractor&lt;Value_, Index_&gt; &gt; dense(</div>
 <div class="line"><a id="l00720" name="l00720"></a><span class="lineno">  720</span>        <span class="keywordtype">bool</span> row, </div>
-<div class="line"><a id="l00721" name="l00721"></a><span class="lineno">  721</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
+<div class="line"><a id="l00721" name="l00721"></a><span class="lineno">  721</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
 <div class="line"><a id="l00722" name="l00722"></a><span class="lineno">  722</span>        Index_ block_start, </div>
 <div class="line"><a id="l00723" name="l00723"></a><span class="lineno">  723</span>        Index_ block_length, </div>
 <div class="line"><a id="l00724" name="l00724"></a><span class="lineno">  724</span>        <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp;)<span class="keyword"> </span></div>
@@ -747,7 +747,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00728" name="l00728"></a><span class="lineno">  728</span> </div>
 <div class="line"><a id="l00729" name="l00729"></a><span class="lineno">  729</span>    std::unique_ptr&lt;tatami::OracularDenseExtractor&lt;Value_, Index_&gt; &gt; dense(</div>
 <div class="line"><a id="l00730" name="l00730"></a><span class="lineno">  730</span>        <span class="keywordtype">bool</span> row, </div>
-<div class="line"><a id="l00731" name="l00731"></a><span class="lineno">  731</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
+<div class="line"><a id="l00731" name="l00731"></a><span class="lineno">  731</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
 <div class="line"><a id="l00732" name="l00732"></a><span class="lineno">  732</span>        <a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#abbb0bdf0b79fe19e504b49b43984f634">tatami::VectorPtr&lt;Index_&gt;</a> indices_ptr, </div>
 <div class="line"><a id="l00733" name="l00733"></a><span class="lineno">  733</span>        <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp;)<span class="keyword"> </span></div>
 <div class="line"><a id="l00734" name="l00734"></a><span class="lineno">  734</span><span class="keyword">    const </span>{</div>
@@ -761,7 +761,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00742" name="l00742"></a><span class="lineno">  742</span><span class="keyword">public</span>:</div>
 <div class="line"><a id="l00743" name="l00743"></a><span class="lineno">  743</span>    std::unique_ptr&lt;tatami::OracularSparseExtractor&lt;Value_, Index_&gt; &gt; sparse(</div>
 <div class="line"><a id="l00744" name="l00744"></a><span class="lineno">  744</span>        <span class="keywordtype">bool</span> row, </div>
-<div class="line"><a id="l00745" name="l00745"></a><span class="lineno">  745</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
+<div class="line"><a id="l00745" name="l00745"></a><span class="lineno">  745</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
 <div class="line"><a id="l00746" name="l00746"></a><span class="lineno">  746</span>        <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt)<span class="keyword"> </span></div>
 <div class="line"><a id="l00747" name="l00747"></a><span class="lineno">  747</span><span class="keyword">    const </span>{</div>
 <div class="line"><a id="l00748" name="l00748"></a><span class="lineno">  748</span>        Index_ full_non_target = (row ? ncol_internal() : nrow_internal());</div>
@@ -770,7 +770,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00751" name="l00751"></a><span class="lineno">  751</span> </div>
 <div class="line"><a id="l00752" name="l00752"></a><span class="lineno">  752</span>    std::unique_ptr&lt;tatami::OracularSparseExtractor&lt;Value_, Index_&gt; &gt; sparse(</div>
 <div class="line"><a id="l00753" name="l00753"></a><span class="lineno">  753</span>        <span class="keywordtype">bool</span> row, </div>
-<div class="line"><a id="l00754" name="l00754"></a><span class="lineno">  754</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
+<div class="line"><a id="l00754" name="l00754"></a><span class="lineno">  754</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
 <div class="line"><a id="l00755" name="l00755"></a><span class="lineno">  755</span>        Index_ block_start, </div>
 <div class="line"><a id="l00756" name="l00756"></a><span class="lineno">  756</span>        Index_ block_length, </div>
 <div class="line"><a id="l00757" name="l00757"></a><span class="lineno">  757</span>        <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt)<span class="keyword"> </span></div>
@@ -780,7 +780,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00761" name="l00761"></a><span class="lineno">  761</span> </div>
 <div class="line"><a id="l00762" name="l00762"></a><span class="lineno">  762</span>    std::unique_ptr&lt;tatami::OracularSparseExtractor&lt;Value_, Index_&gt; &gt; sparse(</div>
 <div class="line"><a id="l00763" name="l00763"></a><span class="lineno">  763</span>        <span class="keywordtype">bool</span> row, </div>
-<div class="line"><a id="l00764" name="l00764"></a><span class="lineno">  764</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
+<div class="line"><a id="l00764" name="l00764"></a><span class="lineno">  764</span>        std::shared_ptr&lt;<span class="keyword">const</span> <a class="code hl_classRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Oracle.html">tatami::Oracle&lt;Index_&gt;</a> &gt; oracle, </div>
 <div class="line"><a id="l00765" name="l00765"></a><span class="lineno">  765</span>        <a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#abbb0bdf0b79fe19e504b49b43984f634">tatami::VectorPtr&lt;Index_&gt;</a> indices_ptr, </div>
 <div class="line"><a id="l00766" name="l00766"></a><span class="lineno">  766</span>        <span class="keyword">const</span> <a class="code hl_structRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a>&amp; opt)<span class="keyword"> </span></div>
 <div class="line"><a id="l00767" name="l00767"></a><span class="lineno">  767</span><span class="keyword">    const </span>{</div>
@@ -794,6 +794,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00774" name="l00774"></a><span class="lineno">  774</span> </div>
 <div class="line"><a id="l00775" name="l00775"></a><span class="lineno">  775</span><span class="preprocessor">#endif</span></div>
 <div class="ttc" id="aclasstatami_1_1Matrix_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a></div></div>
+<div class="ttc" id="aclasstatami_1_1Oracle_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/classtatami_1_1Oracle.html">tatami::Oracle</a></div></div>
 <div class="ttc" id="aclasstatami__hdf5_1_1DenseMatrix_html"><div class="ttname"><a href="classtatami__hdf5_1_1DenseMatrix.html">tatami_hdf5::DenseMatrix</a></div><div class="ttdoc">Dense matrix backed by a DataSet in a HDF5 file.</div><div class="ttdef"><b>Definition</b> DenseMatrix.hpp:505</div></div>
 <div class="ttc" id="aclasstatami__hdf5_1_1DenseMatrix_html_a8d5a4a147ad6cd87375f43bc810ce8d0"><div class="ttname"><a href="classtatami__hdf5_1_1DenseMatrix.html#a8d5a4a147ad6cd87375f43bc810ce8d0">tatami_hdf5::DenseMatrix::DenseMatrix</a></div><div class="ttdeci">DenseMatrix(std::string file, std::string name, bool transpose)</div><div class="ttdef"><b>Definition</b> DenseMatrix.hpp:564</div></div>
 <div class="ttc" id="aclasstatami__hdf5_1_1DenseMatrix_html_a992ffa6768fa0d3ebf0eda9fcd9b438d"><div class="ttname"><a href="classtatami__hdf5_1_1DenseMatrix.html#a992ffa6768fa0d3ebf0eda9fcd9b438d">tatami_hdf5::DenseMatrix::prefer_rows</a></div><div class="ttdeci">bool prefer_rows() const</div><div class="ttdef"><b>Definition</b> DenseMatrix.hpp:617</div></div>
@@ -806,7 +807,6 @@ $(document).ready(function() { init_codefold(0); });
 <div class="ttc" id="anamespacetatami_html_abbb0bdf0b79fe19e504b49b43984f634"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/namespacetatami.html#abbb0bdf0b79fe19e504b49b43984f634">tatami::VectorPtr</a></div><div class="ttdeci">std::shared_ptr&lt; const std::vector&lt; Index_ &gt; &gt; VectorPtr</div></div>
 <div class="ttc" id="aserialize_8hpp_html"><div class="ttname"><a href="serialize_8hpp.html">serialize.hpp</a></div><div class="ttdoc">Default locking for serial access.</div></div>
 <div class="ttc" id="astructtatami_1_1Options_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/structtatami_1_1Options.html">tatami::Options</a></div></div>
-<div class="ttc" id="astructtatami_1_1Oracle_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/structtatami_1_1Oracle.html">tatami::Oracle</a></div></div>
 <div class="ttc" id="astructtatami__hdf5_1_1DenseMatrixOptions_html"><div class="ttname"><a href="structtatami__hdf5_1_1DenseMatrixOptions.html">tatami_hdf5::DenseMatrixOptions</a></div><div class="ttdoc">Options for DenseMatrix extraction.</div><div class="ttdef"><b>Definition</b> DenseMatrix.hpp:26</div></div>
 <div class="ttc" id="astructtatami__hdf5_1_1DenseMatrixOptions_html_a5d24e3dc75b665cb8a54d3d2d1578afb"><div class="ttname"><a href="structtatami__hdf5_1_1DenseMatrixOptions.html#a5d24e3dc75b665cb8a54d3d2d1578afb">tatami_hdf5::DenseMatrixOptions::require_minimum_cache</a></div><div class="ttdeci">bool require_minimum_cache</div><div class="ttdef"><b>Definition</b> DenseMatrix.hpp:43</div></div>
 <div class="ttc" id="astructtatami__hdf5_1_1DenseMatrixOptions_html_aad0d50678510fe9a6bcb5376dfdbf903"><div class="ttname"><a href="structtatami__hdf5_1_1DenseMatrixOptions.html#aad0d50678510fe9a6bcb5376dfdbf903">tatami_hdf5::DenseMatrixOptions::maximum_cache_size</a></div><div class="ttdeci">size_t maximum_cache_size</div><div class="ttdef"><b>Definition</b> DenseMatrix.hpp:36</div></div>

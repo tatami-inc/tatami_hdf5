@@ -109,7 +109,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>Size of the in-memory cache in bytes.</p>
-<p>We cache all chunks required to read a row/column in <code><a class="elRef" href="https://tatami-inc.github.io/tatami/structtatami_1_1MyopicDenseExtractor.html#a9f3ee9c959cdefdb45dcbcd607826a49">tatami::MyopicDenseExtractor::fetch()</a></code> and related methods. This allows us to re-use the cached chunks when adjacent rows/columns are requested, rather than re-reading them from disk.</p>
+<p>We cache all chunks required to read a row/column in <code><a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1MyopicDenseExtractor.html#a9f3ee9c959cdefdb45dcbcd607826a49">tatami::MyopicDenseExtractor::fetch()</a></code> and related methods. This allows us to re-use the cached chunks when adjacent rows/columns are requested, rather than re-reading them from disk.</p>
 <p>Larger caches improve access speed at the cost of memory usage. Small values may be ignored if <code>require_minimum_cache</code> is <code>true</code>. </p>
 
 </div>
