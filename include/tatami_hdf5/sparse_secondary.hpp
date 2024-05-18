@@ -139,7 +139,7 @@ private:
         Index_ chunk_offset = i % sec_dim_stats.chunk_length;
 
         if (chunk_id != last_chunk_id || first) { 
-            Index_ clen = sec_dim_stats.get_chunk_length(chunk_id);
+            Index_ clen = tatami_chunked::get_chunk_length(sec_dim_stats, chunk_id);
             std::fill_n(cache_count.begin(), clen, 0);
 
             serialize([&]() {

@@ -224,7 +224,7 @@ private:
                 return factory.create();
             },
             /* populate = */ [&](Index_ id, Slab& contents) -> void {
-                auto curdim = dim_stats.get_chunk_length(id);
+                auto curdim = tatami_chunked::get_chunk_length(dim_stats, id);
                 auto output = [&](){
                     if constexpr(!by_h5_row_) {
                         return transposition_buffer.data();
@@ -318,7 +318,7 @@ public:
 
                 serialize([&]() -> void {
                     for (const auto& c : chunks) {
-                        auto curdim = dim_stats.get_chunk_length(c.first);
+                        auto curdim = tatami_chunked::get_chunk_length(dim_stats, c.first);
                         extract(c.first * dim_stats.chunk_length, curdim, c.second->data);
                         if constexpr(!by_h5_row_) {
                             cache_transpose_info.emplace_back(c.second, curdim);
