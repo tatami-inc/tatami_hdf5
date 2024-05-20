@@ -65,15 +65,15 @@
       <type></type>
       <name>CompressedSparseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1CompressedSparseMatrix.html</anchorfile>
-      <anchor>a85f630af2cb95261b480dbbbcbb8dbe7</anchor>
-      <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, bool row, const CompressedSparseMatrixOptions &amp;options)</arglist>
+      <anchor>af59e32e5c129e9666821706195779771</anchor>
+      <arglist>(Index_ nrow, Index_ ncol, std::string file_name, std::string value_name, std::string index_name, std::string pointer_name, bool csr, const CompressedSparseMatrixOptions &amp;options)</arglist>
     </member>
     <member kind="function">
       <type></type>
       <name>CompressedSparseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1CompressedSparseMatrix.html</anchorfile>
-      <anchor>ad0b92272abd19c1ae3a39f7ce2c994d8</anchor>
-      <arglist>(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, bool row)</arglist>
+      <anchor>a1003d0dacaf33924cdb62284f9d8f3f7</anchor>
+      <arglist>(Index_ ncsr, Index_ ncol, std::string file_name, std::string value_name, std::string index_name, std::string pointer_name, bool csr)</arglist>
     </member>
   </compound>
   <compound kind="struct">
