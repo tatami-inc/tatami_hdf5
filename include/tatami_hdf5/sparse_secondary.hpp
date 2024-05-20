@@ -23,18 +23,28 @@ class MyopicSecondaryCore {
 public:
     MyopicSecondaryCore(
         const MatrixDetails<Index_>& details,
-        bool, // oracle: for consistency with the oracular constructor.
+        tatami::MaybeOracle<false, Index_>, // oracle, for consistency with the oracular constructor.
         Index_ extract_length,
         bool needs_value,
         bool needs_index) :
         my_pointers(details.pointers),
         my_secondary_dim_stats(
             details.secondary_dim,
-            std::max(
-                static_cast<size_t>(1),
-                // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford. 
-                static_cast<size_t>(details.slab_cache_size / (CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, needs_index) * extract_length))
-            )
+            [&]() -> size_t {
+                // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford.
+                size_t elsize = CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, needs_index);
+                size_t denom = elsize * static_cast<size_t>(extract_length);
+                if (denom == 0) {
+                    return details.secondary_dim; // caching the entire secondary dimension, if possible.
+                }
+
+                size_t primary_chunkdim = details.slab_cache_size / denom;
+                if (primary_chunkdim < 1) {
+                    return 1;
+                }
+
+                return std::min(primary_chunkdim, static_cast<size_t>(details.secondary_dim));
+            }()
         ),
         my_extract_length(extract_length),
         my_needs_value(needs_value),
