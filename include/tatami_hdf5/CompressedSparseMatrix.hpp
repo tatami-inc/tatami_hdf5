@@ -69,56 +69,54 @@ struct CompressedSparseMatrixOptions {
  */
 template<typename Value_, typename Index_, typename CachedValue_ = Value_, typename CachedIndex_ = Index_>
 class CompressedSparseMatrix : public tatami::Matrix<Value_, Index_> {
-    Index_ nrows, ncols;
-    std::string file_name;
-    std::string data_name, index_name;
+    Index_ my_nrow, my_ncol;
+    std::string my_file_name, my_value_name, my_index_name;
     std::vector<hsize_t> pointers;
-    bool csr;
+    bool my_csr;
 
-    // We distinguish between our own cache of dimension elements
-    // versus HDF5's cache of uncompressed chunks.
-    size_t our_cache_size;
-    size_t max_non_zeros;
-    size_t h5_chunk_cache_size;
+    // We distinguish between our own cache of slabs versus HDF5's cache of uncompressed chunks.
+    size_t my_slab_cache_size;
+    size_t my_max_non_zeros;
+    size_t my_chunk_cache_size;
 
 public:
     /**
      * @param nr Number of rows in the matrix.
      * @param nc Number of columns in the matrix.
-     * @param file Path to the file.
-     * @param vals Name of the 1D dataset inside `file` containing the non-zero elements.
-     * @param idx Name of the 1D dataset inside `file` containing the indices of the non-zero elements.
-     * If `row = true`, this should contain column indices sorted within each row, otherwise it should contain row indices sorted within each column.
-     * @param ptr Name of the 1D dataset inside `file` containing the index pointers for the start and end of each row (if `row = true`) or column (otherwise).
+     * @param file_name Path to the file.
+     * @param value_name Name of the 1D dataset inside `file_name` containing the values of the structural non-zero elements.
+     * @param index_name Name of the 1D dataset inside `file_name` containing the indices of the structural non-zero elements.
+     * If `csr = true`, this should contain column indices sorted within each row, otherwise it should contain row indices sorted within each column.
+     * @param pointer_name Name of the 1D dataset inside `file_name` containing the index pointers for the start and end of each row (if `row = true`) or column (otherwise).
      * This should have length equal to the number of rows (if `row = true`) or columns (otherwise).
-     * @param row Whether the matrix is stored on disk in compressed sparse row format.
+     * @param csr Whether the matrix is stored on disk in compressed sparse row format.
      * If false, the matrix is assumed to be stored in compressed sparse column format.
      * @param options Further options.
      */
-    CompressedSparseMatrix(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, bool row, const CompressedSparseMatrixOptions& options) :
-        nrows(nr), 
-        ncols(nc), 
-        file_name(std::move(file)), 
-        data_name(std::move(vals)), 
-        index_name(std::move(idx)), 
-        csr(row),
-        our_cache_size(options.maximum_cache_size)
+    CompressedSparseMatrix(Index_ nrow, Index_ ncol, std::string file_name, std::string value_name, std::string index_name, std::string pointer_name, bool csr, const CompressedSparseMatrixOptions& options) :
+        my_nrow(nrow), 
+        my_ncol(ncol), 
+        my_file_name(std::move(file_name)), 
+        my_value_name(std::move(value_name)), 
+        my_index_name(std::move(index_name)), 
+        my_csr(csr),
+        my_slab_cache_size(options.maximum_cache_size)
     {
         serialize([&]() -> void {
-            H5::H5File file_handle(file_name, H5F_ACC_RDONLY);
-            auto dhandle = open_and_check_dataset<false>(file_handle, data_name);
-            hsize_t nonzeros = get_array_dimensions<1>(dhandle, "vals")[0];
+            H5::H5File file_handle(my_file_name, H5F_ACC_RDONLY);
+            auto dhandle = open_and_check_dataset<false>(file_handle, my_value_name);
+            hsize_t nonzeros = get_array_dimensions<1>(dhandle, "value_name")[0];
 
-            auto ihandle = open_and_check_dataset<true>(file_handle, index_name);
-            if (get_array_dimensions<1>(ihandle, "idx")[0] != nonzeros) {
-                throw std::runtime_error("number of non-zero elements is not consistent between 'data' and 'idx'");
+            auto ihandle = open_and_check_dataset<true>(file_handle, my_index_name);
+            if (get_array_dimensions<1>(ihandle, "index_name")[0] != nonzeros) {
+                throw std::runtime_error("number of non-zero elements is not consistent between 'value_name' and 'index_name'");
             }
 
-            auto phandle = open_and_check_dataset<true>(file_handle, ptr);
-            size_t ptr_size = get_array_dimensions<1>(phandle, "ptr")[0];
-            size_t dim_p1 = static_cast<size_t>(csr ? nrows : ncols) + 1;
+            auto phandle = open_and_check_dataset<true>(file_handle, pointer_name);
+            size_t ptr_size = get_array_dimensions<1>(phandle, "pointer_name")[0];
+            size_t dim_p1 = static_cast<size_t>(my_csr ? my_nrow : my_ncol) + 1;
             if (ptr_size != dim_p1) {
-                throw std::runtime_error("'ptr' dataset should have length equal to the number of " + (csr ? std::string("rows") : std::string("columns")) + " plus 1");
+                throw std::runtime_error("'pointer_name' dataset should have length equal to the number of " + (my_csr ? std::string("rows") : std::string("columns")) + " plus 1");
             }
 
             // We aim to store two chunks in HDF5's chunk cache; one
@@ -154,7 +152,7 @@ public:
                 }
             };
 
-            h5_chunk_cache_size = std::max(
+            my_chunk_cache_size = std::max(
                 non_overflow_double_min(ichunk_length) * ichunk_element_size, 
                 non_overflow_double_min(dchunk_length) * dchunk_element_size
             );
@@ -170,37 +168,35 @@ public:
             }
         });
 
-        max_non_zeros = 0;
+        my_max_non_zeros = 0;
         for (size_t i = 1; i < pointers.size(); ++i) {
             hsize_t diff = pointers[i] - pointers[i-1];
-            if (diff > max_non_zeros) {
-                max_non_zeros = diff;
+            if (diff > my_max_non_zeros) {
+                my_max_non_zeros = diff;
             }
         }
     }
 
     /**
      * Overload that uses the default `CompressedSparseMatrixOptions`.
-     * @param nr Number of rows in the matrix.
-     * @param nc Number of columns in the matrix.
-     * @param file Path to the file.
-     * @param vals Name of the 1D dataset inside `file` containing the non-zero elements.
-     * @param idx Name of the 1D dataset inside `file` containing the indices of the non-zero elements.
-     * If `row = true`, this should contain column indices sorted within each row, otherwise it should contain row indices sorted within each column.
-     * @param ptr Name of the 1D dataset inside `file` containing the index pointers for the start and end of each row (if `row = true`) or column (otherwise).
-     * This should have length equal to the number of rows (if `row = true`) or columns (otherwise).
-     * @param row Whether the matrix is stored in compressed sparse row format.
+     * @param nrow Number of rows in the matrix.
+     * @param ncol Number of columns in the matrix.
+     * @param file_name Path to the file.
+     * @param value_name Name of the 1D dataset inside `file_name` containing the values of the structural non-zero elements.
+     * @param index_name Name of the 1D dataset inside `file_name` containing the indices of the structural non-zero elements.
+     * @param pointer_name Name of the 1D dataset inside `file_name` containing the index pointers for the start and end of each csr (if `csr = true`) or column (otherwise).
+     * @param csr Whether the matrix is stored in compressed sparse csr format.
      */
-    CompressedSparseMatrix(Index_ nr, Index_ nc, std::string file, std::string vals, std::string idx, std::string ptr, bool row) :
-        CompressedSparseMatrix(nr, nc, std::move(file), std::move(vals), std::move(idx), std::move(ptr), row, CompressedSparseMatrixOptions()) {}
+    CompressedSparseMatrix(Index_ ncsr, Index_ ncol, std::string file_name, std::string value_name, std::string index_name, std::string pointer_name, bool csr) :
+        CompressedSparseMatrix(ncsr, ncol, std::move(file_name), std::move(value_name), std::move(index_name), std::move(pointer_name), csr, CompressedSparseMatrixOptions()) {}
 
 public:
     Index_ nrow() const {
-        return nrows;
+        return my_nrow;
     }
 
     Index_ ncol() const {
-        return ncols;
+        return my_ncol;
     }
 
     bool is_sparse() const {
@@ -212,24 +208,20 @@ public:
     }
 
     bool prefer_rows() const {
-        return csr;
+        return my_csr;
     }
 
     double prefer_rows_proportion() const {
-        return static_cast<double>(csr);
+        return static_cast<double>(my_csr);
     }
 
     bool uses_oracle(bool) const {
         return true;
     }
 
-    using tatami::Matrix<Value_, Index_>::dense_row;
+    using tatami::Matrix<Value_, Index_>::dense;
 
-    using tatami::Matrix<Value_, Index_>::dense_column;
-
-    using tatami::Matrix<Value_, Index_>::sparse_row;
-
-    using tatami::Matrix<Value_, Index_>::sparse_column;
+    using tatami::Matrix<Value_, Index_>::sparse;
 
     /**************************************
      ************ Myopic dense ************
@@ -237,21 +229,21 @@ public:
 private:
     CompressedSparseMatrix_internal::MatrixDetails<Index_> details() const {
         return CompressedSparseMatrix_internal::MatrixDetails<Index_>(
-            file_name, 
-            data_name, 
-            index_name, 
-            (csr ? nrows : ncols),
-            (csr ? ncols : nrows),
+            my_file_name, 
+            my_value_name, 
+            my_index_name, 
+            (my_csr ? my_nrow : my_ncol),
+            (my_csr ? my_ncol : my_nrow),
             pointers, 
-            our_cache_size,
-            max_non_zeros,
-            h5_chunk_cache_size
+            my_slab_cache_size,
+            my_max_non_zeros,
+            my_chunk_cache_size
         );
     }
 
     template<bool oracle_>
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, const tatami::Options&) const {
-        if (row == csr) {
+        if (row == my_csr) {
             return std::make_unique<CompressedSparseMatrix_internal::PrimaryFullDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
                 details(), std::move(oracle)
             );
@@ -264,7 +256,7 @@ private:
 
     template<bool oracle_>
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length, const tatami::Options&) const {
-        if (row == csr) {
+        if (row == my_csr) {
             return std::make_unique<CompressedSparseMatrix_internal::PrimaryBlockDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
                 details(), std::move(oracle), block_start, block_length
             );
@@ -277,7 +269,7 @@ private:
 
     template<bool oracle_>
     std::unique_ptr<tatami::DenseExtractor<oracle_, Value_, Index_> > populate_dense(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options&) const {
-        if (row == csr) {
+        if (row == my_csr) {
             return std::make_unique<CompressedSparseMatrix_internal::PrimaryIndexDense<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
                 details(), std::move(oracle), std::move(indices_ptr)
             );
@@ -307,7 +299,7 @@ public:
 private:
     template<bool oracle_>
     std::unique_ptr<tatami::SparseExtractor<oracle_, Value_, Index_> > populate_sparse(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, const tatami::Options& opt) const {
-        if (row == csr) {
+        if (row == my_csr) {
             return std::make_unique<CompressedSparseMatrix_internal::PrimaryFullSparse<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
                 details(), std::move(oracle), opt.sparse_extract_value, opt.sparse_extract_index
             );
@@ -320,7 +312,7 @@ private:
 
     template<bool oracle_>
     std::unique_ptr<tatami::SparseExtractor<oracle_, Value_, Index_> > populate_sparse(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length, const tatami::Options& opt) const {
-        if (row == csr) {
+        if (row == my_csr) {
             return std::make_unique<CompressedSparseMatrix_internal::PrimaryBlockSparse<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
                 details(), std::move(oracle), block_start, block_length, opt.sparse_extract_value, opt.sparse_extract_index
             );
@@ -333,7 +325,7 @@ private:
 
     template<bool oracle_>
     std::unique_ptr<tatami::SparseExtractor<oracle_, Value_, Index_> > populate_sparse(bool row, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, const tatami::Options& opt) const {
-        if (row == csr) {
+        if (row == my_csr) {
             return std::make_unique<CompressedSparseMatrix_internal::PrimaryIndexSparse<oracle_, Value_, Index_, CachedValue_, CachedIndex_> >(
                 details(), std::move(oracle), std::move(indices_ptr), opt.sparse_extract_value, opt.sparse_extract_index
             );

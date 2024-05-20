@@ -16,193 +16,142 @@ namespace tatami_hdf5 {
 
 namespace CompressedSparseMatrix_internal {
 
-template<typename Index_, typename CachedValue_, typename Value_>
-tatami::SparseRange<Value_, Index_> slab_to_sparse(const tatami::SparseRange<CachedValue_, Index_>& slab, Value_* vbuffer, Index_* ibuffer) {
-    tatami::SparseRange<Value_, Index_> output;
-    output.number = slab.number;
-
-    if (slab.value) {
-        std::copy_n(slab.value, slab.number, vbuffer);
-        output.value = vbuffer;
-    }
-
-    if (slab.index) {
-        std::copy_n(slab.index, slab.number, ibuffer);
-        output.index = ibuffer;
-    }
-
-    return output;
-}
-
-template<typename Index_, typename CachedValue_, typename Value_>
-void slab_to_dense(const tatami::SparseRange<CachedValue_, Index_>& slab, Value_* buffer, size_t extract_length) {
-    std::fill_n(buffer, extract_length, 0);
-    auto valptr = slab.value;
-    auto idxptr = slab.index;
-    for (Index_ i = 0; i < slab.number; ++i, ++idxptr, ++valptr) {
-        buffer[*idxptr] = *valptr;
-    }
-    return;
-}
-
-struct SecondaryBase {
-    template<typename Index_>
-    SecondaryBase(const MatrixDetails<Index_>& details) {
-        serialize([&]() -> void {
-            h5comp.reset(new Components);
-
-            // Using some kinda-big prime number as the number of slots. This
-            // doesn't really matter too much as we only intend to store two
-            // chunks at most - see CompressedSparseMatrix.hpp for the rationale.
-            H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
-            fapl.setCache(0, 511, details.h5_chunk_cache_size, 0);
-
-            h5comp->file.openFile(details.file_name, H5F_ACC_RDONLY);
-            h5comp->data_dataset = h5comp->file.openDataSet(details.data_name);
-            h5comp->index_dataset = h5comp->file.openDataSet(details.index_name);
-            h5comp->dataspace = h5comp->data_dataset.getSpace();
-        });
-    }
-
-    ~SecondaryBase() {
-        serialize([&]() {
-            h5comp.reset();
-        });
-    }
-
-protected:
-    // All HDF5-related members are stored in a separate pointer so we can serialize construction and destruction.
-    std::unique_ptr<Components> h5comp;
-};
-
 // We don't use CachedIndex_, as this may be too small to store the other
 // dimension; use Index_ instead as this is guaranteed.
 template<typename Index_, typename CachedValue_>
-class MyopicSecondaryBase : public SecondaryBase {
+class MyopicSecondaryCore {
 public:
-    MyopicSecondaryBase(
+    MyopicSecondaryCore(
         const MatrixDetails<Index_>& details,
         bool, // oracle: for consistency with the oracular constructor.
         Index_ extract_length,
         bool needs_value,
         bool needs_index) :
-        SecondaryBase(details),
-        pointers(details.pointers),
-        sec_dim_stats(
+        my_pointers(details.pointers),
+        my_secondary_dim_stats(
             details.secondary_dim,
             std::max(
                 static_cast<size_t>(1),
                 // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford. 
-                static_cast<size_t>(details.our_cache_size / (CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, true) * extract_length))
+                static_cast<size_t>(details.slab_cache_size / (CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, needs_index) * extract_length))
             )
         ),
-        extract_length(extract_length),
-        needs_value(needs_value),
-        needs_index(needs_index)
+        my_extract_length(extract_length),
+        my_needs_value(needs_value),
+        my_needs_index(needs_index)
     {
-        cache_count.resize(sec_dim_stats.chunk_length);
-        size_t cache_size_in_elements = static_cast<size_t>(sec_dim_stats.chunk_length) * extract_length; // cast to avoid overflow.
-        cache_index.resize(cache_size_in_elements);
-        if (needs_value) {
-            cache_data.resize(cache_size_in_elements);
+        initialize(details, my_h5comp);
+
+        size_t cache_size_in_elements = static_cast<size_t>(my_secondary_dim_stats.chunk_length) * extract_length; // cast to avoid overflow.
+        if (my_needs_value) {
+            my_cache_data.resize(cache_size_in_elements);
         }
+        if (my_needs_index) {
+            my_cache_index.resize(cache_size_in_elements);
+        }
+        my_cache_count.resize(my_secondary_dim_stats.chunk_length);
 
         // Precomputing the offsets so we don't have to do the multiplication every time.
-        cache_offsets.reserve(sec_dim_stats.chunk_length);
+        my_cache_offsets.reserve(my_secondary_dim_stats.chunk_length);
         size_t current_offset = 0;
-        for (Index_ i = 0; i < sec_dim_stats.chunk_length; ++i, current_offset += extract_length) {
-            cache_offsets.push_back(current_offset);
+        for (Index_ i = 0; i < my_secondary_dim_stats.chunk_length; ++i, current_offset += extract_length) {
+            my_cache_offsets.push_back(current_offset);
         }
     }
 
+    ~MyopicSecondaryCore() {
+        destroy(my_h5comp);
+    }
+
 private:
-    const std::vector<hsize_t>& pointers;
-    tatami_chunked::ChunkDimensionStats<Index_> sec_dim_stats;
-    size_t extract_length; // store as a size_t to avoid overflow in offset calculations.
-    bool needs_value;
-    bool needs_index;
+    std::unique_ptr<Components> my_h5comp;
+    const std::vector<hsize_t>& my_pointers;
+    tatami_chunked::ChunkDimensionStats<Index_> my_secondary_dim_stats;
+    size_t my_extract_length; // store as a size_t to avoid overflow in offset calculations.
+    bool my_needs_value;
+    bool my_needs_index;
 
-    std::vector<Index_> index_buffer;
-    std::vector<CachedValue_> data_buffer;
+    std::vector<Index_> my_index_buffer;
+    std::vector<CachedValue_> my_data_buffer;
 
-    Index_ last_chunk_id = 0;
-    std::vector<Index_> cache_index;
-    std::vector<CachedValue_> cache_data;
-    std::vector<Index_> cache_count;
-    std::vector<size_t> cache_offsets;
-    bool first = true;
+    Index_ my_last_chunk_id = 0;
+    std::vector<Index_> my_cache_index;
+    std::vector<CachedValue_> my_cache_data;
+    std::vector<Index_> my_cache_count;
+    std::vector<size_t> my_cache_offsets;
+    bool my_first = true;
 
 private:
     template<class Extract_>
     tatami::SparseRange<CachedValue_, Index_> fetch_raw(Index_ i, Extract_ extract) {
-        Index_ chunk_id = i / sec_dim_stats.chunk_length;
-        Index_ chunk_offset = i % sec_dim_stats.chunk_length;
+        Index_ chunk_id = i / my_secondary_dim_stats.chunk_length;
+        Index_ chunk_offset = i % my_secondary_dim_stats.chunk_length;
 
-        if (chunk_id != last_chunk_id || first) { 
-            Index_ clen = tatami_chunked::get_chunk_length(sec_dim_stats, chunk_id);
-            std::fill_n(cache_count.begin(), clen, 0);
+        if (chunk_id != my_last_chunk_id || my_first) { 
+            Index_ clen = tatami_chunked::get_chunk_length(my_secondary_dim_stats, chunk_id);
+            std::fill_n(my_cache_count.begin(), clen, 0);
 
             serialize([&]() {
-                extract(chunk_id * sec_dim_stats.chunk_length, clen);
+                extract(chunk_id * my_secondary_dim_stats.chunk_length, clen);
             });
-            last_chunk_id = chunk_id;
-            first = false;
+            my_last_chunk_id = chunk_id;
+            my_first = false;
         }
 
-        tatami::SparseRange<CachedValue_, Index_> output(cache_count[chunk_offset]);
-        size_t offset = static_cast<size_t>(chunk_offset) * extract_length; // cast to avoid overflow.
-        if (needs_value) {
-            output.value = cache_data.data() + offset;
+        tatami::SparseRange<CachedValue_, Index_> output(my_cache_count[chunk_offset]);
+        size_t offset = static_cast<size_t>(chunk_offset) * my_extract_length; // cast to avoid overflow.
+        if (my_needs_value) {
+            output.value = my_cache_data.data() + offset;
         }
-        if (needs_index) {
-            output.index = cache_index.data() + offset;
+        if (my_needs_index) {
+            output.index = my_cache_index.data() + offset;
         }
         return output;
     }
 
     // Serial locks should be applied by the callers before calling this.
     void extract_and_append(Index_ primary, Index_ secondary_start, Index_ secondary_length, Index_ primary_to_add) {
-        hsize_t left = pointers[primary], right = pointers[primary + 1];
+        hsize_t left = my_pointers[primary], right = my_pointers[primary + 1];
         hsize_t count = right - left;
         if (count == 0) {
             return;
         }
-        index_buffer.resize(count);
+        my_index_buffer.resize(count);
 
-        this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
-        this->h5comp->memspace.setExtentSimple(1, &count);
-        this->h5comp->memspace.selectAll();
-        this->h5comp->index_dataset.read(index_buffer.data(), define_mem_type<Index_>(), this->h5comp->memspace, this->h5comp->dataspace);
+        my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
+        my_h5comp->memspace.setExtentSimple(1, &count);
+        my_h5comp->memspace.selectAll();
+        my_h5comp->index_dataset.read(my_index_buffer.data(), define_mem_type<Index_>(), my_h5comp->memspace, my_h5comp->dataspace);
 
-        auto start = index_buffer.begin(), end = index_buffer.end();
-        refine_primary_limits(start, end, sec_dim_stats.dimension_extent, secondary_start, secondary_start + secondary_length);
+        auto start = my_index_buffer.begin(), end = my_index_buffer.end();
+        refine_primary_limits(start, end, my_secondary_dim_stats.dimension_extent, secondary_start, secondary_start + secondary_length);
 
-        if (needs_index) {
+        if (my_needs_index) {
             for (auto x = start; x != end; ++x) {
                 Index_ current = *x - secondary_start;
-                cache_index[cache_offsets[current] + static_cast<size_t>(cache_count[current])] = primary_to_add;
+                my_cache_index[my_cache_offsets[current] + static_cast<size_t>(my_cache_count[current])] = primary_to_add;
             }
         }
 
-        if (start != end && needs_value) {
-            hsize_t better_left = left + (start - index_buffer.begin());
+        if (start != end && my_needs_value) {
+            hsize_t better_left = left + (start - my_index_buffer.begin());
             hsize_t better_count = end - start;
-            this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &better_count, &better_left);
-            this->h5comp->memspace.setExtentSimple(1, &better_count);
-            this->h5comp->memspace.selectAll();
+            my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &better_count, &better_left);
+            my_h5comp->memspace.setExtentSimple(1, &better_count);
+            my_h5comp->memspace.selectAll();
 
-            data_buffer.resize(better_count);
-            this->h5comp->data_dataset.read(data_buffer.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+            my_data_buffer.resize(better_count);
+            my_h5comp->data_dataset.read(my_data_buffer.data(), define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
 
             size_t y = 0;
             for (auto x = start; x != end; ++x, ++y) {
                 Index_ current = *x - secondary_start;
-                cache_data[cache_offsets[current] + static_cast<size_t>(cache_count[current])] = data_buffer[y];
+                my_cache_data[my_cache_offsets[current] + static_cast<size_t>(my_cache_count[current])] = my_data_buffer[y];
             }
         }
 
         for (auto x = start; x != end; ++x) {
-            ++(cache_count[*x - secondary_start]);
+            ++(my_cache_count[*x - secondary_start]);
         }
     }
 
@@ -232,95 +181,101 @@ public:
 };
 
 template<typename Index_, typename CachedValue_>
-class OracularSecondaryBase : public SecondaryBase {
+class OracularSecondaryCore {
 public:
-    OracularSecondaryBase(
+    OracularSecondaryCore(
         const MatrixDetails<Index_>& details,
         std::shared_ptr<const tatami::Oracle<Index_> > oracle, 
         Index_ extract_length,
         bool needs_value,
         bool needs_index) :
-        SecondaryBase(details),
-        pointers(details.pointers),
-        secondary_dim(details.secondary_dim),
-        extract_length(extract_length),
-        needs_value(needs_value),
-        needs_index(needs_index),
-        cache(
+        my_pointers(details.pointers),
+        my_secondary_dim(details.secondary_dim),
+        my_extract_length(extract_length),
+        my_needs_value(needs_value),
+        my_needs_index(needs_index),
+        my_cache(
             std::move(oracle),
             tatami_chunked::SlabCacheStats(
                 /* target_length = */ 1,
                 /* non_target_length = */ extract_length,
-                /* target_num_chunks = */ secondary_dim,
-                /* cache_size_in_bytes = */ details.our_cache_size,
-                /* element_size = */ size_of_cached_element<Index_, CachedValue_>(needs_value, true),
+                /* target_num_chunks = */ my_secondary_dim,
+                /* cache_size_in_bytes = */ details.slab_cache_size,
+                /* element_size = */ size_of_cached_element<Index_, CachedValue_>(needs_value, needs_index),
                 /* require_minimum_cache = */ true
             ).max_slabs_in_cache
         )
     {
-        size_t alloc = static_cast<size_t>(cache.get_max_slabs()) * extract_length; // cast to avoid overflow.
-        if (needs_index) {
-            cache_index.resize(alloc);
+        initialize(details, my_h5comp);
+
+        size_t alloc = static_cast<size_t>(my_cache.get_max_slabs()) * my_extract_length; // cast to avoid overflow.
+        if (my_needs_index) {
+            my_cache_index.resize(alloc);
         }
-        if (needs_value) {
-            cache_data.resize(alloc);
+        if (my_needs_value) {
+            my_cache_data.resize(alloc);
         }
-        slab_ptrs.resize(secondary_dim, NULL);
+        my_slab_ptrs.resize(my_secondary_dim, NULL);
+    }
+
+    ~OracularSecondaryCore() {
+        destroy(my_h5comp);
     }
 
 protected:
-    const std::vector<hsize_t>& pointers;
-    Index_ secondary_dim;
-    size_t extract_length; // store this as a size_t to avoid overflow when computing offsets.
-    bool needs_value;
-    bool needs_index;
+    std::unique_ptr<Components> my_h5comp;
+    const std::vector<hsize_t>& my_pointers;
+
+    Index_ my_secondary_dim;
+    size_t my_extract_length; // store this as a size_t to avoid overflow when computing offsets.
+    bool my_needs_value;
+    bool my_needs_index;
 
     struct Slab {
         CachedValue_* value = NULL;
         Index_* index = NULL;
         Index_ number = 0;
     };
-    tatami_chunked::OracularSlabCache<Index_, Index_, Slab> cache;
+    tatami_chunked::OracularSlabCache<Index_, Index_, Slab> my_cache;
 
     // Contiguous data stores for the Slabs to point to. This avoids
     // the overhead of allocating a lot of little vectors.
-    std::vector<Index_> cache_index;
-    std::vector<CachedValue_> cache_data;
-    size_t counter = 0;
+    std::vector<Index_> my_cache_index;
+    std::vector<CachedValue_> my_cache_data;
+    size_t my_offset = 0;
 
     // Temporary buffers for the HDF5 library to read in values/indices for each dimension element.
-    std::vector<Index_> index_buffer;
-    std::vector<CachedValue_> data_buffer;
+    std::vector<Index_> my_index_buffer;
+    std::vector<CachedValue_> my_data_buffer;
 
     // Some account-keeping intermediates to move data from the buffers to the cache.
-    std::vector<Slab*> slab_ptrs;
-    std::vector<CachedValue_*> value_ptrs;
-    std::vector<Index_> found;
+    std::vector<Slab*> my_slab_ptrs;
+    std::vector<CachedValue_*> my_value_ptrs;
+    std::vector<Index_> my_found;
 
 private:
     template<class Extract_>
     tatami::SparseRange<CachedValue_, Index_> fetch_raw(Extract_ extract) {
-        auto out = cache.next(
+        auto out = my_cache.next(
             /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
                 return std::pair<Index_, Index_>(current, 0);
             }, 
             /* create = */ [&]() -> Slab {
                 Slab latest;
-                size_t offset = counter * extract_length;
-                if (needs_value) {
-                    latest.value = cache_data.data() + offset;
+                if (my_needs_value) {
+                    latest.value = my_cache_data.data() + my_offset;
                 }
-                if (needs_index) {
-                    latest.index = cache_index.data() + offset;
+                if (my_needs_index) {
+                    latest.index = my_cache_index.data() + my_offset;
                 }
-                ++counter;
+                my_offset += my_extract_length;
                 return latest;
             },
             /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks) -> void {
                 if (!chunks.empty()) {
-                    Index_ first = secondary_dim, last = 0;
+                    Index_ first = my_secondary_dim, last = 0;
                     for (auto& c : chunks) {
-                        slab_ptrs[c.first] = c.second;
+                        my_slab_ptrs[c.first] = c.second;
                         first = std::min(first, c.first);
                         last = std::max(last, c.first);
                         c.second->number = 0;
@@ -331,7 +286,7 @@ private:
                     });
 
                     for (auto& c : chunks) {
-                        slab_ptrs[c.first] = NULL;
+                        my_slab_ptrs[c.first] = NULL;
                     }
                 }
             }
@@ -341,60 +296,62 @@ private:
 
     // Serial locks should be applied by the callers before calling this.
     void extract_and_append(Index_ primary, Index_ secondary_first, Index_ secondary_last_plus_one, Index_ primary_to_add) {
-        hsize_t left = pointers[primary], right = pointers[primary + 1];
+        hsize_t left = my_pointers[primary], right = my_pointers[primary + 1];
         hsize_t count = right - left;
         if (count == 0) {
             return;
         }
-        index_buffer.resize(count);
+        my_index_buffer.resize(count);
 
-        this->h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
-        this->h5comp->memspace.setExtentSimple(1, &count);
-        this->h5comp->memspace.selectAll();
-        this->h5comp->index_dataset.read(index_buffer.data(), define_mem_type<Index_>(), this->h5comp->memspace, this->h5comp->dataspace);
+        my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
+        my_h5comp->memspace.setExtentSimple(1, &count);
+        my_h5comp->memspace.selectAll();
+        my_h5comp->index_dataset.read(my_index_buffer.data(), define_mem_type<Index_>(), my_h5comp->memspace, my_h5comp->dataspace);
 
-        auto start = index_buffer.begin(), end = index_buffer.end();
-        refine_primary_limits(start, end, secondary_dim, secondary_first, secondary_last_plus_one);
+        auto start = my_index_buffer.begin(), end = my_index_buffer.end();
+        refine_primary_limits(start, end, my_secondary_dim, secondary_first, secondary_last_plus_one);
 
-        if (needs_value) {
-            value_ptrs.clear();
-            found.clear();
+        if (my_needs_value) {
+            my_value_ptrs.clear();
+            my_found.clear();
         }
 
         Index_ counter = 0;
         for (auto x = start; x != end; ++x, ++counter) {
-            auto slab_ptr = slab_ptrs[*x];
+            auto slab_ptr = my_slab_ptrs[*x];
             if (slab_ptr != NULL) {
-                if (needs_index) {
+                if (my_needs_index) {
                     slab_ptr->index[slab_ptr->number] = primary_to_add;
                 }
-                if (needs_value) {
-                    value_ptrs.push_back(slab_ptr->value + slab_ptr->number);
-                    found.push_back(counter);
+                if (my_needs_value) {
+                    my_value_ptrs.push_back(slab_ptr->value + slab_ptr->number);
+                    my_found.push_back(counter);
                 }
                 ++(slab_ptr->number);
             }
         }
 
-        if (!found.empty()) {
-            hsize_t new_start = left + (start - index_buffer.begin());
-            this->h5comp->dataspace.selectNone();
-            tatami::process_consecutive_indices<Index_>(found.data(), found.size(),
+        if (!my_found.empty()) {
+            hsize_t new_start = left + (start - my_index_buffer.begin());
+            my_h5comp->dataspace.selectNone();
+            tatami::process_consecutive_indices<Index_>(
+                my_found.data(),
+                my_found.size(),
                 [&](Index_ start, Index_ length) {
                     hsize_t offset = start + new_start;
                     hsize_t count = length;
-                    this->h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &count, &offset);
+                    my_h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &count, &offset);
                 }
             );
 
-            hsize_t new_len = found.size();
-            this->h5comp->memspace.setExtentSimple(1, &new_len);
-            this->h5comp->memspace.selectAll();
+            hsize_t new_len = my_found.size();
+            my_h5comp->memspace.setExtentSimple(1, &new_len);
+            my_h5comp->memspace.selectAll();
 
-            data_buffer.resize(new_len);
-            this->h5comp->data_dataset.read(data_buffer.data(), define_mem_type<CachedValue_>(), this->h5comp->memspace, this->h5comp->dataspace);
+            my_data_buffer.resize(new_len);
+            my_h5comp->data_dataset.read(my_data_buffer.data(), define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
             for (hsize_t i = 0; i < new_len; ++i) {
-                *(value_ptrs[i]) = data_buffer[i];
+                *(my_value_ptrs[i]) = my_data_buffer[i];
             }
         }
     }
@@ -430,49 +387,46 @@ public:
 };
 
 template<bool oracle_, typename Index_, typename CachedValue_>
-using ConditionalSecondaryBase = typename std::conditional<oracle_, OracularSecondaryBase<Index_, CachedValue_>, MyopicSecondaryBase<Index_, CachedValue_> >::type;
+using ConditionalSecondaryCore = typename std::conditional<oracle_, OracularSecondaryCore<Index_, CachedValue_>, MyopicSecondaryCore<Index_, CachedValue_> >::type;
 
 /********************************
  **** Full extractor classes ****
  ********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct SecondaryFullSparse : 
-    public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
-    public tatami::SparseExtractor<oracle_, Value_, Index_> 
-{
+class SecondaryFullSparse : public tatami::SparseExtractor<oracle_, Value_, Index_> {
+public:
     SecondaryFullSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, bool needs_value, bool needs_index) : 
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), details.primary_dim, needs_value, needs_index),
-        primary_dim(details.primary_dim)
+        my_core(details, std::move(oracle), details.primary_dim, needs_value, needs_index),
+        my_primary_dim(details.primary_dim)
     {}
 
-    tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
-        auto cached = this->template fetch_block<false>(i, 0, primary_dim);
-        return slab_to_sparse(cached, vbuffer, ibuffer); 
+    tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* value_buffer, Index_* index_buffer) {
+        auto cached = my_core.template fetch_block<false>(i, 0, my_primary_dim);
+        return slab_to_sparse(cached, value_buffer, index_buffer); 
     }
 
 private:
-    Index_ primary_dim;
+    ConditionalSecondaryCore<oracle_, Index_, CachedValue_> my_core;
+    Index_ my_primary_dim;
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct SecondaryFullDense : 
-    public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
-    public tatami::DenseExtractor<oracle_, Value_, Index_> 
-{
+struct SecondaryFullDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+public:
     SecondaryFullDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle) :
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), details.primary_dim, true, true),
-        primary_dim(details.primary_dim)
+        my_core(details, std::move(oracle), details.primary_dim, true, true),
+        my_primary_dim(details.primary_dim)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        auto cached = this->template fetch_block<true>(i, 0, primary_dim);
-        slab_to_dense(cached, buffer, primary_dim);
-        return buffer;
+        auto cached = my_core.template fetch_block<true>(i, 0, my_primary_dim);
+        return slab_to_dense(cached, buffer, my_primary_dim);
     }
 
 private:
-    Index_ primary_dim;
+    ConditionalSecondaryCore<oracle_, Index_, CachedValue_> my_core;
+    Index_ my_primary_dim;
 };
 
 /*********************************
@@ -480,46 +434,42 @@ private:
  *********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct SecondaryBlockSparse : 
-    public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
-    public tatami::SparseExtractor<oracle_, Value_, Index_> 
-{
+class SecondaryBlockSparse : public tatami::SparseExtractor<oracle_, Value_, Index_> {
+public:
     SecondaryBlockSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length, bool needs_value, bool needs_index) : 
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), block_length, needs_value, needs_index),
-        block_start(block_start),
-        block_length(block_length)
+        my_core(details, std::move(oracle), block_length, needs_value, needs_index),
+        my_block_start(block_start),
+        my_block_length(block_length)
     {}
 
-    tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
-        auto cached = this->template fetch_block<false>(i, block_start, block_length);
-        return slab_to_sparse(cached, vbuffer, ibuffer);
+    tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* value_buffer, Index_* index_buffer) {
+        auto cached = my_core.template fetch_block<false>(i, my_block_start, my_block_length);
+        return slab_to_sparse(cached, value_buffer, index_buffer);
     }
 
 private:
-    Index_ block_start;
-    Index_ block_length;
+    ConditionalSecondaryCore<oracle_, Index_, CachedValue_> my_core;
+    Index_ my_block_start;
+    Index_ my_block_length;
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct SecondaryBlockDense : 
-    public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
-    public tatami::DenseExtractor<oracle_, Value_, Index_> 
-{
+struct SecondaryBlockDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
     SecondaryBlockDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length) :
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), block_length, true, true),
-        block_start(block_start),
-        block_length(block_length)
+        my_core(details, std::move(oracle), block_length, true, true),
+        my_block_start(block_start),
+        my_block_length(block_length)
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        auto cached = this->template fetch_block<true>(i, block_start, block_length);
-        slab_to_dense(cached, buffer, block_length);
-        return buffer;
+        auto cached = my_core.template fetch_block<true>(i, my_block_start, my_block_length);
+        return slab_to_dense(cached, buffer, my_block_length);
     }
 
 private:
-    Index_ block_start;
-    Index_ block_length;
+    ConditionalSecondaryCore<oracle_, Index_, CachedValue_> my_core;
+    Index_ my_block_start;
+    Index_ my_block_length;
 };
 
 /*********************************
@@ -527,44 +477,39 @@ private:
  *********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct SecondaryIndexSparse : 
-    public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
-    public tatami::SparseExtractor<oracle_, Value_, Index_> 
-{
-    SecondaryIndexSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> idx_ptr, bool needs_value, bool needs_index) : 
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), idx_ptr->size(), needs_value, needs_index),
-        indices_ptr(std::move(idx_ptr)),
-        needs_index(needs_index)
+class SecondaryIndexSparse : public tatami::SparseExtractor<oracle_, Value_, Index_> {
+public:
+    SecondaryIndexSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, bool needs_value, bool needs_index) : 
+        my_core(details, std::move(oracle), indices_ptr->size(), needs_value, needs_index),
+        my_indices_ptr(std::move(indices_ptr))
     {}
 
-    tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* vbuffer, Index_* ibuffer) {
-        auto cached = this->template fetch_indices<false>(i, *indices_ptr);
-        return slab_to_sparse(cached, vbuffer, ibuffer);
+    tatami::SparseRange<Value_, Index_> fetch(Index_ i, Value_* value_buffer, Index_* index_buffer) {
+        auto cached = my_core.template fetch_indices<false>(i, *my_indices_ptr);
+        return slab_to_sparse(cached, value_buffer, index_buffer);
     }
 
 private:
-    tatami::VectorPtr<Index_> indices_ptr;
-    bool needs_index;
+    ConditionalSecondaryCore<oracle_, Index_, CachedValue_> my_core;
+    tatami::VectorPtr<Index_> my_indices_ptr;
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct SecondaryIndexDense :
-    public ConditionalSecondaryBase<oracle_, Index_, CachedValue_>,
-    public tatami::DenseExtractor<oracle_, Value_, Index_> 
-{
-    SecondaryIndexDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> idx_ptr) :
-        ConditionalSecondaryBase<oracle_, Index_, CachedValue_>(details, std::move(oracle), idx_ptr->size(), true, true),
-        indices_ptr(std::move(idx_ptr))
+class SecondaryIndexDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+public:
+    SecondaryIndexDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr) :
+        my_core(details, std::move(oracle), indices_ptr->size(), true, true),
+        my_indices_ptr(std::move(indices_ptr))
     {}
 
     const Value_* fetch(Index_ i, Value_* buffer) {
-        auto cached = this->template fetch_indices<true>(i, *indices_ptr);
-        slab_to_dense(cached, buffer, static_cast<Index_>(indices_ptr->size()));
-        return buffer;
+        auto cached = my_core.template fetch_indices<true>(i, *my_indices_ptr);
+        return slab_to_dense(cached, buffer, static_cast<Index_>(my_indices_ptr->size()));
     }
 
 private:
-    tatami::VectorPtr<Index_> indices_ptr;
+    ConditionalSecondaryCore<oracle_, Index_, CachedValue_> my_core;
+    tatami::VectorPtr<Index_> my_indices_ptr;
 };
 
 }
