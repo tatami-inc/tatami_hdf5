@@ -1,7 +1,8 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-find_dependency(tatami_tatami_chunked CONFIG REQUIRED)
+find_dependency(tatami_tatami_chunked 2.0.0 CONFIG REQUIRED)
+
 if(@TATAMI_HDF5_FIND_HDF5@)
     # Not REQUIRED, so don't use find_dependency according to
     # https://stackoverflow.com/questions/64846805/how-do-i-specify-an-optional-dependency-in-a-cmake-package-configuration-file

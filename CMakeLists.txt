@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(tatami_hdf5
-    VERSION 1.0.2
+    VERSION 2.0.0
     DESCRIPTION "tatami bindings for HDF5"
     LANGUAGES CXX)
 
@@ -14,7 +14,7 @@ option(TATAMI_HDF5_FETCH_EXTERN "Automatically fetch tatami_hdf5's external depe
 if(TATAMI_HDF5_FETCH_EXTERN)
     add_subdirectory(extern)
 else()
-    find_package(tatami_tatami_chunked CONFIG REQUIRED)
+    find_package(tatami_tatami_chunked 2.0.0 CONFIG REQUIRED)
 endif()
 
 target_link_libraries(tatami_hdf5 INTERFACE tatami::tatami_chunked)
@@ -68,5 +68,10 @@ configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Config.cmake.in
     "${CMAKE_CURRENT_BINARY_DIR}/tatami_tatami_hdf5Config.cmake"
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tatami_tatami_hdf5)
 
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/tatami_tatami_hdf5ConfigVersion.cmake
+    COMPATIBILITY SameMajorVersion)
+
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tatami_tatami_hdf5Config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/tatami_tatami_hdf5ConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tatami_tatami_hdf5)
