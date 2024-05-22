@@ -90,7 +90,7 @@ void initialize(const MatrixDetails<Index_>& details, std::unique_ptr<Components
     });
 }
 
-void destroy(std::unique_ptr<Components>& h5comp) {
+inline void destroy(std::unique_ptr<Components>& h5comp) {
     serialize([&]() {
         h5comp.reset();
     });
