@@ -344,10 +344,10 @@ template&lt;class Function_ &gt; </div>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Serialize a function's execution to avoid simultaneous calls to the (non-thread-safe) HDF5 library.</p>
-<p>If the <code>TATAMI_HDF5_PARALLEL_LOCK</code> macro is defined, it should be a function-like macro that accepts <code>f</code> and executes it in a serial section.</p>
-<p>If OpenMP is available, serialization is achieved by running <code>f</code> inside OpenMP critical regions named <code>"hdf5"</code>.</p>
-<p>Otherwise, we use a mutex from the standard <code>&lt;thread&gt;</code> library to guard the execution of <code>f</code>.</p>
+<p>Serialize a function's execution to avoid simultaneous calls to the (non-thread-safe) HDF5 library within <code><a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a5a08e0387bc00e8045a0364d6e35d120">tatami::parallelize()</a></code> calls.</p>
+<p>If <code>TATAMI_CUSTOM_PARALLEL</code> or <code>SUBPAR_CUSTOM_PARALLEL</code> is defined, the user is expected to define a <code>TATAMI_HDF5_PARALLEL_LOCK</code> macro. The latter should be a function-like macro that accepts <code>f</code> and executes it in a serial section that is appropriate to the custom parallelization scheme of the former.</p>
+<p>Otherwise, if OpenMP is available and <code>SUBPAR_NO_OPENMP</code> is not defined, it is assumed that <code><a class="elRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a5a08e0387bc00e8045a0364d6e35d120">tatami::parallelize()</a></code> will use OpenMP. In this case, serialization is achieved by running <code>f</code> inside OpenMP critical regions named <code>"hdf5"</code>.</p>
+<p>Otherwise, we use a mutex from the standard <code>&lt;mutex&gt;</code> library to guard the execution of <code>f</code>.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">f</td><td>Function to be run in a serial section. This accepts no arguments and returns no outputs. </td></tr>
