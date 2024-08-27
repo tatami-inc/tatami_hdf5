@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(tatami_hdf5
-    VERSION 2.0.0
+    VERSION 2.0.1
     DESCRIPTION "tatami bindings for HDF5"
     LANGUAGES CXX)
 
@@ -15,7 +15,7 @@ if(TATAMI_HDF5_FETCH_EXTERN)
     add_subdirectory(extern)
 else()
     find_package(tatami_tatami_chunked 2.0.0 CONFIG REQUIRED)
-    find_package(ltla_subpar 0.2.0 CONFIG REQUIRED)
+    find_package(ltla_subpar 0.2.1 CONFIG REQUIRED)
 endif()
 
 target_link_libraries(tatami_hdf5 INTERFACE tatami::tatami_chunked ltla::subpar)
