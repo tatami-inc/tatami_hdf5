@@ -6,15 +6,15 @@
  * @brief Default locking for serial access.
  */
 
-/**
- * @cond
- */
 #ifndef TATAMI_HDF5_PARALLEL_LOCK
 #include "subpar/subpar.hpp"
 #ifndef SUBPAR_USES_OPENMP
-#include <thread>
 #include <mutex>
+#include <thread>
 namespace tatami_hdf5 {
+// We put this in a separate function instead of a static function variable
+// inside serialize(), as we would get a different mutex for each instance 
+// of serialize() created with a different Function_.
 inline auto& get_default_hdf5_lock() {
     static std::mutex hdf5_lock;
     return hdf5_lock;
@@ -22,9 +22,6 @@ inline auto& get_default_hdf5_lock() {
 }
 #endif
 #endif
-/**
- * @endcond
- */
 
 namespace tatami_hdf5 {
 
@@ -48,14 +45,17 @@ template<class Function_>
 void serialize(Function_ f) {
 #ifdef TATAMI_HDF5_PARALLEL_LOCK
     TATAMI_HDF5_PARALLEL_LOCK(f);
-#elif defined(SUBPAR_USES_OPENMP)
+#else
+#ifdef SUBPAR_USES_OPENMP
     #pragma omp critical(hdf5)
     {
         f();
     }
 #else
-    std::lock_guard<std::mutex> thing(get_hdf5_lock());
+    auto& h5lock = get_default_hdf5_lock();
+    std::lock_guard<std::mutex> thing(h5lock);
     f();
+#endif
 #endif
 }
 
