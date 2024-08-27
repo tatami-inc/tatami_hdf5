@@ -51,6 +51,15 @@ endmacro()
 
 decorate_test(libtest)
 
+add_executable(
+    cuslocktest
+    src/write_compressed_sparse_matrix.cpp
+    src/DenseMatrix.cpp
+    src/CompressedSparseMatrix.cpp
+)
+decorate_test(cuslocktest)
+target_compile_definitions(cuslocktest PRIVATE TATAMI_HDF5_TEST_PARALLEL_ONLY=1 TATAMI_HDF5_TEST_CUSTOM_LOCK=1)
+
 find_package(OpenMP)
 if(OpenMP_FOUND)
     add_executable(
@@ -59,7 +68,6 @@ if(OpenMP_FOUND)
         src/DenseMatrix.cpp
         src/CompressedSparseMatrix.cpp
     )
-
     decorate_test(omptest)
     target_link_libraries(omptest OpenMP::OpenMP_CXX)
     target_compile_definitions(omptest PRIVATE TATAMI_HDF5_TEST_PARALLEL_ONLY=1)

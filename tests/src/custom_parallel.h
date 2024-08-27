@@ -6,6 +6,7 @@
 // OpenMP critical regions instead of using this mutex-based lock.
 
 #ifndef _OPENMP
+#ifdef TATAMI_HDF5_TEST_CUSTOM_LOCK
 #include <thread>
 #include <mutex>
 
@@ -23,4 +24,5 @@ void hdf5_serialize(Function f) {
 #define TATAMI_HDF5_PARALLEL_LOCK hdf5_serialize
 #endif
 
+#endif
 #endif
