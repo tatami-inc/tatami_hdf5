@@ -11,6 +11,15 @@
 #ifndef SUBPAR_USES_OPENMP
 #include <mutex>
 #include <thread>
+namespace tatami_hdf5 {
+// We put this in a separate function instead of a static function variable
+// inside serialize(), as we would get a different mutex for each instance 
+// of serialize() created with a different Function_.
+inline auto& get_default_hdf5_lock() {
+    static std::mutex hdf5_lock;
+    return hdf5_lock;
+}
+}
 #endif
 #endif
 
@@ -43,7 +52,7 @@ void serialize(Function_ f) {
         f();
     }
 #else
-    static std::mutex h5lock; // global across all threads.
+    auto& h5lock = get_default_hdf5_lock();
     std::lock_guard<std::mutex> thing(h5lock);
     f();
 #endif
