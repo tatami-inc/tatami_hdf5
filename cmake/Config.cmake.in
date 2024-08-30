@@ -2,7 +2,7 @@
 
 include(CMakeFindDependencyMacro)
 find_dependency(tatami_tatami_chunked 2.0.0 CONFIG REQUIRED)
-find_dependency(ltla_subpar 0.2.1 CONFIG REQUIRED)
+find_dependency(ltla_subpar 0.3.1 CONFIG REQUIRED)
 
 if(@TATAMI_HDF5_FIND_HDF5@)
     # Not REQUIRED, so don't use find_dependency according to

@@ -15,7 +15,7 @@ if(TATAMI_HDF5_FETCH_EXTERN)
     add_subdirectory(extern)
 else()
     find_package(tatami_tatami_chunked 2.0.0 CONFIG REQUIRED)
-    find_package(ltla_subpar 0.2.1 CONFIG REQUIRED)
+    find_package(ltla_subpar 0.3.1 CONFIG REQUIRED)
 endif()
 
 target_link_libraries(tatami_hdf5 INTERFACE tatami::tatami_chunked ltla::subpar)
