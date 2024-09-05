@@ -109,9 +109,13 @@ find_package(tatami_tatami_hdf5 CONFIG REQUIRED)
 target_link_libraries(mylib INTERFACE tatami::tatami_hdf5)
 ```
 
+By default, this will use `FetchContent` to fetch all external dependencies.
+If you want to install them manually, use `-DTATAMI_HDF5_FETCH_EXTERN=OFF`.
+See [`extern/CMakeLists.txt`](extern/CMakeLists.txt) to find compatible versions of each dependency.
+
 ### Manual
 
 If you're not using CMake, the simple approach is to just copy the files - either directly or with Git submodules - and include their path during compilation with, e.g., GCC's `-I`.
-This will also require the core [**tatami**](https://github.com/tatami-inc/tatami) library.
+The external dependencies listed in [`extern/CMakeLists.txt`](extern/CMakeLists.txt) need to be made available during compilation.
 You'll also need to link to the HDF5 library yourself (version 1.10 or higher).
 Specific frameworks may come with their own HDF5 binaries, e.g., [**Rhdf5lib**](https://bioconductor.org/packages/Rhdf5lib), [**h5wasm**](https://github.com/usnistgov/libhdf5-wasm).

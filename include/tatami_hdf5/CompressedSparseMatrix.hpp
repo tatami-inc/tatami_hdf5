@@ -50,7 +50,7 @@ struct CompressedSparseMatrixOptions {
  * These are held in memory in the `Extractor` while the relevant column/row is returned to the user by `row()` or `column()`.
  * The size of the slice is determined by the `options` in the constructor.
  *
- * Callers should follow the `prefer_rows()` suggestion when extracting data,
+ * Callers should follow the suggestion of `prefer_rows()` when extracting data,
  * as this tries to minimize the number of chunks that need to be read per access request.
  * This recommendation is even stronger than for the `DenseMatrix`,
  * as the access pattern on disk for the non-preferred dimension is very suboptimal.
