@@ -148,7 +148,6 @@ public:
         bool by_h5_row,
         [[maybe_unused]] tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats, // only listed here for compatibility with the other constructors.
         tatami::MaybeOracle<oracle_, Index_> oracle, 
-        [[maybe_unused]] Index_ non_target_length, 
         [[maybe_unused]] const tatami_chunked::SlabCacheStats& slab_stats) :
         my_by_h5_row(by_h5_row),
         my_oracle(std::move(oracle))
@@ -199,11 +198,9 @@ public:
         bool by_h5_row,
         tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats,
         [[maybe_unused]] tatami::MaybeOracle<false, Index_>, // for consistency with the oracular version.
-        Index_ non_target_length, 
         const tatami_chunked::SlabCacheStats& slab_stats) :
         my_by_h5_row(by_h5_row),
         my_dim_stats(std::move(target_dim_stats)),
-        my_extract_length(non_target_length),
         my_factory(slab_stats), 
         my_cache(slab_stats.max_slabs_in_cache)
     {
@@ -222,7 +219,6 @@ private:
     bool my_by_h5_row;
 
     tatami_chunked::ChunkDimensionStats<Index_> my_dim_stats;
-    Index_ my_extract_length;
 
     tatami_chunked::DenseSlabFactory<CachedValue_> my_factory;
     typedef typename decltype(my_factory)::Slab Slab;
@@ -232,7 +228,7 @@ private:
 
 private:
     template<typename Value_, class Extract_>
-    void fetch_raw(Index_ i, Value_* buffer, Extract_ extract) {
+    void fetch_raw(Index_ i, Value_* buffer, size_t non_target_length, Extract_ extract) {
         Index_ chunk = i / my_dim_stats.chunk_length;
         Index_ index = i % my_dim_stats.chunk_length;
 
@@ -255,19 +251,19 @@ private:
                     serialize([&]() -> void {
                         extract(id * my_dim_stats.chunk_length, curdim, tptr);
                     });
-                    tatami::transpose(tptr, my_extract_length, curdim, contents.data);
+                    tatami::transpose(tptr, non_target_length, curdim, contents.data);
                 }
             }
         );
 
-        auto ptr = info.data + static_cast<size_t>(my_extract_length) * static_cast<size_t>(index); // cast to size_t to avoid overflow
-        std::copy_n(ptr, my_extract_length, buffer);
+        auto ptr = info.data + non_target_length * static_cast<size_t>(index); // cast to size_t to avoid overflow
+        std::copy_n(ptr, non_target_length, buffer);
     }
 
 public:
     template<typename Value_>
     const Value_* fetch_block(Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
-        fetch_raw(i, buffer, [&](Index_ start, Index_ length, CachedValue_* buf) {
+        fetch_raw(i, buffer, block_length, [&](Index_ start, Index_ length, CachedValue_* buf) {
             extract_block(my_by_h5_row, start, length, block_start, block_length, buf, *my_h5comp);
         });
         return buffer;
@@ -275,7 +271,7 @@ public:
 
     template<typename Value_>
     const Value_* fetch_indices(Index_ i, const std::vector<Index_>& indices, Value_* buffer) {
-        fetch_raw(i, buffer, [&](Index_ start, Index_ length, CachedValue_* buf) {
+        fetch_raw(i, buffer, indices.size(), [&](Index_ start, Index_ length, CachedValue_* buf) {
             extract_indices(my_by_h5_row, start, length, indices, buf, *my_h5comp);
         });
         return buffer;
@@ -290,11 +286,9 @@ struct OracularCore {
         bool by_h5_row,
         tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats,
         tatami::MaybeOracle<true, Index_> oracle, 
-        Index_ non_target_length, 
         const tatami_chunked::SlabCacheStats& slab_stats) :
         my_by_h5_row(by_h5_row),
         my_dim_stats(std::move(target_dim_stats)),
-        my_extract_length(non_target_length),
         my_factory(slab_stats), 
         my_cache(std::move(oracle), slab_stats.max_slabs_in_cache)
     {
@@ -315,7 +309,6 @@ private:
     bool my_by_h5_row;
 
     tatami_chunked::ChunkDimensionStats<Index_> my_dim_stats;
-    Index_ my_extract_length;
 
     tatami_chunked::DenseSlabFactory<CachedValue_> my_factory;
     typedef typename decltype(my_factory)::Slab Slab;
@@ -327,7 +320,7 @@ private:
 
 public:
     template<typename Value_, class Extract_>
-    void fetch_raw([[maybe_unused]] Index_ i, Value_* buffer, Extract_ extract) {
+    void fetch_raw([[maybe_unused]] Index_ i, Value_* buffer, size_t non_target_length, Extract_ extract) {
         auto info = my_cache.next(
             /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
                 return std::pair<Index_, Index_>(current / my_dim_stats.chunk_length, current % my_dim_stats.chunk_length);
@@ -353,10 +346,10 @@ public:
                 // Applying transpositions to each cached buffers for easier
                 // retrieval. Done outside the serial section to unblock other threads.
                 if (!my_by_h5_row) {
-                    if (my_extract_length != 1) {
+                    if (non_target_length != 1) {
                         for (const auto& c : my_cache_transpose_info) {
                             if (c.second != 1) {
-                                tatami::transpose(c.first->data, my_extract_length, c.second, my_transposition_buffer_ptr);
+                                tatami::transpose(c.first->data, non_target_length, c.second, my_transposition_buffer_ptr);
 
                                 // We actually swap the pointers here, so the slab
                                 // pointers might not point to the factory pool after this!
@@ -369,14 +362,14 @@ public:
             }
         );
 
-        auto ptr = info.first->data + static_cast<size_t>(my_extract_length) * static_cast<size_t>(info.second); // cast to size_t to avoid overflow
-        std::copy_n(ptr, my_extract_length, buffer);
+        auto ptr = info.first->data + non_target_length * static_cast<size_t>(info.second); // cast to size_t to avoid overflow
+        std::copy_n(ptr, non_target_length, buffer);
     }
 
 public:
     template<typename Value_>
     const Value_* fetch_block(Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
-        fetch_raw(i, buffer, [&](Index_ start, Index_ length, CachedValue_* buf) {
+        fetch_raw(i, buffer, block_length, [&](Index_ start, Index_ length, CachedValue_* buf) {
             extract_block(my_by_h5_row, start, length, block_start, block_length, buf, *my_h5comp);
         });
         return buffer;
@@ -384,7 +377,7 @@ public:
 
     template<typename Value_>
     const Value_* fetch_indices(Index_ i, const std::vector<Index_>& indices, Value_* buffer) {
-        fetch_raw(i, buffer, [&](Index_ start, Index_ length, CachedValue_* buf) {
+        fetch_raw(i, buffer, indices.size(), [&](Index_ start, Index_ length, CachedValue_* buf) {
             extract_indices(my_by_h5_row, start, length, indices, buf, *my_h5comp);
         });
         return buffer;
@@ -420,7 +413,6 @@ struct Full : public tatami::DenseExtractor<oracle_, Value_, Index_> {
             by_h5_row,
             std::move(target_dim_stats),
             std::move(oracle),
-            non_target_dim, 
             slab_stats
         ),
         my_non_target_dim(non_target_dim)
@@ -452,7 +444,6 @@ struct Block : public tatami::DenseExtractor<oracle_, Value_, Index_> {
             by_h5_row,
             std::move(target_dim_stats),
             std::move(oracle),
-            block_length, 
             slab_stats
         ),
         my_block_start(block_start),
@@ -484,7 +475,6 @@ struct Index : public tatami::DenseExtractor<oracle_, Value_, Index_> {
             by_h5_row,
             std::move(target_dim_stats),
             std::move(oracle),
-            indices_ptr->size(), 
             slab_stats
         ),
         my_indices_ptr(std::move(indices_ptr))
