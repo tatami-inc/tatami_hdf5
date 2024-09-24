@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Get latest CMake
       uses: lukka/get-cmake@latest
@@ -24,7 +24,9 @@ jobs:
         sudo cmake --install build
 
     - name: Install HDF5
-      run: sudo apt-get install libhdf5-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install libhdf5-dev
 
     - name: Configure the build
       run: cmake -S . -B build -DTATAMI_HDF5_FETCH_EXTERN=OFF -DTATAMI_HDF5_TESTS=OFF
