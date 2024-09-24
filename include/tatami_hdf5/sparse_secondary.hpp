@@ -422,7 +422,7 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct SecondaryFullDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class SecondaryFullDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     SecondaryFullDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle) :
         my_core(details, std::move(oracle), details.primary_dim, true, true),
@@ -464,7 +464,8 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct SecondaryBlockDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class SecondaryBlockDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+public:
     SecondaryBlockDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length) :
         my_core(details, std::move(oracle), block_length, true, true),
         my_block_start(block_start),

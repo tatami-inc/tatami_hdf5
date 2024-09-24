@@ -279,7 +279,8 @@ public:
 };
 
 template<typename Index_, typename CachedValue_>
-struct OracularCore {
+class OracularCore {
+public:
     OracularCore(
         const std::string& file_name,
         const std::string& dataset_name, 
@@ -318,7 +319,7 @@ private:
     CachedValue_* my_transposition_buffer_ptr;
     std::vector<std::pair<Slab*, Index_> > my_cache_transpose_info;
 
-public:
+private:
     template<typename Value_, class Extract_>
     void fetch_raw([[maybe_unused]] Index_ i, Value_* buffer, size_t non_target_length, Extract_ extract) {
         auto info = my_cache.next(
@@ -398,7 +399,8 @@ using DenseCore = typename std::conditional<solo_,
  ***************************/
 
 template<bool solo_, bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct Full : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class Full : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+public:
     Full(
         const std::string& file_name, 
         const std::string& dataset_name, 
@@ -428,7 +430,8 @@ private:
 };
 
 template<bool solo_, bool oracle_, typename Value_, typename Index_, typename CachedValue_> 
-struct Block : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class Block : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+public:
     Block(
         const std::string& file_name, 
         const std::string& dataset_name, 
@@ -460,7 +463,8 @@ private:
 };
 
 template<bool solo_, bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-struct Index : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class Index : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+public:
     Index(
         const std::string& file_name, 
         const std::string& dataset_name, 
