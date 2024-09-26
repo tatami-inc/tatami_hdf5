@@ -308,6 +308,16 @@ private:
     size_t my_offset = 0;
 
 private:
+    template<class Function_>
+    static void sort_by_field(std::vector<std::pair<Index_, Slab*> >& indices, Function_ field) {
+        auto comp = [&field](const std::pair<Index_, Slab*>& l, const std::pair<Index_, Slab*>& r) -> bool {
+            return field(l) < field(r);
+        };
+        if (!std::is_sorted(indices.begin(), indices.end(), comp)) {
+            std::sort(indices.begin(), indices.end(), comp);
+        }
+    }
+
     template<typename Value_, class Unionize_>
     void fetch_raw([[maybe_unused]] Index_ i, Value_* buffer, size_t non_target_length, Unionize_ unionize) {
         auto info = my_cache.next(
@@ -323,9 +333,7 @@ private:
             /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks, std::vector<std::pair<Index_, Slab*> >& to_reuse) {
                 // Defragmenting the existing chunks. We sort by offset to make 
                 // sure that we're not clobbering in-use slabs during the copy().
-                std::sort(to_reuse.begin(), to_reuse.end(), [](const std::pair<Index_, Slab*>& left, const std::pair<Index_, Slab*>& right) -> bool { 
-                    return left.second->offset < right.second->offset; 
-                });
+                sort_by_field(to_reuse, [](const std::pair<Index_, Slab*>& x) -> size_t { return x.second->offset; });
 
                 auto dest = my_memory_pool.data();
                 size_t running_offset = 0;
@@ -343,7 +351,7 @@ private:
                 // to populate the contiguous memory pool that we made available after
                 // defragmentation; then we just update the slab pointers to refer
                 // to the slices of memory corresponding to each slab.
-                std::sort(chunks.begin(), chunks.end());
+                sort_by_field(chunks, [](const std::pair<Index_, Slab*>& x) -> Index_ { return x.first; });
 
                 serialize([&]() -> void {
                     auto& components = *my_h5comp;
