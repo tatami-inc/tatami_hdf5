@@ -537,6 +537,13 @@ public:
     }
 };
 
+// COMMENT: technically, for all oracular extractors, we could pretend that the chunk length on the target dimension is 1.
+// This would allow us to only extract the desired indices on each call, allowing for more efficient use of the cache.
+// (In the transposed case, we would also reduce the amount of transposition that we need to perform.)
+// The problem is that we would get harshly penalized for any chunk reuse outside of the current prediction cycle,
+// where the chunk would need to be read from disk again if the exact elements weren't already in the cache.
+// This access pattern might not be uncommon after applying a DelayedSubset with shuffled rows/columns. 
+
 template<bool solo_, bool oracle_, bool by_h5_row_, typename Index_, typename CachedValue_>
 using DenseCore = typename std::conditional<solo_, 
       SoloCore<oracle_, by_h5_row_, Index_>,
