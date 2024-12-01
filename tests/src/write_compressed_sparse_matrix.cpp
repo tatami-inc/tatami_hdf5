@@ -7,7 +7,7 @@
 #include "tatami_hdf5/write_compressed_sparse_matrix.hpp"
 
 #include "tatami_test/tatami_test.hpp"
-#include "tatami_test/temp_file_path.hpp"
+#include "temp_file_path.h"
 
 #include <vector>
 #include <random>
@@ -19,14 +19,20 @@ class WriteCompressedSparseMatrixBasicTest : public ::testing::TestWithParam<int
 
 TEST_P(WriteCompressedSparseMatrixBasicTest, SparseColumn) {
     const size_t NR = 200, NC = 100;
-    auto triplets = tatami_test::simulate_sparse_compressed<double>(NC, NR, 0.05, 0, 100);
-    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NC, NR, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.data), std::move(triplets.index), std::move(triplets.indptr));
 
     tatami_hdf5::WriteCompressedSparseMatrixOptions param_core;
     param_core.num_threads = GetParam();
 
     // Dumping it.
-    auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
+    auto fpath = temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
@@ -49,7 +55,7 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, SparseColumn) {
     // Roundtripping.
     {
         auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
-        tatami_test::test_simple_row_access(reloaded.get(), &mat);
+        tatami_test::test_simple_row_access(*reloaded, mat);
     }
 
     // Forcing it to be integer.
@@ -73,11 +79,11 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, SparseColumn) {
         auto mwrk = mat.dense_row();
         auto rwrk = reloaded->dense_row();
         for (size_t r = 0; r < NR; ++r) {
-            auto matrow = tatami_test::fetch(mwrk.get(), static_cast<int>(r), NC);
+            auto matrow = tatami_test::fetch(*mwrk, static_cast<int>(r), NC);
             for (auto& x : matrow) {
                 x = static_cast<int>(x);
             }
-            auto relrow = tatami_test::fetch(rwrk.get(), static_cast<int>(r), NC);
+            auto relrow = tatami_test::fetch(*rwrk, static_cast<int>(r), NC);
             EXPECT_EQ(matrow, relrow);
         }
     }
@@ -85,14 +91,20 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, SparseColumn) {
 
 TEST_P(WriteCompressedSparseMatrixBasicTest, SparseRow) {
     const size_t NR = 200, NC = 100;
-    auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.05, 0, 100);
-    tatami::CompressedSparseRowMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NR, NC, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
+    tatami::CompressedSparseRowMatrix<double, int> mat(NR, NC, std::move(triplets.data), std::move(triplets.index), std::move(triplets.indptr));
 
     tatami_hdf5::WriteCompressedSparseMatrixOptions param_core;
     param_core.num_threads = GetParam();
 
     // Dumping it.
-    auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
+    auto fpath = temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
@@ -112,7 +124,7 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, SparseRow) {
     // Roundtripping.
     {
         auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", true);
-        tatami_test::test_simple_row_access(reloaded.get(), &mat);
+        tatami_test::test_simple_row_access(*reloaded, mat);
     }
 
     // Forcing it to be columnar.
@@ -135,20 +147,26 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, SparseRow) {
 
     {
         auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
-        tatami_test::test_simple_row_access(reloaded.get(), &mat);
+        tatami_test::test_simple_row_access(*reloaded, mat);
     }
 }
 
 TEST_P(WriteCompressedSparseMatrixBasicTest, DenseColumn) {
     const size_t NR = 190, NC = 210;
-    auto vec = tatami_test::simulate_sparse_vector<double>(NR * NC, 0.05, 0, 100);
+    auto vec = tatami_test::simulate_vector<double>(NR * NC, []{
+        tatami_test::SimulateVectorOptions opt;
+        opt.density = 0.05;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
     tatami::DenseColumnMatrix<double, int> mat(NR, NC, std::move(vec));
 
     tatami_hdf5::WriteCompressedSparseMatrixOptions param_core;
     param_core.num_threads = GetParam();
 
     // Dumping it.
-    auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
+    auto fpath = temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
@@ -157,19 +175,25 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, DenseColumn) {
 
     // Roundtripping.
     auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
-    tatami_test::test_simple_row_access(reloaded.get(), &mat);
+    tatami_test::test_simple_row_access(*reloaded, mat);
 }
 
 TEST_P(WriteCompressedSparseMatrixBasicTest, DenseRow) {
     const size_t NR = 90, NC = 300;
-    auto vec = tatami_test::simulate_sparse_vector<double>(NR * NC, 0.05, 0, 100);
+    auto vec = tatami_test::simulate_vector<double>(NR * NC, []{
+        tatami_test::SimulateVectorOptions opt;
+        opt.density = 0.05;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
     tatami::DenseRowMatrix<double, int> mat(NR, NC, std::move(vec));
 
     tatami_hdf5::WriteCompressedSparseMatrixOptions param_core;
     param_core.num_threads = GetParam();
 
     // Dumping it.
-    auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
+    auto fpath = temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
@@ -178,7 +202,7 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, DenseRow) {
 
     // Roundtripping.
     auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", true);
-    tatami_test::test_simple_row_access(reloaded.get(), &mat);
+    tatami_test::test_simple_row_access(*reloaded, mat);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -198,8 +222,14 @@ TEST_P(WriteCompressedSparseMatrixUnsignedDataTypeTest, Check) {
     auto nthreads = std::get<1>(params);
 
     const size_t NR = 200, NC = 100;
-    auto triplets = tatami_test::simulate_sparse_compressed<double>(NC, NR, 0.05, 0, 100);
-    for (auto& x : triplets.value) {
+    auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NC, NR, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
+    for (auto& x : triplets.data) {
         x = std::round(x);
         if (type == tatami_hdf5::WriteStorageType::UINT16) {
             x *= 10;
@@ -207,13 +237,13 @@ TEST_P(WriteCompressedSparseMatrixUnsignedDataTypeTest, Check) {
             x *= 1000;
         }
     }
-    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.data), std::move(triplets.index), std::move(triplets.indptr));
 
     tatami_hdf5::WriteCompressedSparseMatrixOptions param_core;
     param_core.num_threads = nthreads;
 
     // Dumping it.
-    auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
+    auto fpath = temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
@@ -240,7 +270,7 @@ TEST_P(WriteCompressedSparseMatrixUnsignedDataTypeTest, Check) {
     // Roundtripping.
     {
         auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
-        tatami_test::test_simple_row_access(reloaded.get(), &mat);
+        tatami_test::test_simple_row_access(*reloaded, mat);
     }
 
     // But we can always force it to a float.
@@ -260,7 +290,7 @@ TEST_P(WriteCompressedSparseMatrixUnsignedDataTypeTest, Check) {
 
     {
         auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
-        tatami_test::test_simple_row_access(reloaded.get(), &mat);
+        tatami_test::test_simple_row_access(*reloaded, mat);
     }
 }
 
@@ -288,8 +318,14 @@ TEST_P(WriteCompressedSparseMatrixSignedDataTypeTest, Check) {
     auto nthreads = std::get<1>(params);
 
     const size_t NR = 200, NC = 100;
-    auto triplets = tatami_test::simulate_sparse_compressed<double>(NC, NR, 0.05, -100, 100);
-    for (auto& x : triplets.value) {
+    auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NC, NR, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = -100;
+        opt.upper = 100;
+        return opt;
+    }());
+    for (auto& x : triplets.data) {
         x = std::round(x);
         if (type == tatami_hdf5::WriteStorageType::INT16) {
             x *= 10;
@@ -297,10 +333,10 @@ TEST_P(WriteCompressedSparseMatrixSignedDataTypeTest, Check) {
             x *= 1000;
         }
     }
-    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.data), std::move(triplets.index), std::move(triplets.indptr));
 
     // Dumping it.
-    auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
+    auto fpath = temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
@@ -328,7 +364,7 @@ TEST_P(WriteCompressedSparseMatrixSignedDataTypeTest, Check) {
 
     // Roundtripping.
     auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
-    tatami_test::test_simple_row_access(reloaded.get(), &mat);
+    tatami_test::test_simple_row_access(*reloaded, mat);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -362,11 +398,17 @@ TEST_P(WriteCompressedSparseMatrixIndexTypeTest, Check) {
         NR = 100000;
     }
 
-    auto triplets = tatami_test::simulate_sparse_compressed<double>(NC, NR, 0.05, -100, 100);
-    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.value), std::move(triplets.index), std::move(triplets.ptr));
+    auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NC, NR, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = -100;
+        opt.upper = 100;
+        return opt;
+    }());
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.data), std::move(triplets.index), std::move(triplets.indptr));
 
     // Dumping it.
-    auto fpath = tatami_test::temp_file_path("tatami-write-test.h5");
+    auto fpath = temp_file_path("tatami-write-test.h5");
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
@@ -394,7 +436,7 @@ TEST_P(WriteCompressedSparseMatrixIndexTypeTest, Check) {
 
     // Roundtripping.
     auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
-    tatami_test::test_simple_row_access(reloaded.get(), &mat);
+    tatami_test::test_simple_row_access(*reloaded, mat);
 }
 
 INSTANTIATE_TEST_SUITE_P(

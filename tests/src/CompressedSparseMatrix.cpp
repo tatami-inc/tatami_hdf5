@@ -6,12 +6,12 @@
 #include "tatami_hdf5/CompressedSparseMatrix.hpp"
 
 #include "tatami_test/tatami_test.hpp"
-#include "tatami_test/temp_file_path.hpp"
+#include "temp_file_path.h"
 
 #include <vector>
 #include <random>
 
-static void dump_to_file(const tatami_test::CompressedSparseDetails<double>& triplets, const std::string& fpath, const std::string& name, int chunk_size = 50) {
+static void dump_to_file(const tatami_test::SimulateCompressedSparseResult<double, int>& triplets, const std::string& fpath, const std::string& name, int chunk_size = 50) {
     H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
     auto ghandle = fhandle.createGroup(name);
 
@@ -20,16 +20,16 @@ static void dump_to_file(const tatami_test::CompressedSparseDetails<double>& tri
         plist.setLayout(H5D_CONTIGUOUS);
     } else {
         plist.setLayout(H5D_CHUNKED);
-        hsize_t chunkdim = std::min(triplets.value.size(), static_cast<size_t>(chunk_size));
+        hsize_t chunkdim = std::min(triplets.data.size(), static_cast<size_t>(chunk_size));
         plist.setChunk(1, &chunkdim);
     }
 
-    hsize_t dims = triplets.value.size();
+    hsize_t dims = triplets.data.size();
     H5::DataSpace dspace(1, &dims);
     {
         H5::DataType dtype(H5::PredType::NATIVE_DOUBLE);
         auto dhandle = ghandle.createDataSet("data", dtype, dspace, plist);
-        dhandle.write(triplets.value.data(), H5::PredType::NATIVE_DOUBLE);
+        dhandle.write(triplets.data.data(), H5::PredType::NATIVE_DOUBLE);
     }
 
     {
@@ -39,11 +39,12 @@ static void dump_to_file(const tatami_test::CompressedSparseDetails<double>& tri
     }
 
     {
-        hsize_t ncp1 = triplets.ptr.size();
+        hsize_t ncp1 = triplets.indptr.size();
         H5::DataSpace dspace(1, &ncp1);
         H5::DataType dtype(H5::PredType::NATIVE_UINT64);
         auto dhandle = ghandle.createDataSet("indptr", dtype, dspace);
-        dhandle.write(triplets.ptr.data(), H5::PredType::NATIVE_LONG);
+        std::vector<uint64_t> copy(triplets.indptr.begin(), triplets.indptr.end()); // making a copy as size_t doesn't have a HDF5 datatype.
+        dhandle.write(copy.data(), H5::PredType::NATIVE_UINT64);
     }
 }
 
@@ -85,27 +86,34 @@ protected:
         size_t NC = dimensions.second;
         auto cache_fraction = std::get<0>(sim_params);
 
-        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.15, 0, 100, /* seed = */ NR * NC + 100 * cache_fraction);
+        auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NR, NC, [&]{
+            tatami_test::SimulateCompressedSparseOptions opt;
+            opt.density = 0.15;
+            opt.lower = 0;
+            opt.upper = 100;
+            opt.seed = NR * NC + 100 * cache_fraction;
+            return opt;
+        }());
         auto hopt = create_options(NR, NC, cache_fraction);
 
         // Generating the file.
-        auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
+        auto fpath = temp_file_path("tatami-sparse-test.h5");
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name);
 
         mat.reset(new tatami_hdf5::CompressedSparseMatrix<double, int>(
             NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt
         )); 
-        ref.reset(new tatami::CompressedSparseRowMatrix<double, int, decltype(triplets.value), decltype(triplets.index), decltype(triplets.ptr)>(
-            NR, NC, triplets.value, triplets.index, triplets.ptr
+        ref.reset(new tatami::CompressedSparseRowMatrix<double, int, decltype(triplets.data), decltype(triplets.index), decltype(triplets.indptr)>(
+            NR, NC, triplets.data, triplets.index, triplets.indptr, false
         ));
 
         // Creating the transposed versions as well.
         tmat.reset(new tatami_hdf5::CompressedSparseMatrix<double, int>(
             NC, NR, fpath, name + "/data", name + "/index", name + "/indptr", false, hopt
         )); 
-        tref.reset(new tatami::CompressedSparseColumnMatrix<double, int, decltype(triplets.value), decltype(triplets.index), decltype(triplets.ptr)>(
-            NC, NR, triplets.value, triplets.index, triplets.ptr, false
+        tref.reset(new tatami::CompressedSparseColumnMatrix<double, int, decltype(triplets.data), decltype(triplets.index), decltype(triplets.indptr)>(
+            NC, NR, triplets.data, triplets.index, triplets.indptr, false
         ));
     }
 };
@@ -144,31 +152,31 @@ TEST_F(SparseMatrixUtilsTest, Basic) {
  *************************************/
 
 class SparseMatrixFullAccessTest : 
-    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters> >, 
+    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessOptions> >, 
     public SparseMatrixTestCore
 {};
 
 TEST_P(SparseMatrixFullAccessTest, Primary) {
-    auto param = GetParam(); 
-    assemble({ {200, 100}, std::get<0>(param) });
-    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
+    auto tparam = GetParam(); 
+    assemble({ {200, 100}, std::get<0>(tparam) });
+    auto opts = tatami_test::convert_test_access_options(std::get<1>(tparam));
 
-    if (tparams.use_row) {
-        tatami_test::test_full_access(tparams, mat.get(), ref.get());
+    if (opts.use_row) {
+        tatami_test::test_full_access(*mat, *ref, opts);
     } else {
-        tatami_test::test_full_access(tparams, tmat.get(), tref.get());
+        tatami_test::test_full_access(*tmat, *tref, opts);
     }
 }
 
 TEST_P(SparseMatrixFullAccessTest, Secondary) {
-    auto param = GetParam(); 
-    assemble({ {50, 40}, std::get<0>(param) }); // smaller for the secondary dimension.
-    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
+    auto tparam = GetParam(); 
+    assemble({ {50, 40}, std::get<0>(tparam) }); // smaller for the secondary dimension.
+    auto opts = tatami_test::convert_test_access_options(std::get<1>(tparam));
 
-    if (tparams.use_row) {
-        tatami_test::test_full_access(tparams, tmat.get(), tref.get());
+    if (opts.use_row) {
+        tatami_test::test_full_access(*tmat, *tref, opts);
     } else {
-        tatami_test::test_full_access(tparams, mat.get(), ref.get());
+        tatami_test::test_full_access(*mat, *ref, opts);
     }
 }
 
@@ -177,7 +185,7 @@ INSTANTIATE_TEST_SUITE_P(
     SparseMatrixFullAccessTest,
     ::testing::Combine(
         SparseMatrixTestCore::create_combinations(),
-        tatami_test::standard_test_access_parameter_combinations()
+        tatami_test::standard_test_access_options_combinations()
     )
 );
 
@@ -185,37 +193,33 @@ INSTANTIATE_TEST_SUITE_P(
  *************************************/
 
 class SparseMatrixBlockAccessTest : 
-    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, double> > >, 
+    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessOptions, std::pair<double, double> > >, 
     public SparseMatrixTestCore
 {};
 
 TEST_P(SparseMatrixBlockAccessTest, Primary) {
-    auto param = GetParam(); 
-    assemble({ {128, 256}, std::get<0>(param) });
-    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
-    auto block = std::get<2>(param);
+    auto tparam = GetParam(); 
+    assemble({ {128, 256}, std::get<0>(tparam) });
+    auto opts = tatami_test::convert_test_access_options(std::get<1>(tparam));
+    auto block = std::get<2>(tparam);
 
-    if (tparams.use_row) {
-        size_t FIRST = block.first * ref->ncol(), LAST = block.second * ref->ncol();
-        tatami_test::test_block_access(tparams, mat.get(), ref.get(), FIRST, LAST);
+    if (opts.use_row) {
+        tatami_test::test_block_access(*mat, *ref, block.first, block.second, opts);
     } else {
-        size_t FIRST = block.first * tref->nrow(), LAST = block.second * tref->nrow();
-        tatami_test::test_block_access(tparams, tmat.get(), tref.get(), FIRST, LAST);
+        tatami_test::test_block_access(*tmat, *tref, block.first, block.second, opts);
     }
 }
 
 TEST_P(SparseMatrixBlockAccessTest, Secondary) {
-    auto param = GetParam(); 
-    assemble({ {30, 50}, std::get<0>(param) }); // smaller for the secondary dimension.
-    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
-    auto block = std::get<2>(param);
+    auto tparam = GetParam(); 
+    assemble({ {30, 50}, std::get<0>(tparam) }); // smaller for the secondary dimension.
+    auto opts = tatami_test::convert_test_access_options(std::get<1>(tparam));
+    auto block = std::get<2>(tparam);
 
-    if (tparams.use_row) {
-        size_t FIRST = block.first * tref->ncol(), LAST = block.second * tref->ncol();
-        tatami_test::test_block_access(tparams, tmat.get(), tref.get(), FIRST, LAST);
+    if (opts.use_row) {
+        tatami_test::test_block_access(*tmat, *tref, block.first, block.second, opts);
     } else {
-        size_t FIRST = block.first * ref->nrow(), LAST = block.second * ref->nrow();
-        tatami_test::test_block_access(tparams, mat.get(), ref.get(), FIRST, LAST);
+        tatami_test::test_block_access(*mat, *ref, block.first, block.second, opts);
     }
 }
 
@@ -224,11 +228,11 @@ INSTANTIATE_TEST_SUITE_P(
     SparseMatrixBlockAccessTest,
     ::testing::Combine(
         SparseMatrixTestCore::create_combinations(),
-        tatami_test::standard_test_access_parameter_combinations(),
+        tatami_test::standard_test_access_options_combinations(),
         ::testing::Values(
             std::make_pair(0.0, 0.333), 
-            std::make_pair(0.222, 0.888), 
-            std::make_pair(0.555, 1.0)
+            std::make_pair(0.222, 0.666), 
+            std::make_pair(0.555, 0.444)
         )
     )
 );
@@ -237,37 +241,33 @@ INSTANTIATE_TEST_SUITE_P(
  *************************************/
 
 class SparseMatrixIndexedAccessTest :
-    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, int> > >, 
+    public ::testing::TestWithParam<std::tuple<SparseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessOptions, std::pair<double, double> > >, 
     public SparseMatrixTestCore
 {};
 
 TEST_P(SparseMatrixIndexedAccessTest, Primary) {
-    auto param = GetParam(); 
-    assemble({ {197, 125}, std::get<0>(param) });
-    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
-    auto index_info = std::get<2>(param);
+    auto tparam = GetParam(); 
+    assemble({ {197, 125}, std::get<0>(tparam) });
+    auto opts = tatami_test::convert_test_access_options(std::get<1>(tparam));
+    auto index_info = std::get<2>(tparam);
 
-    if (tparams.use_row) {
-        size_t FIRST = index_info.first * ref->ncol(), STEP = index_info.second;
-        tatami_test::test_indexed_access(tparams, mat.get(), ref.get(), FIRST, STEP);
+    if (opts.use_row) {
+        tatami_test::test_indexed_access(*mat, *ref, index_info.first, index_info.second, opts);
     } else {
-        size_t FIRST = index_info.first * tref->nrow(), STEP = index_info.second;
-        tatami_test::test_indexed_access(tparams, tmat.get(), tref.get(), FIRST, STEP);
+        tatami_test::test_indexed_access(*tmat, *tref, index_info.first, index_info.second, opts);
     }
 }
 
 TEST_P(SparseMatrixIndexedAccessTest, Secondary) {
-    auto param = GetParam(); 
-    assemble({ {35, 40}, std::get<0>(param) }); // much smaller for the secondary dimension.
-    auto tparams = tatami_test::convert_access_parameters(std::get<1>(param));
-    auto index_info = std::get<2>(param);
+    auto tparam = GetParam(); 
+    assemble({ {35, 40}, std::get<0>(tparam) }); // much smaller for the secondary dimension.
+    auto opts = tatami_test::convert_test_access_options(std::get<1>(tparam));
+    auto index_info = std::get<2>(tparam);
 
-    if (tparams.use_row) {
-        size_t FIRST = index_info.first * tref->ncol(), STEP = index_info.second; 
-        tatami_test::test_indexed_access(tparams, tmat.get(), tref.get(), FIRST, STEP);
+    if (opts.use_row) {
+        tatami_test::test_indexed_access(*tmat, *tref, index_info.first, index_info.second, opts);
     } else {
-        size_t FIRST = index_info.first * ref->nrow(), STEP = index_info.second;
-        tatami_test::test_indexed_access(tparams, mat.get(), ref.get(), FIRST, STEP);
+        tatami_test::test_indexed_access(*mat, *ref, index_info.first, index_info.second, opts);
     }
 }
 
@@ -276,11 +276,11 @@ INSTANTIATE_TEST_SUITE_P(
     SparseMatrixIndexedAccessTest,
     ::testing::Combine(
         SparseMatrixTestCore::create_combinations(),
-        tatami_test::standard_test_access_parameter_combinations(),
+        tatami_test::standard_test_access_options_combinations(),
         ::testing::Values(
-            std::make_pair(0.3, 5), 
-            std::make_pair(0.322, 4), 
-            std::make_pair(0.455, 3)
+            std::make_pair(0.3, 0.2), 
+            std::make_pair(0.322, 0.25), 
+            std::make_pair(0.455, 0.33)
         )
     )
 );
@@ -329,10 +329,10 @@ TEST_P(SparseMatrixReusePrimaryCacheTest, FullExtent) {
     auto full = ref->ncol();
 
     for (auto i : predictions) {
-        auto expected = tatami_test::fetch(rwork.get(), i, full);
-        auto observed = tatami_test::fetch(mwork.get(), i, full);
+        auto expected = tatami_test::fetch(*rwork, i, full);
+        auto observed = tatami_test::fetch(*mwork, i, full);
         EXPECT_EQ(observed, expected);
-        auto observed2 = tatami_test::fetch(mwork2.get(), full);
+        auto observed2 = tatami_test::fetch(*mwork2, full);
         EXPECT_EQ(observed2, expected);
     }
 }
@@ -346,10 +346,10 @@ TEST_P(SparseMatrixReusePrimaryCacheTest, Block) {
     auto mwork2 = mat->dense_row(std::make_unique<tatami::FixedViewOracle<int> >(predictions.data(), predictions.size()), cstart, clen);
 
     for (auto i : predictions) {
-        auto expected = tatami_test::fetch(rwork.get(), i, clen);
-        auto observed = tatami_test::fetch(mwork.get(), i, clen);
+        auto expected = tatami_test::fetch(*rwork, i, clen);
+        auto observed = tatami_test::fetch(*mwork, i, clen);
         EXPECT_EQ(observed, expected);
-        auto observed2 = tatami_test::fetch(mwork2.get(), clen);
+        auto observed2 = tatami_test::fetch(*mwork2, clen);
         EXPECT_EQ(observed2, expected);
     }
 }
@@ -367,10 +367,10 @@ TEST_P(SparseMatrixReusePrimaryCacheTest, Indexed) {
 
     int clen = chosen.size();
     for (auto i : predictions) {
-        auto expected = tatami_test::fetch(rwork.get(), i, clen);
-        auto observed = tatami_test::fetch(mwork.get(), i, clen);
+        auto expected = tatami_test::fetch(*rwork, i, clen);
+        auto observed = tatami_test::fetch(*mwork, i, clen);
         EXPECT_EQ(observed, expected);
-        auto observed2 = tatami_test::fetch(mwork2.get(), clen);
+        auto observed2 = tatami_test::fetch(*mwork2, clen);
         EXPECT_EQ(observed2, expected);
     }
 }
@@ -410,11 +410,18 @@ protected:
         int NR = (use_row ? 500 : 41);
         int NC = (use_row ? 200 : 58);
 
-        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.15, 0, 100, /* seed = */ NR * NC + 100 * cache_fraction);
+        auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NR, NC, [&]{
+            tatami_test::SimulateCompressedSparseOptions opt;
+            opt.density = 0.15;
+            opt.lower = 0;
+            opt.upper = 100;
+            opt.seed = NR * NC + 100 * cache_fraction;
+            return opt;
+        }());
         auto hopt = create_options(NR, NC, cache_fraction);
 
         // Generating the file.
-        auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
+        auto fpath = temp_file_path("tatami-sparse-test.h5");
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name);
 
@@ -429,29 +436,27 @@ protected:
             hopt
         ));
 
-        std::vector<int> vcasted(triplets.value.begin(), triplets.value.end());
+        std::vector<int> vcasted(triplets.data.begin(), triplets.data.end());
         std::vector<uint16_t> icasted(triplets.index.begin(), triplets.index.end());
-        ref.reset(new tatami::CompressedSparseRowMatrix<double, int, decltype(vcasted), decltype(icasted), decltype(triplets.ptr)>(
+        ref.reset(new tatami::CompressedSparseRowMatrix<double, int, decltype(vcasted), decltype(icasted), decltype(triplets.indptr)>(
             NR,
             NC, 
             std::move(vcasted),
             std::move(icasted),
-            triplets.ptr
+            triplets.indptr
         ));
     }
 };
 
 TEST_P(SparseMatrixCacheTypeTest, CastToInt) {
-    tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
-    params.use_row = std::get<1>(tparam);
-    params.use_oracle = std::get<2>(tparam);
+    tatami_test::TestAccessOptions opts;
+    opts.use_row = std::get<1>(tparam);
+    opts.use_oracle = std::get<2>(tparam);
 
-    tatami_test::test_full_access(params, mat.get(), ref.get());
-
-    auto len = params.use_row ? ref->ncol() : ref->nrow();
-    tatami_test::test_block_access(params, mat.get(), ref.get(), len * 0.25, len * 0.7);
-    tatami_test::test_indexed_access(params, mat.get(), ref.get(), len * 0.1, 4);
+    tatami_test::test_full_access(*mat, *ref, opts);
+    tatami_test::test_block_access(*mat, *ref, 0.25, 0.7, opts);
+    tatami_test::test_indexed_access(*mat, *ref, 0.1, 0.25, opts);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -489,30 +494,35 @@ protected:
         int NR = (use_row ? 333 : 50);
         int NC = (use_row ? 444 : 40);
 
-        auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.2, 0, 100, /* seed = */ NR * NC + cache_fraction * 100);
+        auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NR, NC, [&]{
+            tatami_test::SimulateCompressedSparseOptions opt;
+            opt.density = 0.2;
+            opt.lower = 0;
+            opt.upper = 100;
+            opt.seed = NR * NC + cache_fraction * 100;
+            return opt;
+        }());
         auto hopt = create_options(NR, NC, cache_fraction);
 
         // Generating the file; chunk_size = 0 indicates that we want it uncompressed.
-        auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
+        auto fpath = temp_file_path("tatami-sparse-test.h5");
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name, /* chunk_size = */ 0);
 
         mat.reset(new tatami_hdf5::CompressedSparseMatrix<double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt));
-        ref.reset(new tatami::CompressedSparseRowMatrix<double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
+        ref.reset(new tatami::CompressedSparseRowMatrix<double, int>(NR, NC, std::move(triplets.data), std::move(triplets.index), triplets.indptr));
     }
 };
 
 TEST_P(SparseMatrixUncompressedTest, Basic) {
-    tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
-    params.use_row = std::get<1>(tparam);
-    params.use_oracle = std::get<2>(tparam);
+    tatami_test::TestAccessOptions opts;
+    opts.use_row = std::get<1>(tparam);
+    opts.use_oracle = std::get<2>(tparam);
 
-    tatami_test::test_full_access(params, mat.get(), ref.get());
-
-    auto len = params.use_row ? ref->ncol() : ref->nrow();
-    tatami_test::test_block_access(params, mat.get(), ref.get(), len * 0.12, len * 0.8);
-    tatami_test::test_indexed_access(params, mat.get(), ref.get(), len * 0.05, 2);
+    tatami_test::test_full_access(*mat, *ref, opts);
+    tatami_test::test_block_access(*mat, *ref, 0.12, 0.8, opts);
+    tatami_test::test_indexed_access(*mat, *ref, 0.05, 0.25, opts);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -552,42 +562,40 @@ protected:
         int NC = use_row ? 200 : 20;
         int NR = NC;
 
-        tatami_test::CompressedSparseDetails<double> triplets;
-        triplets.ptr.resize(NC + 1);
+        tatami_test::SimulateCompressedSparseResult<double, int> triplets;
+        triplets.indptr.resize(NC + 1);
         std::mt19937_64 rng(NC * NR * 100 * cache_fraction);
         std::normal_distribution ndist;
         for (int i = 1; i < NC; i += 2) {
             triplets.index.push_back(i);
-            triplets.value.push_back(ndist(rng));
-            ++(triplets.ptr[i]);
+            triplets.data.push_back(ndist(rng));
+            ++(triplets.indptr[i]);
         }
         for (int p = 1; p <= NC; ++p) {
-            triplets.ptr[p] += triplets.ptr[p - 1];
+            triplets.indptr[p] += triplets.indptr[p - 1];
         }
 
         auto hopt = create_options(NR, NC, cache_fraction);
 
         // Generating the file.
-        auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
+        auto fpath = temp_file_path("tatami-sparse-test.h5");
         std::string name = "stuff";
         dump_to_file(triplets, fpath, name);
 
         mat.reset(new tatami_hdf5::CompressedSparseMatrix<double, int>(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt));
-        ref.reset(new tatami::CompressedSparseRowMatrix<double, int>(NR, NC, std::move(triplets.value), std::move(triplets.index), triplets.ptr));
+        ref.reset(new tatami::CompressedSparseRowMatrix<double, int>(NR, NC, std::move(triplets.data), std::move(triplets.index), triplets.indptr));
     }
 };
 
 TEST_P(SparseMatrixNearEmptyTest, Basic) {
-    tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
-    params.use_row = std::get<1>(tparam);
-    params.use_oracle = std::get<2>(tparam);
+    tatami_test::TestAccessOptions opts;
+    opts.use_row = std::get<1>(tparam);
+    opts.use_oracle = std::get<2>(tparam);
 
-    tatami_test::test_full_access(params, mat.get(), ref.get());
-
-    auto len = params.use_row ? ref->ncol() : ref->nrow();
-    tatami_test::test_block_access(params, mat.get(), ref.get(), len * 0.17, len * 0.6);
-    tatami_test::test_indexed_access(params, mat.get(), ref.get(), len * 0.33, 3);
+    tatami_test::test_full_access(*mat, *ref, opts);
+    tatami_test::test_block_access(*mat, *ref, 0.17, 0.6, opts);
+    tatami_test::test_indexed_access(*mat, *ref, 0.33, 0.3, opts);
 }
 
 INSTANTIATE_TEST_SUITE_P(

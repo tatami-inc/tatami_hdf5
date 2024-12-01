@@ -5,7 +5,7 @@
 #include "tatami_hdf5/load_compressed_sparse_matrix.hpp"
 
 #include "tatami_test/tatami_test.hpp"
-#include "tatami_test/temp_file_path.hpp"
+#include "temp_file_path.h"
 
 #include <vector>
 #include <random>
@@ -14,20 +14,26 @@ TEST(LoadCompressedSparseMatrixTest, Basic) {
     const size_t NR = 200, NC = 100;
 
     // Dumping a sparse matrix.
-    auto fpath = tatami_test::temp_file_path("tatami-sparse-test.h5");
+    auto fpath = temp_file_path("tatami-sparse-test.h5");
     std::string name = "stuff";
-    auto triplets = tatami_test::simulate_sparse_compressed<double>(NR, NC, 0.05, 0, 100);
+    auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NR, NC, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
 
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto ghandle = fhandle.createGroup(name);
 
-        hsize_t dims = triplets.value.size();
+        hsize_t dims = triplets.data.size();
         H5::DataSpace dspace(1, &dims);
         {
             H5::DataType dtype(H5::PredType::NATIVE_DOUBLE);
             auto dhandle = ghandle.createDataSet("data", dtype, dspace);
-            dhandle.write(triplets.value.data(), H5::PredType::NATIVE_DOUBLE);
+            dhandle.write(triplets.data.data(), H5::PredType::NATIVE_DOUBLE);
         }
 
         {
@@ -37,11 +43,12 @@ TEST(LoadCompressedSparseMatrixTest, Basic) {
         }
 
         {
-            hsize_t ncp1 = triplets.ptr.size();
+            hsize_t ncp1 = triplets.indptr.size();
             H5::DataSpace dspace(1, &ncp1);
             H5::DataType dtype(H5::PredType::NATIVE_UINT64);
             auto dhandle = ghandle.createDataSet("indptr", dtype, dspace);
-            dhandle.write(triplets.ptr.data(), H5::PredType::NATIVE_LONG);
+            std::vector<uint64_t> copy(triplets.indptr.begin(), triplets.indptr.end()); // making a copy as size_t doesn't have a HDF5 datatype.
+            dhandle.write(copy.data(), H5::PredType::NATIVE_UINT64);
         }
     }
 
@@ -51,12 +58,12 @@ TEST(LoadCompressedSparseMatrixTest, Basic) {
         tatami::CompressedSparseRowMatrix<
             double, 
             int, 
-            decltype(triplets.value), 
+            decltype(triplets.data), 
             decltype(triplets.index), 
-            decltype(triplets.ptr)
-        > ref(NR, NC, triplets.value, triplets.index, triplets.ptr);
+            decltype(triplets.indptr)
+        > ref(NR, NC, triplets.data, triplets.index, triplets.indptr);
 
-        tatami_test::test_simple_row_access(mat.get(), &ref);
+        tatami_test::test_simple_row_access(*mat, ref);
     }
 
     // Pretending it's a CSC matrix.
@@ -65,12 +72,12 @@ TEST(LoadCompressedSparseMatrixTest, Basic) {
         tatami::CompressedSparseColumnMatrix<
             double, 
             int, 
-            decltype(triplets.value), 
+            decltype(triplets.data), 
             decltype(triplets.index), 
-            decltype(triplets.ptr)
-        > ref(NC, NR, triplets.value, triplets.index, triplets.ptr);
+            decltype(triplets.indptr)
+        > ref(NC, NR, triplets.data, triplets.index, triplets.indptr);
 
-        tatami_test::test_simple_column_access(mat.get(), &ref);
+        tatami_test::test_simple_column_access(*mat, ref);
     }
 
     // Trying a variety of storage types.
@@ -83,7 +90,7 @@ TEST(LoadCompressedSparseMatrixTest, Basic) {
             std::vector<uint64_t>
         >(NR, NC, fpath, name + "/data", name + "/index", name + "/indptr", true);
 
-        std::vector<double> truncated = triplets.value;
+        std::vector<double> truncated = triplets.data;
         for (auto& x : truncated) {
             x = std::trunc(x);
         }
@@ -93,9 +100,9 @@ TEST(LoadCompressedSparseMatrixTest, Basic) {
             int, 
             decltype(truncated), 
             decltype(triplets.index), 
-            decltype(triplets.ptr)
-        > ref(NR, NC, std::move(truncated), triplets.index, triplets.ptr);
+            decltype(triplets.indptr)
+        > ref(NR, NC, std::move(truncated), triplets.index, triplets.indptr);
 
-        tatami_test::test_simple_column_access(mat.get(), &ref);
+        tatami_test::test_simple_column_access(*mat, ref);
     }
 }

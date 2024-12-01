@@ -6,7 +6,7 @@
 #include "tatami_hdf5/DenseMatrix.hpp"
 
 #include "tatami_test/tatami_test.hpp"
-#include "tatami_test/temp_file_path.hpp"
+#include "temp_file_path.h"
 
 #include <vector>
 #include <random>
@@ -49,8 +49,7 @@ protected:
         auto chunk_sizes = std::get<0>(params);
         auto cache_fraction = std::get<1>(params);
 
-        fpath = tatami_test::temp_file_path("tatami-dense-test.h5");
-        tatami_test::remove_file_path(fpath);
+        fpath = temp_file_path("tatami-dense-test.h5");
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
 
         hsize_t dims[2];
@@ -72,7 +71,13 @@ protected:
 
         name = "stuff";
         auto dhandle = fhandle.createDataSet(name, dtype, dspace, plist);
-        auto values = tatami_test::simulate_dense_vector<double>(NR * NC, 0, 100, /* seed = */ chunk_sizes.first * chunk_sizes.second + 100 * cache_fraction);
+        auto values = tatami_test::simulate_vector<double>(NR * NC, [&]{
+            tatami_test::SimulateVectorOptions opt;
+            opt.lower = 0;
+            opt.upper = 100;
+            opt.seed = chunk_sizes.first * chunk_sizes.second + 100 * cache_fraction;
+            return opt;
+        }());
         dhandle.write(values.data(), H5::PredType::NATIVE_DOUBLE);
 
         ref.reset(new tatami::DenseRowMatrix<double, int>(NR, NC, std::move(values)));
@@ -129,7 +134,7 @@ TEST_F(DenseMatrixUtilsTest, Basic) {
  *************************************/
 
 class DenseMatrixAccessFullTest :
-    public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters> >,
+    public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessOptions> >,
     public DenseMatrixTestCore {
 protected:
     void SetUp() {
@@ -138,9 +143,9 @@ protected:
 };
 
 TEST_P(DenseMatrixAccessFullTest, Basic) {
-    auto params = tatami_test::convert_access_parameters(std::get<1>(GetParam()));
-    tatami_test::test_full_access(params, mat.get(), ref.get());
-    tatami_test::test_full_access(params, tmat.get(), tref.get());
+    auto opts = tatami_test::convert_test_access_options(std::get<1>(GetParam()));
+    tatami_test::test_full_access(*mat, *ref, opts);
+    tatami_test::test_full_access(*tmat, *tref, opts);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -148,7 +153,7 @@ INSTANTIATE_TEST_SUITE_P(
     DenseMatrixAccessFullTest,
     ::testing::Combine(
         DenseMatrixTestCore::create_combinations(), 
-        tatami_test::standard_test_access_parameter_combinations()
+        tatami_test::standard_test_access_options_combinations()
     )
 );
 
@@ -156,7 +161,7 @@ INSTANTIATE_TEST_SUITE_P(
  *************************************/
 
 class DenseSlicedTest : 
-    public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, double> > >,
+    public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessOptions, std::pair<double, double> > >,
     public DenseMatrixTestCore {
 protected:
     void SetUp() {
@@ -166,20 +171,10 @@ protected:
 
 TEST_P(DenseSlicedTest, Basic) {
     auto tparam = GetParam();
-    auto params = tatami_test::convert_access_parameters(std::get<1>(tparam));
+    auto opts = tatami_test::convert_test_access_options(std::get<1>(tparam));
     auto block = std::get<2>(tparam);
-
-    {
-        auto len = params.use_row ? ref->ncol() : ref->nrow();
-        size_t FIRST = block.first * len, LAST = block.second * len;
-        tatami_test::test_block_access(params, mat.get(), ref.get(), FIRST, LAST);
-    }
-
-    {
-        auto len = params.use_row ? tref->ncol() : tref->nrow();
-        size_t FIRST = block.first * len, LAST = block.second * len;
-        tatami_test::test_block_access(params, tmat.get(), tref.get(), FIRST, LAST);
-    }
+    tatami_test::test_block_access(*mat, *ref, block.first, block.second, opts);
+    tatami_test::test_block_access(*tmat, *tref, block.first, block.second, opts);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -187,11 +182,11 @@ INSTANTIATE_TEST_SUITE_P(
     DenseSlicedTest,
     ::testing::Combine(
         DenseMatrixTestCore::create_combinations(), 
-        tatami_test::standard_test_access_parameter_combinations(),
+        tatami_test::standard_test_access_options_combinations(),
         ::testing::Values(
             std::make_pair(0.0, 0.5), 
-            std::make_pair(0.25, 0.75), 
-            std::make_pair(0.51, 1.0)
+            std::make_pair(0.25, 0.5), 
+            std::make_pair(0.51, 0.4)
         )
     )
 );
@@ -200,30 +195,20 @@ INSTANTIATE_TEST_SUITE_P(
  *************************************/
 
 class DenseIndexedTest : 
-    public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessParameters, std::pair<double, int> > >,
+    public ::testing::TestWithParam<std::tuple<DenseMatrixTestCore::SimulationParameters, tatami_test::StandardTestAccessOptions, std::pair<double, double> > >,
     public DenseMatrixTestCore {
 protected:
     void SetUp() {
         assemble(std::get<0>(GetParam()));
     }
 };
-  
+
 TEST_P(DenseIndexedTest, Basic) {
     auto tparam = GetParam();
-    auto params = tatami_test::convert_access_parameters(std::get<1>(tparam));
+    auto opts = tatami_test::convert_test_access_options(std::get<1>(tparam));
     auto index = std::get<2>(tparam);
-
-    {
-        auto len = params.use_row ? ref->ncol() : ref->nrow();
-        size_t FIRST = index.first * len, STEP = index.second;
-        tatami_test::test_indexed_access(params, mat.get(), ref.get(), FIRST, STEP);
-    }
-
-    {
-        auto len = params.use_row ? tref->ncol() : tref->nrow();
-        size_t FIRST = index.first * len, STEP = index.second;
-        tatami_test::test_indexed_access(params, tmat.get(), tref.get(), FIRST, STEP);
-    }
+    tatami_test::test_indexed_access(*mat, *ref, index.first, index.second, opts);
+    tatami_test::test_indexed_access(*tmat, *tref, index.first, index.second, opts);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -231,11 +216,11 @@ INSTANTIATE_TEST_SUITE_P(
     DenseIndexedTest,
     ::testing::Combine(
         DenseMatrixTestCore::create_combinations(), 
-        tatami_test::standard_test_access_parameter_combinations(),
+        tatami_test::standard_test_access_options_combinations(),
         ::testing::Values(
-            std::make_pair(0.3, 5), 
-            std::make_pair(0.11, 9),
-            std::make_pair(0.4, 7)
+            std::make_pair(0.3, 0.2), 
+            std::make_pair(0.11, 0.11),
+            std::make_pair(0.4, 0.15)
         )
     )
 );
@@ -243,7 +228,9 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
-class DenseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<bool, bool> >, public DenseMatrixTestCore {};
+class DenseMatrixCacheTypeTest : 
+    public ::testing::TestWithParam<std::tuple<bool, bool> >, 
+    public DenseMatrixTestCore {};
 
 TEST_P(DenseMatrixCacheTypeTest, CastToInt) {
     assemble(SimulationParameters(std::make_pair(9, 13), 1));
@@ -251,14 +238,14 @@ TEST_P(DenseMatrixCacheTypeTest, CastToInt) {
     tatami_hdf5::DenseMatrix<double, int, int> mat(fpath, name, false);
     auto altref = tatami::convert_to_dense<double, int, int>(ref.get(), true);
 
-    tatami_test::TestAccessParameters params;
     auto tparam = GetParam();
-    params.use_row = std::get<0>(tparam);
-    params.use_oracle = std::get<1>(tparam);
+    tatami_test::TestAccessOptions opts;
+    opts.use_row = std::get<0>(tparam);
+    opts.use_oracle = std::get<1>(tparam);
 
-    tatami_test::test_full_access(params, &mat, altref.get());
-    tatami_test::test_block_access(params, &mat, altref.get(), 5, 20);
-    tatami_test::test_indexed_access(params, &mat, altref.get(), 3, 5);
+    tatami_test::test_full_access(mat, *altref, opts);
+    tatami_test::test_block_access(mat, *altref, 0.2, 0.55, opts);
+    tatami_test::test_indexed_access(mat, *altref, 0.3, 0.2, opts);
 }
 
 INSTANTIATE_TEST_SUITE_P(

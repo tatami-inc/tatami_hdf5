@@ -5,17 +5,22 @@
 #include "tatami_hdf5/load_dense_matrix.hpp"
 
 #include "tatami_test/tatami_test.hpp"
-#include "tatami_test/temp_file_path.hpp"
+#include "temp_file_path.h"
 
 #include <vector>
 #include <random>
 
 TEST(LoadDenseMatrixTest, Basic) {
     size_t NR = 200, NC = 100;
-    auto fpath = tatami_test::temp_file_path("tatami-dense-test.h5");
+    auto fpath = temp_file_path("tatami-dense-test.h5");
     std::string name = "stuff";
 
-    std::vector<double> values = tatami_test::simulate_dense_vector<double>(NR * NC, 0, 100);
+    std::vector<double> values = tatami_test::simulate_vector<double>(NR * NC, []{
+        tatami_test::SimulateVectorOptions opt;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
 
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
@@ -32,14 +37,14 @@ TEST(LoadDenseMatrixTest, Basic) {
     {
         auto mat = tatami_hdf5::load_dense_matrix<double, int>(fpath, name, false);
         tatami::DenseRowMatrix<double, int> ref(NR, NC, values);
-        tatami_test::test_simple_row_access(mat.get(), &ref);
+        tatami_test::test_simple_row_access(*mat, ref);
     }
 
     // Pretending it's a column-major matrix.
     {
         auto mat = tatami_hdf5::load_dense_matrix<double, int, std::vector<double> >(fpath, name, true);
         tatami::DenseColumnMatrix<double, int> ref(NC, NR, values);
-        tatami_test::test_simple_column_access(mat.get(), &ref);
+        tatami_test::test_simple_column_access(*mat, ref);
     }
 
     // Trying a different storage type.
@@ -52,6 +57,6 @@ TEST(LoadDenseMatrixTest, Basic) {
         }
         tatami::DenseRowMatrix<double, int> ref(NR, NC, std::move(truncated));
 
-        tatami_test::test_simple_column_access(mat.get(), &ref);
+        tatami_test::test_simple_column_access(*mat, ref);
     }
 }
