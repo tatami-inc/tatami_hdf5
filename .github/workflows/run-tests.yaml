@@ -67,6 +67,8 @@ jobs:
 
     - name: Upload to Codecov
       if: ${{ matrix.config.cov }}
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         directory: build/tests/CMakeFiles/
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
