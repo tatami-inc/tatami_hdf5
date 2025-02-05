@@ -55,7 +55,8 @@ var searchData=
   ['delayedunaryisometrictanh_52',['DelayedUnaryIsometricTanh',['https://tatami-inc.github.io/tatami/classtatami_1_1DelayedUnaryIsometricTanh.html',1,'tatami']]],
   ['delayedunaryisometrictrunc_53',['DelayedUnaryIsometricTrunc',['https://tatami-inc.github.io/tatami/classtatami_1_1DelayedUnaryIsometricTrunc.html',1,'tatami']]],
   ['densecolumnmatrix_54',['DenseColumnMatrix',['https://tatami-inc.github.io/tatami/classtatami_1_1DenseColumnMatrix.html',1,'tatami']]],
-  ['densematrix_55',['densematrix',['https://tatami-inc.github.io/tatami/classtatami_1_1DenseMatrix.html',1,'tatami::DenseMatrix&lt; typename Value_, typename Index_, class Storage_ &gt;'],['../classtatami__hdf5_1_1DenseMatrix.html',1,'tatami_hdf5::DenseMatrix&lt; Value_, Index_, CachedValue_ &gt;']]],
-  ['densematrixoptions_56',['DenseMatrixOptions',['../structtatami__hdf5_1_1DenseMatrixOptions.html',1,'tatami_hdf5']]],
-  ['denserowmatrix_57',['DenseRowMatrix',['https://tatami-inc.github.io/tatami/classtatami_1_1DenseRowMatrix.html',1,'tatami']]]
+  ['densematrix_55',['DenseMatrix',['https://tatami-inc.github.io/tatami/classtatami_1_1DenseMatrix.html',1,'tatami::DenseMatrix&lt; typename Value_, typename Index_, class Storage_ &gt;'],['../classtatami__hdf5_1_1DenseMatrix.html',1,'tatami_hdf5::DenseMatrix&lt; Value_, Index_, CachedValue_ &gt;']]],
+  ['densematrix_3c_20value_5f_2c_20index_5f_2c_20storage_5f_20_3e_56',['DenseMatrix&lt; Value_, Index_, Storage_ &gt;',['https://tatami-inc.github.io/tatami/classtatami_1_1DenseMatrix.html',1,'tatami']]],
+  ['densematrixoptions_57',['DenseMatrixOptions',['../structtatami__hdf5_1_1DenseMatrixOptions.html',1,'tatami_hdf5']]],
+  ['denserowmatrix_58',['DenseRowMatrix',['https://tatami-inc.github.io/tatami/classtatami_1_1DenseRowMatrix.html',1,'tatami']]]
 ];
