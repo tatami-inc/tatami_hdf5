@@ -93,8 +93,10 @@ void extract_indices(bool h5_row_is_target, Index_ cache_start, Index_ cache_len
     // but hopefully they've fixed the problem with non-consecutive slices in:
     // https://forum.hdfgroup.org/t/union-of-non-consecutive-hyperslabs-is-very-slow/5062
     comp.dataspace.selectNone();
-    tatami::process_consecutive_indices<Index_>(indices.data(), indices.size(),
-        [&](Index_ start, Index_ length) {
+    tatami::process_consecutive_indices<Index_>(
+        indices.data(),
+        indices.size(),
+        [&](Index_ start, Index_ length) -> void {
             offset[non_target_dim] = start;
             count[non_target_dim] = length;
             comp.dataspace.selectHyperslab(H5S_SELECT_OR, count, offset);
@@ -168,7 +170,7 @@ public:
         if constexpr(oracle_) {
             i = my_oracle->get(my_counter++);
         }
-        serialize([&](){
+        serialize([&]() -> void {
             extract_block(by_h5_row_, i, static_cast<Index_>(1), block_start, block_length, buffer, *my_h5comp);
         });
         return buffer;
@@ -179,7 +181,7 @@ public:
         if constexpr(oracle_) {
             i = my_oracle->get(my_counter++);
         }
-        serialize([&](){
+        serialize([&]() -> void {
             extract_indices(by_h5_row_, i, static_cast<Index_>(1), indices, buffer, *my_h5comp);
         });
         return buffer;
@@ -256,17 +258,27 @@ private:
 public:
     template<typename Value_>
     const Value_* fetch_block(Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
-        fetch_raw(i, buffer, block_length, [&](Index_ start, Index_ length, CachedValue_* buf) {
-            extract_block(by_h5_row_, start, length, block_start, block_length, buf, *my_h5comp);
-        });
+        fetch_raw(
+            i, 
+            buffer, 
+            block_length, 
+            [&](Index_ start, Index_ length, CachedValue_* buf) -> void {
+                extract_block(by_h5_row_, start, length, block_start, block_length, buf, *my_h5comp);
+            }
+        );
         return buffer;
     }
 
     template<typename Value_>
     const Value_* fetch_indices(Index_ i, const std::vector<Index_>& indices, Value_* buffer) {
-        fetch_raw(i, buffer, indices.size(), [&](Index_ start, Index_ length, CachedValue_* buf) {
-            extract_indices(by_h5_row_, start, length, indices, buf, *my_h5comp);
-        });
+        fetch_raw(
+            i,
+            buffer,
+            indices.size(), 
+            [&](Index_ start, Index_ length, CachedValue_* buf) -> void {
+                extract_indices(by_h5_row_, start, length, indices, buf, *my_h5comp);
+            }
+        );
         return buffer;
     }
 };
@@ -330,7 +342,7 @@ private:
                 my_offset += my_slab_size;
                 return output;
             },
-            /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks, std::vector<std::pair<Index_, Slab*> >& to_reuse) {
+            /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks, std::vector<std::pair<Index_, Slab*> >& to_reuse) -> void {
                 // Defragmenting the existing chunks. We sort by offset to make 
                 // sure that we're not clobbering in-use slabs during the copy().
                 sort_by_field(to_reuse, [](const std::pair<Index_, Slab*>& x) -> size_t { return x.second->offset; });
@@ -407,35 +419,47 @@ private:
 public:
     template<typename Value_>
     const Value_* fetch_block(Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
-        fetch_raw(i, buffer, block_length, [&](H5::DataSpace& dspace, Index_ run_start, Index_ run_length) {
-            hsize_t offset[2];
-            hsize_t count[2];
-            offset[0] = run_start;
-            offset[1] = block_start;
-            count[0] = run_length;
-            count[1] = block_length;
-            dspace.selectHyperslab(H5S_SELECT_OR, count, offset);
-        });
+        fetch_raw(
+            i,
+            buffer,
+            block_length,
+            [&](H5::DataSpace& dspace, Index_ run_start, Index_ run_length) -> void {
+                hsize_t offset[2];
+                hsize_t count[2];
+                offset[0] = run_start;
+                offset[1] = block_start;
+                count[0] = run_length;
+                count[1] = block_length;
+                dspace.selectHyperslab(H5S_SELECT_OR, count, offset);
+            }
+        );
         return buffer;
     }
 
     template<typename Value_>
     const Value_* fetch_indices(Index_ i, const std::vector<Index_>& indices, Value_* buffer) {
-        fetch_raw(i, buffer, indices.size(), [&](H5::DataSpace& dspace, Index_ run_start, Index_ run_length) {
-            hsize_t offset[2];
-            hsize_t count[2];
-            offset[0] = run_start;
-            count[0] = run_length;
+        fetch_raw(
+            i,
+            buffer,
+            indices.size(),
+            [&](H5::DataSpace& dspace, Index_ run_start, Index_ run_length) -> void {
+                hsize_t offset[2];
+                hsize_t count[2];
+                offset[0] = run_start;
+                count[0] = run_length;
 
-            // See comments in extract_indices().
-            tatami::process_consecutive_indices<Index_>(indices.data(), indices.size(),
-                [&](Index_ start, Index_ length) {
-                    offset[1] = start;
-                    count[1] = length;
-                    dspace.selectHyperslab(H5S_SELECT_OR, count, offset);
-                }
-            );
-        });
+                // See comments in extract_indices().
+                tatami::process_consecutive_indices<Index_>(
+                    indices.data(),
+                    indices.size(),
+                    [&](Index_ start, Index_ length) -> void {
+                        offset[1] = start;
+                        count[1] = length;
+                        dspace.selectHyperslab(H5S_SELECT_OR, count, offset);
+                    }
+                );
+            }
+        );
         return buffer;
     }
 };
@@ -487,7 +511,7 @@ private:
             /* create = */ [&]() -> Slab {
                 return my_factory.create();
             },
-            /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks) {
+            /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks) -> void {
                 my_cache_transpose_info.clear();
 
                 serialize([&]() -> void {
@@ -522,17 +546,27 @@ private:
 public:
     template<typename Value_>
     const Value_* fetch_block(Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
-        fetch_raw(i, buffer, block_length, [&](Index_ start, Index_ length, CachedValue_* buf) {
-            extract_block(false, start, length, block_start, block_length, buf, *my_h5comp);
-        });
+        fetch_raw(
+            i,
+            buffer,
+            block_length,
+            [&](Index_ start, Index_ length, CachedValue_* buf) -> void {
+                extract_block(false, start, length, block_start, block_length, buf, *my_h5comp);
+            }
+        );
         return buffer;
     }
 
     template<typename Value_>
     const Value_* fetch_indices(Index_ i, const std::vector<Index_>& indices, Value_* buffer) {
-        fetch_raw(i, buffer, indices.size(), [&](Index_ start, Index_ length, CachedValue_* buf) {
-            extract_indices(false, start, length, indices, buf, *my_h5comp);
-        });
+        fetch_raw(
+            i,
+            buffer,
+            indices.size(),
+            [&](Index_ start, Index_ length, CachedValue_* buf) -> void {
+                extract_indices(false, start, length, indices, buf, *my_h5comp);
+            }
+        );
         return buffer;
     }
 };

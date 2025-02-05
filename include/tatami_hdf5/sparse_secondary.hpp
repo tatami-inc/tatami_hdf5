@@ -101,7 +101,7 @@ private:
             Index_ clen = tatami_chunked::get_chunk_length(my_secondary_dim_stats, chunk_id);
             std::fill_n(my_cache_count.begin(), clen, 0);
 
-            serialize([&]() {
+            serialize([&]() -> void {
                 extract(chunk_id * my_secondary_dim_stats.chunk_length, clen);
             });
             my_last_chunk_id = chunk_id;
@@ -171,22 +171,28 @@ public:
     // itself (useful for sparse extraction).
     template<bool store_index_>
     tatami::SparseRange<CachedValue_, Index_> fetch_block(Index_ i, Index_ primary_start, Index_ primary_length) {
-        return fetch_raw(i, [&](Index_ secondary_start, Index_ secondary_length) {
-            for (Index_ px = 0; px < primary_length; ++px) {
-                auto primary = px + primary_start;
-                extract_and_append(primary, secondary_start, secondary_length, (store_index_ ? px : primary));
+        return fetch_raw(
+            i,
+            [&](Index_ secondary_start, Index_ secondary_length) -> void {
+                for (Index_ px = 0; px < primary_length; ++px) {
+                    auto primary = px + primary_start;
+                    extract_and_append(primary, secondary_start, secondary_length, (store_index_ ? px : primary));
+                }
             }
-        });
+        );
     }
 
     template<bool store_index_>
     tatami::SparseRange<CachedValue_, Index_> fetch_indices(Index_ i, const std::vector<Index_>& primary_indices) {
-        return fetch_raw(i, [&](Index_ secondary_start, Index_ secondary_length) { 
-            for (Index_ px = 0, end = primary_indices.size(); px < end; ++px) {
-                auto primary = primary_indices[px];
-                extract_and_append(primary, secondary_start, secondary_length, (store_index_ ? px : primary));
+        return fetch_raw(
+            i,
+            [&](Index_ secondary_start, Index_ secondary_length) -> void { 
+                for (Index_ px = 0, end = primary_indices.size(); px < end; ++px) {
+                    auto primary = primary_indices[px];
+                    extract_and_append(primary, secondary_start, secondary_length, (store_index_ ? px : primary));
+                }
             }
-        });
+        );
     }
 };
 
@@ -347,7 +353,7 @@ private:
             tatami::process_consecutive_indices<Index_>(
                 my_found.data(),
                 my_found.size(),
-                [&](Index_ start, Index_ length) {
+                [&](Index_ start, Index_ length) -> void {
                     hsize_t offset = start + new_start;
                     hsize_t count = length;
                     my_h5comp->dataspace.selectHyperslab(H5S_SELECT_OR, &count, &offset);
@@ -375,7 +381,7 @@ public:
     // myopic counterpart, and is not actually needed itself.
     template<bool store_index_>
     tatami::SparseRange<CachedValue_, Index_> fetch_block(Index_, Index_ primary_start, Index_ primary_length) {
-        const auto& info = fetch_raw([&](Index_ secondary_first, Index_ secondary_last_plus_one) {
+        const auto& info = fetch_raw([&](Index_ secondary_first, Index_ secondary_last_plus_one) -> void {
             for (Index_ px = 0; px < primary_length; ++px) {
                 auto primary = px + primary_start;
                 extract_and_append(primary, secondary_first, secondary_last_plus_one, (store_index_ ? px : primary));
@@ -386,7 +392,7 @@ public:
 
     template<bool store_index_>
     tatami::SparseRange<CachedValue_, Index_> fetch_indices(Index_, const std::vector<Index_>& primary_indices) {
-        const auto& info = fetch_raw([&](Index_ secondary_first, Index_ secondary_last_plus_one) {
+        const auto& info = fetch_raw([&](Index_ secondary_first, Index_ secondary_last_plus_one) -> void {
             for (Index_ px = 0, end = primary_indices.size(); px < end; ++px) {
                 auto primary = primary_indices[px];
                 extract_and_append(primary, secondary_first, secondary_last_plus_one, (store_index_ ? px : primary));

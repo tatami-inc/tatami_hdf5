@@ -91,7 +91,7 @@ void initialize(const MatrixDetails<Index_>& details, std::unique_ptr<Components
 }
 
 inline void destroy(std::unique_ptr<Components>& h5comp) {
-    serialize([&]() {
+    serialize([&]() -> void {
         h5comp.reset();
     });
 }
@@ -467,8 +467,10 @@ public:
                         if (this->my_needs_value && num_found > 0) {
                             hsize_t new_start = extraction_start + (indices_start - my_index_buffer.begin());
                             comp.dataspace.selectNone();
-                            tatami::process_consecutive_indices<Index_>(my_found.data(), my_found.size(),
-                                [&](Index_ start, Index_ length) {
+                            tatami::process_consecutive_indices<Index_>(
+                                my_found.data(),
+                                my_found.size(),
+                                [&](Index_ start, Index_ length) -> void {
                                     hsize_t offset = start + new_start;
                                     hsize_t count = length;
                                     comp.dataspace.selectHyperslab(H5S_SELECT_OR, &count, &offset);
@@ -586,7 +588,7 @@ public:
             /* create = */ [&]() -> SlabPrecursor {
                 return SlabPrecursor();
             },
-            /* populate = */ [&](std::vector<std::pair<Index_, size_t> >& to_populate, std::vector<std::pair<Index_, size_t> >& to_reuse, std::vector<SlabPrecursor>& all_preslabs) {
+            /* populate = */ [&](std::vector<std::pair<Index_, size_t> >& to_populate, std::vector<std::pair<Index_, size_t> >& to_reuse, std::vector<SlabPrecursor>& all_preslabs) -> void {
                 size_t dest_offset = 0;
 
                 if (to_reuse.size()) {
@@ -696,7 +698,7 @@ public:
             std::vector<SlabPrecursor>& all_preslabs, 
             std::vector<CachedValue_>& full_value_buffer, 
             std::vector<CachedIndex_>& full_index_buffer) -> void {
-                serialize([&](){
+                serialize([&]() -> void {
                     this->prepare_contiguous_index_spaces(dest_offset, to_populate, all_preslabs);
                     auto& comp = *(this->my_h5comp);
                     if (my_needs_index) {
@@ -748,7 +750,7 @@ public:
             std::vector<SlabPrecursor>& all_preslabs, 
             std::vector<CachedValue_>& full_value_buffer, 
             std::vector<CachedIndex_>& full_index_buffer) -> void {
-                serialize([&](){
+                serialize([&]() -> void {
                     this->prepare_contiguous_index_spaces(dest_offset, to_populate, all_preslabs);
                     auto& comp = *(this->my_h5comp);
                     comp.index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
@@ -851,7 +853,7 @@ public:
             std::vector<SlabPrecursor>& all_preslabs, 
             std::vector<CachedValue_>& full_value_buffer, 
             std::vector<CachedIndex_>& full_index_buffer) -> void {
-                serialize([&](){
+                serialize([&]() -> void {
                     this->prepare_contiguous_index_spaces(dest_offset, to_populate, all_preslabs);
                     auto& comp = *(this->my_h5comp);
                     comp.index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
@@ -882,8 +884,10 @@ public:
                                 // indices in 'found' across 'needed', to reduce the memory usage of 'found';
                                 // otherwise we grossly exceed the cache limits during extraction.
                                 hsize_t new_start = this->my_pointers[p.first] + (indices_start - original_start);
-                                tatami::process_consecutive_indices<Index_>(found.data(), found.size(),
-                                    [&](Index_ start, Index_ length) {
+                                tatami::process_consecutive_indices<Index_>(
+                                    found.data(),
+                                    found.size(),
+                                    [&](Index_ start, Index_ length) -> void {
                                         hsize_t offset = start + new_start;
                                         hsize_t count = length;
                                         comp.dataspace.selectHyperslab(H5S_SELECT_OR, &count, &offset);
