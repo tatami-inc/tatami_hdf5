@@ -410,7 +410,7 @@ using ConditionalSecondaryCore = typename std::conditional<oracle_, OracularSeco
  ********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryFullSparse : public tatami::SparseExtractor<oracle_, Value_, Index_> {
+class SecondaryFullSparse final : public tatami::SparseExtractor<oracle_, Value_, Index_> {
 public:
     SecondaryFullSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, bool needs_value, bool needs_index) : 
         my_core(details, std::move(oracle), details.primary_dim, needs_value, needs_index),
@@ -428,7 +428,7 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryFullDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class SecondaryFullDense final : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     SecondaryFullDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle) :
         my_core(details, std::move(oracle), details.primary_dim, true, true),
@@ -450,7 +450,7 @@ private:
  *********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryBlockSparse : public tatami::SparseExtractor<oracle_, Value_, Index_> {
+class SecondaryBlockSparse final : public tatami::SparseExtractor<oracle_, Value_, Index_> {
 public:
     SecondaryBlockSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length, bool needs_value, bool needs_index) : 
         my_core(details, std::move(oracle), block_length, needs_value, needs_index),
@@ -470,7 +470,7 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryBlockDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class SecondaryBlockDense final : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     SecondaryBlockDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length) :
         my_core(details, std::move(oracle), block_length, true, true),
@@ -494,7 +494,7 @@ private:
  *********************************/
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryIndexSparse : public tatami::SparseExtractor<oracle_, Value_, Index_> {
+class SecondaryIndexSparse final : public tatami::SparseExtractor<oracle_, Value_, Index_> {
 public:
     SecondaryIndexSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, bool needs_value, bool needs_index) : 
         my_core(details, std::move(oracle), indices_ptr->size(), needs_value, needs_index),
@@ -512,7 +512,7 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_>
-class SecondaryIndexDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class SecondaryIndexDense final : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     SecondaryIndexDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr) :
         my_core(details, std::move(oracle), indices_ptr->size(), true, true),

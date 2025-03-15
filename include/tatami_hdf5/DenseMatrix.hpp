@@ -595,7 +595,7 @@ using DenseCore = typename std::conditional<solo_,
  ***************************/
 
 template<bool solo_, bool oracle_, bool by_h5_row_, typename Value_, typename Index_, typename CachedValue_>
-class Full : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class Full final : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     Full(
         const std::string& file_name, 
@@ -624,7 +624,7 @@ private:
 };
 
 template<bool solo_, bool oracle_, bool by_h5_row_, typename Value_, typename Index_, typename CachedValue_> 
-class Block : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class Block final : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     Block(
         const std::string& file_name, 
@@ -655,7 +655,7 @@ private:
 };
 
 template<bool solo_, bool oracle_, bool by_h5_row_, typename Value_, typename Index_, typename CachedValue_>
-class Index : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class Index final : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     Index(
         const std::string& file_name, 
@@ -713,7 +713,7 @@ private:
  * if a smaller type is known to be able to store the values (based on their HDF5 type or other knowledge).
  */
 template<typename Value_, typename Index_, typename CachedValue_ = Value_>
-class DenseMatrix : public tatami::Matrix<Value_, Index_> {
+class DenseMatrix final : public tatami::Matrix<Value_, Index_> {
     std::string my_file_name, my_dataset_name;
     bool my_transpose;
 

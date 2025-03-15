@@ -68,7 +68,7 @@ struct CompressedSparseMatrixOptions {
  * if a smaller type is known to be able to store all indices (based on their HDF5 type or other knowledge).
  */
 template<typename Value_, typename Index_, typename CachedValue_ = Value_, typename CachedIndex_ = Index_>
-class CompressedSparseMatrix : public tatami::Matrix<Value_, Index_> {
+class CompressedSparseMatrix final : public tatami::Matrix<Value_, Index_> {
     Index_ my_nrow, my_ncol;
     std::string my_file_name, my_value_name, my_index_name;
     std::vector<hsize_t> pointers;

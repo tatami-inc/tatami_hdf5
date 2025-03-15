@@ -926,7 +926,7 @@ using ConditionalPrimaryFullCore = typename std::conditional<
 >::type;
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryFullSparse : public tatami::SparseExtractor<oracle_, Value_, Index_> {
+class PrimaryFullSparse final : public tatami::SparseExtractor<oracle_, Value_, Index_> {
 public:
     PrimaryFullSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, bool needs_value, bool needs_index) : 
         my_core(details, std::move(oracle), needs_value, needs_index) {}
@@ -941,7 +941,7 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryFullDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class PrimaryFullDense final : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     PrimaryFullDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle) : 
         my_core(details, std::move(oracle), true, true),
@@ -970,7 +970,7 @@ using ConditionalPrimaryBlockCore = typename std::conditional<
 >::type;
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryBlockSparse : public tatami::SparseExtractor<oracle_, Value_, Index_> {
+class PrimaryBlockSparse final : public tatami::SparseExtractor<oracle_, Value_, Index_> {
 public:
     PrimaryBlockSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length, bool needs_value, bool needs_index) : 
         my_core(details, std::move(oracle), block_start, block_length, needs_value, needs_index) {}
@@ -985,7 +985,7 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryBlockDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class PrimaryBlockDense final : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     PrimaryBlockDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, Index_ block_start, Index_ block_length) :
         my_core(details, std::move(oracle), block_start, block_length, true, true), my_extract_length(block_length) {}
@@ -1012,7 +1012,7 @@ using ConditionalPrimaryIndexCore = typename std::conditional<
 >::type;
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryIndexSparse : public tatami::SparseExtractor<oracle_, Value_, Index_> {
+class PrimaryIndexSparse final : public tatami::SparseExtractor<oracle_, Value_, Index_> {
 public:
     PrimaryIndexSparse(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr, bool needs_value, bool needs_index) : 
         my_core(details, std::move(oracle), *indices_ptr, needs_value, needs_index) {}
@@ -1027,7 +1027,7 @@ private:
 };
 
 template<bool oracle_, typename Value_, typename Index_, typename CachedValue_, typename CachedIndex_>
-class PrimaryIndexDense : public tatami::DenseExtractor<oracle_, Value_, Index_> {
+class PrimaryIndexDense final : public tatami::DenseExtractor<oracle_, Value_, Index_> {
 public:
     PrimaryIndexDense(const MatrixDetails<Index_>& details, tatami::MaybeOracle<oracle_, Index_> oracle, tatami::VectorPtr<Index_> indices_ptr) :
         my_core(details, std::move(oracle), *indices_ptr, true, true), my_extract_length(indices_ptr->size()) {}
