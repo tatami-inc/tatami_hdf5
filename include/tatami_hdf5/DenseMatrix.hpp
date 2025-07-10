@@ -1,16 +1,17 @@
 #ifndef TATAMI_HDF5_DENSE_MATRIX_HPP
 #define TATAMI_HDF5_DENSE_MATRIX_HPP
 
-#include "H5Cpp.h"
+#include "serialize.hpp"
+#include "utils.hpp"
 
 #include <string>
 #include <type_traits>
 #include <cmath>
 #include <vector>
 
-#include "serialize.hpp"
-#include "utils.hpp"
+#include "H5Cpp.h"
 #include "tatami_chunked/tatami_chunked.hpp"
+#include "sanisizer/sanisizer.hpp"
 
 /**
  * @file DenseMatrix.hpp
@@ -33,7 +34,7 @@ struct DenseMatrixOptions {
      * Larger caches improve access speed at the cost of memory usage.
      * Small values may be ignored if `require_minimum_cache` is `true`.
      */
-    size_t maximum_cache_size = 100000000;
+    std::size_t maximum_cache_size = sanisizer::cap<std::size_t>(100000000);
 
     /**
      * Whether to automatically enforce a minimum size for the cache, regardless of `maximum_cache_size`.
@@ -122,10 +123,9 @@ inline void initialize(const std::string& file_name, const std::string& dataset_
     serialize([&]() -> void {
         h5comp.reset(new Components);
 
-        // Turn off HDF5's caching, as we'll be handling that. This allows us
-        // to parallelize extractions without locking when the data has already
-        // been loaded into memory; if we just used HDF5's cache, we would have
-        // to lock on every extraction, given the lack of thread safety.
+        // Turn off HDF5's caching, as we'll be handling that.
+        // This allows us to parallelize extractions without locking when the data has already been loaded into memory.
+        // If we just used HDF5's cache, we would have to lock on every extraction, given the lack of thread safety.
         H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
         fapl.setCache(0, 0, 0, 0);
 
@@ -149,7 +149,7 @@ public:
         const std::string& dataset_name, 
         [[maybe_unused]] tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats, // only listed here for compatibility with the other constructors.
         tatami::MaybeOracle<oracle_, Index_> oracle, 
-        [[maybe_unused]] const tatami_chunked::SlabCacheStats& slab_stats) :
+        [[maybe_unused]] const tatami_chunked::SlabCacheStats<Index_>& slab_stats) :
         my_oracle(std::move(oracle))
     {
         initialize(file_name, dataset_name, my_h5comp);
@@ -162,7 +162,7 @@ public:
 private:
     std::unique_ptr<Components> my_h5comp;
     tatami::MaybeOracle<oracle_, Index_> my_oracle;
-    typename std::conditional<oracle_, size_t, bool>::type my_counter = 0;
+    typename std::conditional<oracle_, tatami::PredictionIndex, bool>::type my_counter = 0;
 
 public:
     template<typename Value_>
@@ -196,7 +196,7 @@ public:
         const std::string& dataset_name, 
         tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats,
         [[maybe_unused]] tatami::MaybeOracle<false, Index_>, // for consistency with the oracular version.
-        const tatami_chunked::SlabCacheStats& slab_stats) :
+        const tatami_chunked::SlabCacheStats<Index_>& slab_stats) :
         my_dim_stats(std::move(target_dim_stats)),
         my_factory(slab_stats), 
         my_cache(slab_stats.max_slabs_in_cache)
@@ -223,7 +223,7 @@ private:
 
 private:
     template<typename Value_, class Extract_>
-    void fetch_raw(Index_ i, Value_* buffer, size_t non_target_length, Extract_ extract) {
+    void fetch_raw(Index_ i, Value_* buffer, Index_ non_target_length, Extract_ extract) {
         Index_ chunk = i / my_dim_stats.chunk_length;
         Index_ index = i % my_dim_stats.chunk_length;
 
@@ -251,7 +251,7 @@ private:
             }
         );
 
-        auto ptr = info.data + non_target_length * static_cast<size_t>(index); // cast to size_t to avoid overflow
+        auto ptr = info.data + sanisizer::product_unsafe<std::size_t>(non_target_length, index);
         std::copy_n(ptr, non_target_length, buffer);
     }
 
@@ -293,11 +293,11 @@ public:
         const std::string& dataset_name, 
         tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats,
         tatami::MaybeOracle<true, Index_> oracle, 
-        const tatami_chunked::SlabCacheStats& slab_stats) :
+        const tatami_chunked::SlabCacheStats<Index_>& slab_stats) :
         my_dim_stats(std::move(target_dim_stats)),
         my_cache(std::move(oracle), slab_stats.max_slabs_in_cache),
         my_slab_size(slab_stats.slab_size_in_elements),
-        my_memory_pool(slab_stats.max_slabs_in_cache * my_slab_size)
+        my_memory_pool(sanisizer::product<decltype(my_memory_pool.size())>(slab_stats.max_slabs_in_cache, my_slab_size))
     {
         initialize(file_name, dataset_name, my_h5comp);
     }
@@ -311,13 +311,13 @@ private:
     tatami_chunked::ChunkDimensionStats<Index_> my_dim_stats;
 
     struct Slab {
-        size_t offset;
+        std::size_t offset;
     };
 
     tatami_chunked::OracularSlabCache<Index_, Index_, Slab, true> my_cache;
-    size_t my_slab_size;
+    std::size_t my_slab_size;
     std::vector<CachedValue_> my_memory_pool;
-    size_t my_offset = 0;
+    std::size_t my_offset = 0;
 
 private:
     template<class Function_>
@@ -331,7 +331,7 @@ private:
     }
 
     template<typename Value_, class Unionize_>
-    void fetch_raw([[maybe_unused]] Index_ i, Value_* buffer, size_t non_target_length, Unionize_ unionize) {
+    void fetch_raw([[maybe_unused]] Index_ i, Value_* buffer, Index_ non_target_length, Unionize_ unionize) {
         auto info = my_cache.next(
             /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
                 return std::pair<Index_, Index_>(current / my_dim_stats.chunk_length, current % my_dim_stats.chunk_length);
@@ -345,10 +345,10 @@ private:
             /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks, std::vector<std::pair<Index_, Slab*> >& to_reuse) -> void {
                 // Defragmenting the existing chunks. We sort by offset to make 
                 // sure that we're not clobbering in-use slabs during the copy().
-                sort_by_field(to_reuse, [](const std::pair<Index_, Slab*>& x) -> size_t { return x.second->offset; });
+                sort_by_field(to_reuse, [](const std::pair<Index_, Slab*>& x) -> std::size_t { return x.second->offset; });
 
                 auto dest = my_memory_pool.data();
-                size_t running_offset = 0;
+                std::size_t running_offset = 0;
                 for (auto& x : to_reuse) {
                     auto& cur_offset = x.second->offset;
                     if (cur_offset != running_offset) {
@@ -412,7 +412,7 @@ private:
             }
         );
 
-        auto ptr = my_memory_pool.data() + info.first->offset + non_target_length * static_cast<size_t>(info.second); // cast to size_t to avoid overflow
+        auto ptr = my_memory_pool.data() + info.first->offset + sanisizer::product_unsafe<std::size_t>(non_target_length, info.second);
         std::copy_n(ptr, non_target_length, buffer);
     }
 
@@ -474,11 +474,11 @@ public:
         const std::string& dataset_name, 
         tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats,
         tatami::MaybeOracle<true, Index_> oracle, 
-        const tatami_chunked::SlabCacheStats& slab_stats) :
+        const tatami_chunked::SlabCacheStats<Index_>& slab_stats) :
         my_dim_stats(std::move(target_dim_stats)),
         my_factory(slab_stats), 
         my_cache(std::move(oracle), slab_stats.max_slabs_in_cache),
-        my_transposition_buffer(slab_stats.slab_size_in_elements),
+        my_transposition_buffer(sanisizer::cast<decltype(my_transposition_buffer.size()>(slab_stats.slab_size_in_elements)),
         my_transposition_buffer_ptr(my_transposition_buffer.data())
     {
         initialize(file_name, dataset_name, my_h5comp);
@@ -503,7 +503,7 @@ private:
 
 private:
     template<typename Value_, class Extract_>
-    void fetch_raw([[maybe_unused]] Index_ i, Value_* buffer, size_t non_target_length, Extract_ extract) {
+    void fetch_raw([[maybe_unused]] Index_ i, Value_* buffer, Index_ non_target_length, Extract_ extract) {
         auto info = my_cache.next(
             /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
                 return std::pair<Index_, Index_>(current / my_dim_stats.chunk_length, current % my_dim_stats.chunk_length);
@@ -539,7 +539,7 @@ private:
             }
         );
 
-        auto ptr = info.first->data + non_target_length * static_cast<size_t>(info.second); // cast to size_t to avoid overflow
+        auto ptr = info.first->data + sanisizer::product_unsafe<std::size_t>(non_target_length, info.second);
         std::copy_n(ptr, non_target_length, buffer);
     }
 
@@ -603,7 +603,7 @@ public:
         tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ non_target_dim,
-        const tatami_chunked::SlabCacheStats& slab_stats) :
+        const tatami_chunked::SlabCacheStats<Index_>& slab_stats) :
         my_core(
             file_name, 
             dataset_name, 
@@ -633,7 +633,7 @@ public:
         tatami::MaybeOracle<oracle_, Index_> oracle,
         Index_ block_start,
         Index_ block_length,
-        const tatami_chunked::SlabCacheStats& slab_stats) :
+        const tatami_chunked::SlabCacheStats<Index_>& slab_stats) :
         my_core( 
             file_name, 
             dataset_name, 
@@ -663,7 +663,7 @@ public:
         tatami_chunked::ChunkDimensionStats<Index_> target_dim_stats,
         tatami::MaybeOracle<oracle_, Index_> oracle,
         tatami::VectorPtr<Index_> indices_ptr,
-        const tatami_chunked::SlabCacheStats& slab_stats) :
+        const tatami_chunked::SlabCacheStats<Index_>& slab_stats) :
         my_core(
             file_name,
             dataset_name, 
@@ -717,7 +717,7 @@ class DenseMatrix final : public tatami::Matrix<Value_, Index_> {
     std::string my_file_name, my_dataset_name;
     bool my_transpose;
 
-    size_t my_cache_size_in_elements;
+    std::size_t my_cache_size_in_elements;
     bool my_require_minimum_cache;
 
     tatami_chunked::ChunkDimensionStats<Index_> my_firstdim_stats, my_seconddim_stats;
@@ -846,7 +846,7 @@ private:
         bool by_h5_row = (row != my_transpose);
         const auto& dim_stats = (by_h5_row ? my_firstdim_stats : my_seconddim_stats);
 
-        tatami_chunked::SlabCacheStats slab_stats(dim_stats.chunk_length, non_target_length, dim_stats.num_chunks, my_cache_size_in_elements, my_require_minimum_cache);
+        tatami_chunked::SlabCacheStats<Index_> slab_stats(dim_stats.chunk_length, non_target_length, dim_stats.num_chunks, my_cache_size_in_elements, my_require_minimum_cache);
         if (slab_stats.max_slabs_in_cache > 0) {
             if (by_h5_row) {
                 return std::make_unique<Extractor_<false, oracle_, true, Value_, Index_, CachedValue_> >(

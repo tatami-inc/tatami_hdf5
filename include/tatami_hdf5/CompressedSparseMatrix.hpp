@@ -1,18 +1,19 @@
 #ifndef TATAMI_HDF5_SPARSE_MATRIX_HPP
 #define TATAMI_HDF5_SPARSE_MATRIX_HPP
 
-#include "H5Cpp.h"
-
-#include <string>
-#include <vector>
-#include <algorithm>
-
-#include "tatami/tatami.hpp"
-
 #include "sparse_primary.hpp"
 #include "sparse_secondary.hpp"
 #include "serialize.hpp"
 #include "utils.hpp"
+
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <cstddef>
+
+#include "H5Cpp.h"
+#include "tatami/tatami.hpp"
+#include "sanisizer/sanisizer.hpp"
 
 /**
  * @file CompressedSparseMatrix.hpp
@@ -35,7 +36,7 @@ struct CompressedSparseMatrixOptions {
      * Larger caches improve access speed at the cost of memory usage.
      * Small values may be ignored as `CompressedSparseMatrix` will always allocate enough to cache a single element of the target dimension.
      */
-    size_t maximum_cache_size = 100000000;
+    std::size_t maximum_cache_size = sanisizer::cap<std::size_t>(100000000);
 };
 
 /**
@@ -74,10 +75,9 @@ class CompressedSparseMatrix final : public tatami::Matrix<Value_, Index_> {
     std::vector<hsize_t> pointers;
     bool my_csr;
 
-    // We distinguish between our own cache of slabs versus HDF5's cache of uncompressed chunks.
-    size_t my_slab_cache_size;
-    size_t my_max_non_zeros;
-    size_t my_chunk_cache_size;
+    std::size_t my_slab_cache_size; // our own cache of slabs.
+    Index_ my_max_non_zeros;
+    hsize_t my_chunk_cache_size; // HDF5's cache of uncompressed chunks.
 
 public:
     /**
@@ -113,21 +113,17 @@ public:
             }
 
             auto phandle = open_and_check_dataset<true>(file_handle, pointer_name);
-            size_t ptr_size = get_array_dimensions<1>(phandle, "pointer_name")[0];
-            size_t dim_p1 = static_cast<size_t>(my_csr ? my_nrow : my_ncol) + 1;
-            if (ptr_size != dim_p1) {
+            auto ptr_size = get_array_dimensions<1>(phandle, "pointer_name")[0];
+            if (ptr_size == 0 || !sanisizer::is_equal(ptr_size - 1, my_csr ? my_nrow : my_ncol)) {
                 throw std::runtime_error("'pointer_name' dataset should have length equal to the number of " + (my_csr ? std::string("rows") : std::string("columns")) + " plus 1");
             }
 
-            // We aim to store two chunks in HDF5's chunk cache; one
-            // overlapping the start of the primary dimension element's range,
-            // and one overlapping the end, so that we don't re-read the
-            // content for the new primary dimension element. To simplify
-            // matters, we just read the chunk sizes (in bytes) for both
-            // datasets and use the larger chunk size for both datasets.
+            // We aim to store two chunks in HDF5's chunk cache; one overlapping the start of the primary dimension element's range, and one overlapping the end.
+            // This ensures that we don't re-read the content for the next/previous primary dimension element, depending on which direction we're going.
+            // To simplify matters, we just read the chunk sizes (in bytes) for both the index/data datasets and use the larger chunk size for both datasets.
             // Hopefully the chunks are not too big...
             hsize_t dchunk_length = 0;
-            size_t dchunk_element_size = 0;
+            std::size_t dchunk_element_size = 0;
             auto dparms = dhandle.getCreatePlist();
             if (dparms.getLayout() == H5D_CHUNKED) {
                 dparms.getChunk(1, &dchunk_length);
@@ -135,14 +131,14 @@ public:
             }
 
             hsize_t ichunk_length = 0;
-            size_t ichunk_element_size = 0;
+            std::size_t ichunk_element_size = 0;
             auto iparms = ihandle.getCreatePlist();
             if (iparms.getLayout() == H5D_CHUNKED) {
                 iparms.getChunk(1, &ichunk_length);
                 ichunk_element_size = ihandle.getDataType().getSize();
             }
 
-            auto non_overflow_double_min = [nonzeros](hsize_t chunk_length) -> size_t {
+            auto non_overflow_double_min = [nonzeros](hsize_t chunk_length) -> hsize_t {
                 // Basically computes std::min(chunk_length * 2, nonzeros) without
                 // overflowing hsize_t, for a potentially silly choice of hsize_t...
                 if (chunk_length < nonzeros) {
@@ -153,12 +149,12 @@ public:
             };
 
             my_chunk_cache_size = std::max(
-                non_overflow_double_min(ichunk_length) * ichunk_element_size, 
-                non_overflow_double_min(dchunk_length) * dchunk_element_size
+                sanisizer::product<hsize_t>(non_overflow_double_min(ichunk_length), ichunk_element_size), 
+                sanisizer::product<hsize_t>(non_overflow_double_min(dchunk_length), dchunk_element_size)
             );
 
             // Checking the contents of the index pointers.
-            pointers.resize(dim_p1);
+            pointers.resize(sanisizer::cast<decltype(pointers.size())>(ptr_size));
             phandle.read(pointers.data(), H5::PredType::NATIVE_HSIZE);
             if (pointers[0] != 0) {
                 throw std::runtime_error("first index pointer should be zero");
