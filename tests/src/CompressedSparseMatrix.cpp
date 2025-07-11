@@ -625,9 +625,8 @@ TEST(SparseMatrix, PrimaryOracularCacheSize) {
     std::vector<hsize_t> pointers { 0, 10, 11, 20, 22, 30, 33, 40, 44 };
     std::size_t slab_size = 10000;
     int max_non_zeros = 4;
-    hsize_t chunk_size = 10;
 
-    tatami_hdf5::CompressedSparseMatrix_internal::MatrixDetails<int> deets(placeholder, placeholder, placeholder, NR, NC, pointers, slab_size, max_non_zeros, chunk_size);
+    tatami_hdf5::CompressedSparseMatrix_internal::MatrixDetails<int> deets(placeholder, placeholder, placeholder, NR, NC, pointers, slab_size, max_non_zeros, {});
     auto chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_cache_size_for_primary_oracular<double, int>(deets, true, true);
     EXPECT_EQ(chosen, 44);
     chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_cache_size_for_primary_oracular<double, int>(deets, false, false);
@@ -643,7 +642,7 @@ TEST(SparseMatrix, PrimaryOracularCacheSize) {
 
     deets.slab_cache_size = 10;
     chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_cache_size_for_primary_oracular<double, int>(deets, true, true);
-    EXPECT_EQ(chosen, 4); // must be at least equal to the maximum number of non-zeros in any primary dimension element.
+    EXPECT_EQ(chosen, max_non_zeros); // must be at least equal to the maximum number of non-zeros in any primary dimension element.
 }
 
 TEST(SparseMatrix, MyopicSecondaryChunkLength) {
@@ -653,9 +652,8 @@ TEST(SparseMatrix, MyopicSecondaryChunkLength) {
     std::vector<hsize_t> pointers { 0, 10, 11, 20, 22, 30, 33, 40, 44, 50, 55 };
     std::size_t slab_size = 10000;
     int max_non_zeros = 4;
-    hsize_t chunk_size = 10;
 
-    tatami_hdf5::CompressedSparseMatrix_internal::MatrixDetails<int> deets(placeholder, placeholder, placeholder, NR, NC, pointers, slab_size, max_non_zeros, chunk_size);
+    tatami_hdf5::CompressedSparseMatrix_internal::MatrixDetails<int> deets(placeholder, placeholder, placeholder, NR, NC, pointers, slab_size, max_non_zeros, {});
     auto chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_chunk_length_for_myopic_secondary<double, int>(deets, NR, true, true);
     EXPECT_EQ(chosen, 20);
     chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_chunk_length_for_myopic_secondary<double, int>(deets, NR, false, false);

@@ -48,6 +48,13 @@ struct Components {
     H5::DataSpace memspace;
 };
 
+struct ChunkCacheSizes {
+    ChunkCacheSizes() = default;
+    ChunkCacheSizes(hsize_t value, hsize_t index) : value(value), index(index) {}
+    hsize_t value = 0;
+    hsize_t index = 0;
+};
+
 // In all cases, we know that max_non_zeros can be safely casted between hsize_t and Index_,
 // because the value is derived from differences between hsize_t pointers.
 // We also know that it can be safely cast to std::size_t, as max_non_zeros is no greater than the dimension extents,
@@ -64,7 +71,7 @@ struct MatrixDetails {
         const std::vector<hsize_t>& pointers, 
         std::size_t slab_cache_size,
         Index_ max_non_zeros,
-        hsize_t chunk_cache_size
+        ChunkCacheSizes chunk_cache_sizes
     ) :
         file_name(file_name), 
         value_name(value_name), 
@@ -74,7 +81,7 @@ struct MatrixDetails {
         pointers(pointers), 
         slab_cache_size(slab_cache_size),
         max_non_zeros(max_non_zeros),
-        chunk_cache_size(chunk_cache_size) 
+        chunk_cache_sizes(std::move(chunk_cache_sizes))
     {}
 
     const std::string& file_name;
@@ -87,7 +94,7 @@ struct MatrixDetails {
 
     std::size_t slab_cache_size; // size for our own cache of slabs.
     Index_ max_non_zeros;
-    hsize_t chunk_cache_size; // size for HDF5's cache of uncompressed chunks.
+    ChunkCacheSizes chunk_cache_sizes; // size for HDF5's cache of uncompressed chunks.
 };
 
 // All HDF5-related members are stored in a separate pointer so we can serialize construction and destruction.
@@ -96,15 +103,20 @@ void initialize(const MatrixDetails<Index_>& details, std::unique_ptr<Components
     serialize([&]() -> void {
         h5comp.reset(new Components);
 
-        // Using some kinda-big prime number as the number of slots. This
-        // doesn't really matter too much as we only intend to store two
-        // chunks at most - see CompressedSparseMatrix.hpp for the rationale.
-        H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
-        fapl.setCache(0, 511, details.chunk_cache_size, 0);
+        auto create_dapl = [&](hsize_t cache_size) -> H5::DSetAccPropList {
+            H5::DSetAccPropList dapl(H5::DSetAccPropList::DEFAULT.getId());
+            dapl.setChunkCache(
+                511,        // Using some kinda-big prime number as the number of slots.
+                            // This doesn't really matter too much as we only intend to store two chunks at most. 
+                cache_size, // This should be large enouh to store two chunks.
+                1           // Set to 1 to discard fully-read chunks first, as we want to keep chunks with unread data.
+            );
+            return dapl;
+        };
 
-        h5comp->file.openFile(details.file_name, H5F_ACC_RDONLY, fapl);
-        h5comp->data_dataset = h5comp->file.openDataSet(details.value_name);
-        h5comp->index_dataset = h5comp->file.openDataSet(details.index_name);
+        h5comp->file.openFile(details.file_name, H5F_ACC_RDONLY);
+        h5comp->data_dataset = h5comp->file.openDataSet(details.value_name, create_dapl(details.chunk_cache_sizes.value));
+        h5comp->index_dataset = h5comp->file.openDataSet(details.index_name, create_dapl(details.chunk_cache_sizes.index));
         h5comp->dataspace = h5comp->data_dataset.getSpace();
     });
 }
