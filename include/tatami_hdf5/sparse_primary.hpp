@@ -862,22 +862,22 @@ public:
             true // We always need indices to figure out what to keep.
         ), 
 
-        secondary_dim(details.secondary_dim),
-        needs_value(needs_value),
-        needs_index(needs_index)
+        my_secondary_dim(details.secondary_dim),
+        my_needs_value(needs_value),
+        my_needs_index(needs_index)
     {
-        populate_sparse_remap_vector<sparse_>(indices, remap, first_index, past_last_index);
+        populate_sparse_remap_vector<sparse_>(indices, my_remap, my_first_index, my_past_last_index);
 
         // Protect pointer differences against overflow when refining primary limits.
-        sanisizer::can_ptrdiff<decltype(this->my_full_index_buffer.begin())>(secondary_dim);
+        sanisizer::can_ptrdiff<decltype(this->my_full_index_buffer.begin())>(my_secondary_dim);
     }
 
 private:
-    Index_ secondary_dim;
-    Index_ first_index, past_last_index;
-    SparseRemapVector<sparse_, Index_> remap;
-    std::vector<Index_> found;
-    bool needs_value, needs_index;
+    Index_ my_secondary_dim;
+    Index_ my_first_index, my_past_last_index;
+    SparseRemapVector<sparse_, Index_> my_remap;
+    std::vector<Index_> my_found;
+    bool my_needs_value, my_needs_index;
 
 public:
     Slab<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
@@ -894,7 +894,7 @@ public:
                     comp.index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
 
                     std::size_t post_shift_len = 0;
-                    if (this->needs_value) {
+                    if (my_needs_value) {
                         comp.dataspace.selectNone();
                     }
 
@@ -907,7 +907,7 @@ public:
                         auto indices_start = full_index_buffer.begin() + pre_shift_offset;
                         auto original_start = indices_start;
                         auto indices_end = indices_start + current_preslab.length;
-                        refine_primary_limits(indices_start, indices_end, secondary_dim, first_index, past_last_index);
+                        refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_first_index, my_past_last_index);
 
                         Index_ num_found = 0;
                         if (indices_start != indices_end) {
@@ -915,22 +915,22 @@ public:
                             num_found = scan_for_indices_in_remap_vector<sparse_>(
                                 indices_start,
                                 indices_end,
-                                first_index,
+                                my_first_index,
                                 fiIt,
-                                found,
-                                remap,
-                                this->needs_value,
-                                this->needs_index
+                                my_found,
+                                my_remap,
+                                my_needs_value,
+                                my_needs_index
                             );
 
-                            if (this->needs_value && !found.empty()) {
+                            if (my_needs_value && !my_found.empty()) {
                                 // We fill up the dataspace on each primary element, rather than accumulating
                                 // indices in 'found' across 'to_populate', to reduce the memory usage of 'found';
                                 // otherwise we grossly exceed the cache limits during extraction.
                                 hsize_t new_start = this->my_pointers[p.first] + (indices_start - original_start);
                                 tatami::process_consecutive_indices<Index_>(
-                                    found.data(),
-                                    found.size(),
+                                    my_found.data(),
+                                    my_found.size(),
                                     [&](Index_ start, Index_ length) -> void {
                                         hsize_t offset = start + new_start;
                                         hsize_t count = length;
@@ -944,7 +944,7 @@ public:
                         post_shift_len += num_found;
                     }
 
-                    if (this->needs_value && post_shift_len > 0) {
+                    if (my_needs_value && post_shift_len > 0) {
                         hsize_t new_len = post_shift_len;
                         comp.memspace.setExtentSimple(1, &new_len);
                         comp.memspace.selectAll();
@@ -952,8 +952,8 @@ public:
                     }
                 });
             },
-            needs_value,
-            needs_index
+            my_needs_value,
+            my_needs_index
         );
     }
 };
