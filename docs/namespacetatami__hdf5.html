@@ -138,9 +138,9 @@ Enumerations</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:aa59696c85ffa51c9d05eb9dcf071f7b0" id="r_aa59696c85ffa51c9d05eb9dcf071f7b0"><td class="memTemplParams" colspan="2">template&lt;typename Value_ , typename Index_ , class ValueStorage_  = std::vector&lt;Value_&gt;, class IndexStorage_  = std::vector&lt;Index_&gt;, class PointerStorage_  = std::vector&lt;size_t&gt;&gt; </td></tr>
-<tr class="memitem:aa59696c85ffa51c9d05eb9dcf071f7b0"><td class="memTemplItemLeft" align="right" valign="top">std::shared_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="#aa59696c85ffa51c9d05eb9dcf071f7b0">load_compressed_sparse_matrix</a> (size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr, bool row)</td></tr>
-<tr class="separator:aa59696c85ffa51c9d05eb9dcf071f7b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a384263136bfe1e251922dadf694903ba" id="r_a384263136bfe1e251922dadf694903ba"><td class="memTemplParams" colspan="2">template&lt;typename Value_ , typename Index_ , class ValueStorage_  = std::vector&lt;Value_&gt;, class IndexStorage_  = std::vector&lt;Index_&gt;, class PointerStorage_  = std::vector&lt;std::size_t&gt;&gt; </td></tr>
+<tr class="memitem:a384263136bfe1e251922dadf694903ba"><td class="memTemplItemLeft" align="right" valign="top">std::shared_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="#a384263136bfe1e251922dadf694903ba">load_compressed_sparse_matrix</a> (Index_ nr, Index_ nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr, bool row)</td></tr>
+<tr class="separator:a384263136bfe1e251922dadf694903ba"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aaaa4d88ae1eafd884f4b225314237ee5" id="r_aaaa4d88ae1eafd884f4b225314237ee5"><td class="memTemplParams" colspan="2">template&lt;typename Value_ , typename Index_ , class ValueStorage_  = std::vector&lt;Value_&gt;&gt; </td></tr>
 <tr class="memitem:aaaa4d88ae1eafd884f4b225314237ee5"><td class="memTemplItemLeft" align="right" valign="top">std::shared_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a>&lt; Value_, Index_ &gt; &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="#aaaa4d88ae1eafd884f4b225314237ee5">load_dense_matrix</a> (const std::string &amp;file, const std::string &amp;name, bool transpose)</td></tr>
 <tr class="separator:aaaa4d88ae1eafd884f4b225314237ee5"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -207,23 +207,23 @@ auto &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>get_default_hdf
 </div>
 </div>
 <h2 class="groupheader">Function Documentation</h2>
-<a id="aa59696c85ffa51c9d05eb9dcf071f7b0" name="aa59696c85ffa51c9d05eb9dcf071f7b0"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa59696c85ffa51c9d05eb9dcf071f7b0">&#9670;&#160;</a></span>load_compressed_sparse_matrix()</h2>
+<a id="a384263136bfe1e251922dadf694903ba" name="a384263136bfe1e251922dadf694903ba"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a384263136bfe1e251922dadf694903ba">&#9670;&#160;</a></span>load_compressed_sparse_matrix()</h2>
 
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;typename Value_ , typename Index_ , class ValueStorage_  = std::vector&lt;Value_&gt;, class IndexStorage_  = std::vector&lt;Index_&gt;, class PointerStorage_  = std::vector&lt;size_t&gt;&gt; </div>
+template&lt;typename Value_ , typename Index_ , class ValueStorage_  = std::vector&lt;Value_&gt;, class IndexStorage_  = std::vector&lt;Index_&gt;, class PointerStorage_  = std::vector&lt;std::size_t&gt;&gt; </div>
       <table class="memname">
         <tr>
           <td class="memname">std::shared_ptr&lt; <a class="elRef" href="https://tatami-inc.github.io/tatami/classtatami_1_1Matrix.html">tatami::Matrix</a>&lt; Value_, Index_ &gt; &gt; tatami_hdf5::load_compressed_sparse_matrix </td>
           <td>(</td>
-          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>nr</em></span>, </td>
+          <td class="paramtype">Index_</td>          <td class="paramname"><span class="paramname"><em>nr</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>nc</em></span>, </td>
+          <td class="paramtype">Index_</td>          <td class="paramname"><span class="paramname"><em>nc</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>

@@ -96,70 +96,73 @@ $(function(){ initResizable(false); });
 <a href="load__compressed__sparse__matrix_8hpp.html">Go to the documentation of this file.</a><div class="fragment"><div class="line"><a id="l00001" name="l00001"></a><span class="lineno">    1</span><span class="preprocessor">#ifndef TATAMI_HDF5_LOAD_SPARSE_MATRIX_HPP</span></div>
 <div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span><span class="preprocessor">#define TATAMI_HDF5_LOAD_SPARSE_MATRIX_HPP</span></div>
 <div class="line"><a id="l00003" name="l00003"></a><span class="lineno">    3</span> </div>
-<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="preprocessor">#include &quot;H5Cpp.h&quot;</span></div>
+<div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="preprocessor">#include &quot;<a class="code" href="utils_8hpp.html">utils.hpp</a>&quot;</span></div>
 <div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span> </div>
 <div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span><span class="preprocessor">#include &lt;string&gt;</span></div>
-<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span> </div>
-<div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="preprocessor">#include &quot;<a class="codeRef" href="https://tatami-inc.github.io/tatami/tatami_8hpp.html">tatami/tatami.hpp</a>&quot;</span></div>
-<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span><span class="preprocessor">#include &quot;<a class="code" href="utils_8hpp.html">utils.hpp</a>&quot;</span></div>
-<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span> </div>
-<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span><span class="keyword">namespace </span><a class="code hl_namespace" href="namespacetatami__hdf5.html">tatami_hdf5</a> {</div>
-<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span> </div>
-<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span><span class="keyword">template</span>&lt;<span class="keyword">typename</span> Value_, <span class="keyword">typename</span> Index_, <span class="keyword">class</span> ValueStorage_ = std::vector&lt;Value_&gt;, <span class="keyword">class</span> IndexStorage_ = std::vector&lt;Index_&gt;, <span class="keyword">class</span> Po<span class="keywordtype">int</span>erStorage_ = std::vector&lt;<span class="keywordtype">size_t</span>&gt; &gt;</div>
-<div class="foldopen" id="foldopen00045" data-start="{" data-end="}">
-<div class="line"><a id="l00045" name="l00045"></a><span class="lineno"><a class="line" href="namespacetatami__hdf5.html#aa59696c85ffa51c9d05eb9dcf071f7b0">   45</a></span>std::shared_ptr&lt;tatami::Matrix&lt;Value_, Index_&gt; &gt; <a class="code hl_function" href="namespacetatami__hdf5.html#aa59696c85ffa51c9d05eb9dcf071f7b0">load_compressed_sparse_matrix</a>(</div>
-<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>    <span class="keywordtype">size_t</span> nr, </div>
-<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>    <span class="keywordtype">size_t</span> nc, </div>
-<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>    <span class="keyword">const</span> std::string&amp; file, </div>
-<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>    <span class="keyword">const</span> std::string&amp; vals, </div>
-<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>    <span class="keyword">const</span> std::string&amp; idx, </div>
-<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>    <span class="keyword">const</span> std::string&amp; ptr,</div>
-<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>    <span class="keywordtype">bool</span> row) </div>
-<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>{</div>
-<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>    H5::H5File file_handle(file, H5F_ACC_RDONLY);</div>
-<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span> </div>
-<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>    <span class="keyword">auto</span> dhandle = open_and_check_dataset&lt;false&gt;(file_handle, vals);</div>
-<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> nonzeros = get_array_dimensions&lt;1&gt;(dhandle, <span class="stringliteral">&quot;vals&quot;</span>)[0];</div>
+<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span><span class="preprocessor">#include &lt;vector&gt;</span></div>
+<div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="preprocessor">#include &lt;cstddef&gt;</span></div>
+<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span> </div>
+<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span><span class="preprocessor">#include &quot;H5Cpp.h&quot;</span></div>
+<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span><span class="preprocessor">#include &quot;<a class="codeRef" href="https://tatami-inc.github.io/tatami/tatami_8hpp.html">tatami/tatami.hpp</a>&quot;</span></div>
+<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="preprocessor">#include &quot;sanisizer/sanisizer.hpp&quot;</span></div>
+<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span> </div>
+<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span><span class="keyword">namespace </span><a class="code hl_namespace" href="namespacetatami__hdf5.html">tatami_hdf5</a> {</div>
+<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span> </div>
+<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span><span class="keyword">template</span>&lt;<span class="keyword">typename</span> Value_, <span class="keyword">typename</span> Index_, <span class="keyword">class</span> ValueStorage_ = std::vector&lt;Value_&gt;, <span class="keyword">class</span> IndexStorage_ = std::vector&lt;Index_&gt;, <span class="keyword">class</span> Po<span class="keywordtype">int</span>erStorage_ = std::vector&lt;std::<span class="keywordtype">size_t</span>&gt; &gt;</div>
+<div class="foldopen" id="foldopen00048" data-start="{" data-end="}">
+<div class="line"><a id="l00048" name="l00048"></a><span class="lineno"><a class="line" href="namespacetatami__hdf5.html#a384263136bfe1e251922dadf694903ba">   48</a></span>std::shared_ptr&lt;tatami::Matrix&lt;Value_, Index_&gt; &gt; <a class="code hl_function" href="namespacetatami__hdf5.html#a384263136bfe1e251922dadf694903ba">load_compressed_sparse_matrix</a>(</div>
+<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>    Index_ nr, </div>
+<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>    Index_ nc, </div>
+<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>    <span class="keyword">const</span> std::string&amp; file, </div>
+<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>    <span class="keyword">const</span> std::string&amp; vals, </div>
+<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>    <span class="keyword">const</span> std::string&amp; idx, </div>
+<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>    <span class="keyword">const</span> std::string&amp; ptr,</div>
+<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span>    <span class="keywordtype">bool</span> row) </div>
+<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>{</div>
+<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span>    H5::H5File file_handle(file, H5F_ACC_RDONLY);</div>
 <div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span> </div>
-<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>    ValueStorage_ x(nonzeros);</div>
-<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>    dhandle.read(x.data(), define_mem_type&lt;<a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a83f5bea1c12d21f81732d6abd0665554">tatami::ElementType&lt;ValueStorage_&gt;</a> &gt;());</div>
-<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>    </div>
-<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>    <span class="keyword">auto</span> ihandle = open_and_check_dataset&lt;true&gt;(file_handle, idx);</div>
-<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>    <span class="keywordflow">if</span> (get_array_dimensions&lt;1&gt;(ihandle, <span class="stringliteral">&quot;idx&quot;</span>)[0] != nonzeros) {</div>
-<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>        <span class="keywordflow">throw</span> std::runtime_error(<span class="stringliteral">&quot;number of non-zero elements is not consistent between &#39;data&#39; and &#39;idx&#39;&quot;</span>);</div>
-<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>    }</div>
-<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span>    IndexStorage_ i(nonzeros);</div>
-<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>    ihandle.read(i.data(), define_mem_type&lt;<a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a83f5bea1c12d21f81732d6abd0665554">tatami::ElementType&lt;IndexStorage_&gt;</a> &gt;());</div>
-<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span> </div>
-<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>    <span class="keyword">auto</span> phandle = open_and_check_dataset&lt;true&gt;(file_handle, ptr);</div>
-<div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> ptr_size = get_array_dimensions&lt;1&gt;(phandle, <span class="stringliteral">&quot;ptr&quot;</span>)[0];</div>
-<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>    <span class="keywordflow">if</span> (ptr_size != (row ? nr : nc) + 1) {</div>
-<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>        <span class="keywordflow">throw</span> std::runtime_error(<span class="stringliteral">&quot;&#39;ptr&#39; dataset should have length equal to the number of &quot;</span> + (row ? std::string(<span class="stringliteral">&quot;rows&quot;</span>) : std::string(<span class="stringliteral">&quot;columns&quot;</span>)) + <span class="stringliteral">&quot; plus 1&quot;</span>);</div>
-<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>    }</div>
-<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span> </div>
-<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span>    <span class="comment">// Because HDF5 doesn&#39;t have a native type for size_t.</span></div>
-<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span>    PointerStorage_ p(ptr_size);</div>
-<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span>    <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(std::is_same&lt;size_t, tatami::ElementType&lt;PointerStorage_&gt; &gt;::value) {</div>
-<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(std::is_same&lt;size_t, hsize_t&gt;::value) {</div>
-<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>            phandle.read(p.data(), H5::PredType::NATIVE_HSIZE);</div>
-<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>            std::vector&lt;hsize_t&gt; p0(ptr_size);</div>
-<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>            phandle.read(p0.data(), H5::PredType::NATIVE_HSIZE);</div>
-<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>            std::copy(p0.begin(), p0.end(), p.begin());</div>
-<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>        }</div>
-<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>    } <span class="keywordflow">else</span> {</div>
-<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>        phandle.read(p.data(), define_mem_type&lt;<a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a83f5bea1c12d21f81732d6abd0665554">tatami::ElementType&lt;PointerStorage_&gt;</a> &gt;());</div>
-<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>    }</div>
-<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span> </div>
-<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>    <span class="keywordflow">return</span> std::make_shared&lt;tatami::CompressedSparseMatrix&lt;Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_&gt; &gt;(nr, nc, std::move(x), std::move(i), std::move(p), row);</div>
-<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span>}</div>
-</div>
+<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>    <span class="keyword">auto</span> dhandle = open_and_check_dataset&lt;false&gt;(file_handle, vals);</div>
+<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>    <span class="keyword">auto</span> nonzeros = get_array_dimensions&lt;1&gt;(dhandle, <span class="stringliteral">&quot;vals&quot;</span>)[0];</div>
+<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span> </div>
+<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>    <span class="keyword">auto</span> x = sanisizer::create&lt;ValueStorage_&gt;(nonzeros);</div>
+<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>    dhandle.read(x.data(), define_mem_type&lt;<a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a83f5bea1c12d21f81732d6abd0665554">tatami::ElementType&lt;ValueStorage_&gt;</a> &gt;());</div>
+<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>    </div>
+<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>    <span class="keyword">auto</span> ihandle = open_and_check_dataset&lt;true&gt;(file_handle, idx);</div>
+<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span>    <span class="keywordflow">if</span> (get_array_dimensions&lt;1&gt;(ihandle, <span class="stringliteral">&quot;idx&quot;</span>)[0] != nonzeros) {</div>
+<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>        <span class="keywordflow">throw</span> std::runtime_error(<span class="stringliteral">&quot;number of non-zero elements is not consistent between &#39;data&#39; and &#39;idx&#39;&quot;</span>);</div>
+<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span>    }</div>
+<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>    <span class="keyword">auto</span> i = sanisizer::create&lt;IndexStorage_&gt;(nonzeros);</div>
+<div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span>    ihandle.read(i.data(), define_mem_type&lt;<a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a83f5bea1c12d21f81732d6abd0665554">tatami::ElementType&lt;IndexStorage_&gt;</a> &gt;());</div>
+<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span> </div>
+<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>    <span class="keyword">auto</span> phandle = open_and_check_dataset&lt;true&gt;(file_handle, ptr);</div>
+<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>    <span class="keyword">auto</span> ptr_size = get_array_dimensions&lt;1&gt;(phandle, <span class="stringliteral">&quot;ptr&quot;</span>)[0];</div>
+<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>    <span class="keywordflow">if</span> (ptr_size == 0 || !sanisizer::is_equal(ptr_size - 1, row ? nr : nc)) {</div>
+<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span>        <span class="keywordflow">throw</span> std::runtime_error(<span class="stringliteral">&quot;&#39;ptr&#39; dataset should have length equal to the number of &quot;</span> + (row ? std::string(<span class="stringliteral">&quot;rows&quot;</span>) : std::string(<span class="stringliteral">&quot;columns&quot;</span>)) + <span class="stringliteral">&quot; plus 1&quot;</span>);</div>
+<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span>    }</div>
+<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span> </div>
+<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>    <span class="comment">// Because HDF5 doesn&#39;t have a native type for size_t.</span></div>
+<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>    <span class="keyword">auto</span> p = sanisizer::create&lt;PointerStorage_&gt;(ptr_size);</div>
+<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>    <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(std::is_same&lt;std::size_t, tatami::ElementType&lt;PointerStorage_&gt; &gt;::value) {</div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span>(std::is_same&lt;std::size_t, hsize_t&gt;::value) {</div>
+<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>            phandle.read(p.data(), H5::PredType::NATIVE_HSIZE);</div>
+<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>            std::vector&lt;hsize_t&gt; p0(ptr_size);</div>
+<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>            phandle.read(p0.data(), H5::PredType::NATIVE_HSIZE);</div>
+<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>            std::copy(p0.begin(), p0.end(), p.begin());</div>
+<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>        }</div>
+<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>        phandle.read(p.data(), define_mem_type&lt;<a class="code hl_typedefRef" href="https://tatami-inc.github.io/tatami/namespacetatami.html#a83f5bea1c12d21f81732d6abd0665554">tatami::ElementType&lt;PointerStorage_&gt;</a> &gt;());</div>
+<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span>    }</div>
 <div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span> </div>
-<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>}</div>
-<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span> </div>
-<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span><span class="preprocessor">#endif</span></div>
-<div class="ttc" id="anamespacetatami__hdf5_html"><div class="ttname"><a href="namespacetatami__hdf5.html">tatami_hdf5</a></div><div class="ttdoc">Representations for matrix data in HDF5 files.</div><div class="ttdef"><b>Definition</b> CompressedSparseMatrix.hpp:23</div></div>
-<div class="ttc" id="anamespacetatami__hdf5_html_aa59696c85ffa51c9d05eb9dcf071f7b0"><div class="ttname"><a href="namespacetatami__hdf5.html#aa59696c85ffa51c9d05eb9dcf071f7b0">tatami_hdf5::load_compressed_sparse_matrix</a></div><div class="ttdeci">std::shared_ptr&lt; tatami::Matrix&lt; Value_, Index_ &gt; &gt; load_compressed_sparse_matrix(size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr, bool row)</div><div class="ttdef"><b>Definition</b> load_compressed_sparse_matrix.hpp:45</div></div>
+<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>    <span class="keywordflow">return</span> std::make_shared&lt;tatami::CompressedSparseMatrix&lt;Value_, Index_, ValueStorage_, IndexStorage_, PointerStorage_&gt; &gt;(nr, nc, std::move(x), std::move(i), std::move(p), row);</div>
+<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>}</div>
+</div>
+<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span> </div>
+<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>}</div>
+<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span> </div>
+<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span><span class="preprocessor">#endif</span></div>
+<div class="ttc" id="anamespacetatami__hdf5_html"><div class="ttname"><a href="namespacetatami__hdf5.html">tatami_hdf5</a></div><div class="ttdoc">Representations for matrix data in HDF5 files.</div><div class="ttdef"><b>Definition</b> CompressedSparseMatrix.hpp:24</div></div>
+<div class="ttc" id="anamespacetatami__hdf5_html_a384263136bfe1e251922dadf694903ba"><div class="ttname"><a href="namespacetatami__hdf5.html#a384263136bfe1e251922dadf694903ba">tatami_hdf5::load_compressed_sparse_matrix</a></div><div class="ttdeci">std::shared_ptr&lt; tatami::Matrix&lt; Value_, Index_ &gt; &gt; load_compressed_sparse_matrix(Index_ nr, Index_ nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr, bool row)</div><div class="ttdef"><b>Definition</b> load_compressed_sparse_matrix.hpp:48</div></div>
 <div class="ttc" id="anamespacetatami_html_a83f5bea1c12d21f81732d6abd0665554"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/namespacetatami.html#a83f5bea1c12d21f81732d6abd0665554">tatami::ElementType</a></div><div class="ttdeci">typename std::remove_cv&lt; typename std::remove_reference&lt; decltype(std::declval&lt; Array_ &gt;()[0])&gt;::type &gt;::type ElementType</div></div>
 <div class="ttc" id="atatami_8hpp_html"><div class="ttname"><a href="https://tatami-inc.github.io/tatami/tatami_8hpp.html">tatami.hpp</a></div></div>
 <div class="ttc" id="autils_8hpp_html"><div class="ttname"><a href="utils_8hpp.html">utils.hpp</a></div><div class="ttdoc">Utilities for HDF5 extraction.</div></div>

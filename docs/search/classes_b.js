@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['writecompressedsparsematrixoptions_0',['WriteCompressedSparseMatrixOptions',['../structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html',1,'tatami_hdf5']]]
+  ['somenumericarray_0',['SomeNumericArray',['https://tatami-inc.github.io/tatami/classtatami_1_1SomeNumericArray.html',1,'tatami']]],
+  ['sparserange_1',['SparseRange',['https://tatami-inc.github.io/tatami/structtatami_1_1SparseRange.html',1,'tatami']]]
 ];

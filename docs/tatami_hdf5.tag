@@ -80,10 +80,10 @@
     <name>tatami_hdf5::CompressedSparseMatrixOptions</name>
     <filename>structtatami__hdf5_1_1CompressedSparseMatrixOptions.html</filename>
     <member kind="variable">
-      <type>size_t</type>
+      <type>std::size_t</type>
       <name>maximum_cache_size</name>
       <anchorfile>structtatami__hdf5_1_1CompressedSparseMatrixOptions.html</anchorfile>
-      <anchor>a56d6478cda41ee0de98e28b71e012046</anchor>
+      <anchor>a961ffcc8dd38d0095219ced5242ac034</anchor>
       <arglist></arglist>
     </member>
   </compound>
@@ -120,10 +120,10 @@
     <name>tatami_hdf5::DenseMatrixOptions</name>
     <filename>structtatami__hdf5_1_1DenseMatrixOptions.html</filename>
     <member kind="variable">
-      <type>size_t</type>
+      <type>std::size_t</type>
       <name>maximum_cache_size</name>
       <anchorfile>structtatami__hdf5_1_1DenseMatrixOptions.html</anchorfile>
-      <anchor>aad0d50678510fe9a6bcb5376dfdbf903</anchor>
+      <anchor>a1db8a78128428df5622108188e965cdc</anchor>
       <arglist></arglist>
     </member>
     <member kind="variable">
@@ -194,10 +194,10 @@
       <arglist></arglist>
     </member>
     <member kind="variable">
-      <type>size_t</type>
+      <type>hsize_t</type>
       <name>chunk_size</name>
       <anchorfile>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</anchorfile>
-      <anchor>ac422ab9cd84eb18345c6361babd3f2fe</anchor>
+      <anchor>a633950d7b6a0d463f32169a9de30db17</anchor>
       <arglist></arglist>
     </member>
     <member kind="variable">
@@ -245,8 +245,8 @@
       <type>std::shared_ptr&lt; tatami::Matrix&lt; Value_, Index_ &gt; &gt;</type>
       <name>load_compressed_sparse_matrix</name>
       <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>aa59696c85ffa51c9d05eb9dcf071f7b0</anchor>
-      <arglist>(size_t nr, size_t nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr, bool row)</arglist>
+      <anchor>a384263136bfe1e251922dadf694903ba</anchor>
+      <arglist>(Index_ nr, Index_ nc, const std::string &amp;file, const std::string &amp;vals, const std::string &amp;idx, const std::string &amp;ptr, bool row)</arglist>
     </member>
     <member kind="function">
       <type>std::shared_ptr&lt; tatami::Matrix&lt; Value_, Index_ &gt; &gt;</type>
