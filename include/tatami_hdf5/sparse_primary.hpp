@@ -36,6 +36,11 @@ struct Components {
     H5::DataSpace memspace;
 };
 
+// In all cases, we know that max_non_zeros can be safely casted between hsize_t and Index_,
+// because the value is derived from differences between hsize_t pointers.
+// We also know that it can be safely cast to std::size_t, as max_non_zeros is no greater than the dimension extents,
+// and we know that the dimension extents must be representable as a std::size_t as per the tatami contract.
+
 template<typename Index_>
 struct MatrixDetails {
     MatrixDetails(
@@ -427,7 +432,7 @@ public:
         PrimaryLruCoreBase<Index_, CachedValue_, CachedIndex_>(
             details, 
             std::move(oracle), 
-            std::min(details.max_non_zeros, sanisizer::cast<Index_>(indices.size())), // Tighten the bounds to fit more elements into the cache.
+            std::min(details.max_non_zeros, static_cast<Index_>(indices.size())), // Tighten the bounds to fit more elements into the cache.
             needs_value, 
             needs_index
         ),
@@ -528,13 +533,12 @@ public:
         bool needs_cached_index) : 
         my_pointers(details.pointers),
         my_cache(std::move(oracle), [&]() -> std::size_t {
-            auto max_nnz = sanisizer::cast<std::size_t>(details.max_non_zeros);
             std::size_t elsize = size_of_cached_element<CachedIndex_, CachedValue_>(needs_cached_value, needs_cached_index);
             if (elsize == 0) {
                 return -1; // i.e., there is no limit on the number of slabs.
             } else {
                 std::size_t proposed = details.slab_cache_size / elsize;
-                return std::max(max_nnz, proposed); // make sure we always have enough space to store at least one dimension element.
+                return std::max(static_cast<std::size_t>(details.max_non_zeros), proposed); // make sure we always have enough space to store at least one dimension element.
             } 
         }())
     {
@@ -604,7 +608,7 @@ public:
                 return std::pair<Index_, Index_>(i, 0); 
             },
             /* estimated_size = */ [&](Index_ i) -> std::size_t {
-                return my_pointers[i + 1] - my_pointers[i]; // cast is safe as we know this value is <= max_non_zeros, and we already checked that for a safe cast to std::size_t in the constructor.
+                return my_pointers[i + 1] - my_pointers[i]; // cast on return is safe as we know this value is <= max_non_zeros.
             },
             /* actual_size = */ [&](Index_, const SlabPrecursor& preslab) -> std::size_t {
                 return preslab.length;

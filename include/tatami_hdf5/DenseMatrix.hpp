@@ -57,6 +57,10 @@ struct Components {
     H5::DataSpace memspace;
 };
 
+// In all cases, we know that the dimension extents can be safely casted between hsize_t and Index_,
+// because we checked for a safe cast (via the ChunkDimensionStats constructor) in the DenseMatrix constructor. 
+// This is in addition to knowing that the extents can be safely casted to size_t as per the tatami contract.
+
 template<typename Index_, typename OutputValue_>
 void extract_block(bool h5_row_is_target, Index_ cache_start, Index_ cache_length, Index_ block_start, Index_ block_length, OutputValue_* buffer, Components& comp) {
     hsize_t offset[2];

@@ -45,7 +45,7 @@ public:
                     return 1; // ensure we have at least one dimension.
                 }
 
-                return std::min(primary_chunkdim, sanisizer::cast<std::size_t>(details.secondary_dim));
+                return std::min(primary_chunkdim, static_cast<std::size_t>(details.secondary_dim));
             }()
         ),
         my_extract_length(extract_length),
@@ -118,7 +118,7 @@ private:
         }
 
         tatami::SparseRange<CachedValue_, Index_> output(my_cache_count[chunk_offset]);
-        auto offset = sanisizer::product_unsafe<std::size_t>(chunk_offset, my_extract_length); // cast to avoid overflow.
+        auto offset = sanisizer::product_unsafe<std::size_t>(chunk_offset, my_extract_length);
         if (my_needs_value) {
             output.value = my_cache_data.data() + offset;
         }

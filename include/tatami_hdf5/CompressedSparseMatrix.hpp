@@ -103,6 +103,15 @@ public:
         my_slab_cache_size(options.maximum_cache_size)
     {
         Index_ primary_dim = my_csr ? my_nrow : my_ncol;
+        Index_ secondary_dim = my_csr ? my_ncol : my_nrow;
+
+        auto dim_as_str = [](bool row) -> std::string {
+            if (row) {
+                return "rows";
+            } else {
+                return "columns";
+            }
+        };
 
         serialize([&]() -> void {
             H5::H5File file_handle(my_file_name, H5F_ACC_RDONLY);
@@ -117,7 +126,7 @@ public:
             auto phandle = open_and_check_dataset<true>(file_handle, pointer_name);
             auto ptr_size = get_array_dimensions<1>(phandle, "pointer_name")[0];
             if (ptr_size == 0 || !sanisizer::is_equal(ptr_size - 1, primary_dim)) {
-                throw std::runtime_error("'pointer_name' dataset should have length equal to the number of " + (my_csr ? std::string("rows") : std::string("columns")) + " plus 1");
+                throw std::runtime_error("'pointer_name' dataset should have length equal to the number of " + dim_as_str(my_csr) + " plus 1");
             }
 
             // We aim to store two chunks in HDF5's chunk cache; one overlapping the start of the primary dimension element's range, and one overlapping the end.
@@ -168,9 +177,15 @@ public:
 
         my_max_non_zeros = 0;
         for (Index_ i = 0; i < primary_dim; ++i) {
-            Index_ diff = pointers[i+1] - pointers[i];
-            if (diff > my_max_non_zeros) {
-                my_max_non_zeros = diff;
+            if (pointers[i+1] < pointers[i]) {
+                throw std::runtime_error("pointers should be ordered");
+            }
+            auto diff = pointers[i+1] - pointers[i];
+            if (sanisizer::is_greater_than(diff, secondary_dim)) {
+                throw std::runtime_error("differences between pointers should be no greater than the number of " + dim_as_str(!my_csr));
+            }
+            if (sanisizer::is_greater_than(diff, my_max_non_zeros)) {
+                my_max_non_zeros = diff; // cast is safe, because we know that it's less than the secondary_dim.
             }
         }
     }
