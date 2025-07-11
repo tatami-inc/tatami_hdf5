@@ -68,10 +68,9 @@ struct MatrixDetails {
     Index_ secondary_dim;
     const std::vector<hsize_t>& pointers;
 
-    // We distinguish between our own cache of slabs versus HDF5's cache of uncompressed chunks.
-    std::size_t slab_cache_size; // our own cache of slabs.
+    std::size_t slab_cache_size; // size for our own cache of slabs.
     Index_ max_non_zeros;
-    hsize_t chunk_cache_size; // HDF5's cache of uncompressed chunks.
+    hsize_t chunk_cache_size; // size for HDF5's cache of uncompressed chunks.
 };
 
 // All HDF5-related members are stored in a separate pointer so we can serialize construction and destruction.
@@ -150,7 +149,7 @@ void refine_primary_limits(IndexIt_& indices_start, IndexIt_& indices_end, Index
 }
 
 template<bool sparse_, typename Index_>
-using SparseRemapVector = typename std::conditional<sparse_, std::vector<uint8_t>, std::vector<Index_> >::type;
+using SparseRemapVector = typename std::conditional<sparse_, std::vector<unsigned char>, std::vector<Index_> >::type;
 
 template<bool sparse_, typename Index_>
 void populate_sparse_remap_vector(const std::vector<Index_>& indices, SparseRemapVector<sparse_, Index_>& remap, Index_& first_index, Index_& past_last_index) {
@@ -529,12 +528,13 @@ public:
         bool needs_cached_index) : 
         my_pointers(details.pointers),
         my_cache(std::move(oracle), [&]() -> std::size_t {
+            auto max_nnz = sanisizer::cast<std::size_t>(details.max_non_zeros);
             std::size_t elsize = size_of_cached_element<CachedIndex_, CachedValue_>(needs_cached_value, needs_cached_index);
             if (elsize == 0) {
                 return -1; // i.e., there is no limit on the number of slabs.
             } else {
                 std::size_t proposed = details.slab_cache_size / elsize;
-                return std::max(sanisizer::cast<std::size_t>(details.max_non_zeros), proposed); // make sure we always have enough space to store at least one dimension element.
+                return std::max(max_nnz, proposed); // make sure we always have enough space to store at least one dimension element.
             } 
         }())
     {
@@ -604,7 +604,7 @@ public:
                 return std::pair<Index_, Index_>(i, 0); 
             },
             /* estimated_size = */ [&](Index_ i) -> std::size_t {
-                return my_pointers[i + 1] - my_pointers[i]; // cast is safe as we know this value is <= max_non_zeros, and we already checked that for a safe cast to std::size_t.
+                return my_pointers[i + 1] - my_pointers[i]; // cast is safe as we know this value is <= max_non_zeros, and we already checked that for a safe cast to std::size_t in the constructor.
             },
             /* actual_size = */ [&](Index_, const SlabPrecursor& preslab) -> std::size_t {
                 return preslab.length;
@@ -689,7 +689,7 @@ protected:
                 auto& next_preslab = all_preslabs[pnext.second];
                 next_preslab.mem_offset = first_preslab.mem_offset + src_len;
                 hsize_t next_len = my_pointers[pnext.first + 1] - my_pointers[pnext.first];
-                next_preslab.length = next_len;
+                next_preslab.length = next_len; // cast is safe, as we know that this is <= max_non_zeros, and we already checked for a safe cast in the constructor.
                 src_len += next_len;
             }
 
@@ -800,7 +800,7 @@ public:
                         auto indices_end = indices_start + current_preslab.length;
                         refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_block_start, my_block_past_end);
 
-                        Index_ new_len = indices_end - indices_start;
+                        Index_ new_len = indices_end - indices_start; // pointer subtraction is safe as we checked this in the constructor.
                         if (new_len) {
                             if (my_needs_index) {
                                 // Shifting the desired block of indices backwards in the same full_index_buffer,
@@ -814,7 +814,7 @@ public:
                                     // For dense extraction, we remove the block start so that the resulting
                                     // indices can be directly used to index into the output buffer.
                                     for (decltype(new_len) i = 0; i < new_len; ++i) {
-                                        indices_dest[i] -= my_block_start;
+                                        *(indices_dest + i) -= my_block_start;
                                     }
                                 }
                             }
@@ -921,7 +921,7 @@ public:
 
                             if (this->needs_value && !found.empty()) {
                                 // We fill up the dataspace on each primary element, rather than accumulating
-                                // indices in 'found' across 'needed', to reduce the memory usage of 'found';
+                                // indices in 'found' across 'to_populate', to reduce the memory usage of 'found';
                                 // otherwise we grossly exceed the cache limits during extraction.
                                 hsize_t new_start = this->my_pointers[p.first] + (indices_start - original_start);
                                 tatami::process_consecutive_indices<Index_>(

@@ -226,7 +226,7 @@ void update_hdf5_stats(const Value_* extracted, Index_ n, WriteSparseHdf5Statist
         output.add_index(i);
     }
 
-    // Checking that there aren't overflows outside of the hot loop.
+    // Checking that there aren't overflows, but doing so outside of the hot loop for perf.
     output.non_zeros = sanisizer::sum<hsize_t>(output.non_zeros, local_nonzero);
 }
 

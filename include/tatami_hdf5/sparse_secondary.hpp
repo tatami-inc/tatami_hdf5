@@ -72,6 +72,10 @@ public:
 
         // Protect pointer differences against overflow when refining primary limits.
         sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim_stats.dimension_extent);
+
+        // Check that resizing will work correctly for these vectors.
+        tatami::can_cast_Index_to_container_size<decltype(my_index_buffer)>(my_secondary_dim_stats.dimension_extent);
+        tatami::can_cast_Index_to_container_size<decltype(my_data_buffer)>(my_secondary_dim_stats.dimension_extent);
     }
 
     ~MyopicSecondaryCore() {
@@ -131,7 +135,7 @@ private:
         if (count == 0) {
             return;
         }
-        tatami::resize_container_to_Index_size(my_index_buffer, count); // this is legal as count <= dimension extents, which are stored as Index_.
+        my_index_buffer.resize(count);
 
         my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
         my_h5comp->memspace.setExtentSimple(1, &count);
@@ -144,7 +148,7 @@ private:
         if (my_needs_index) {
             for (auto x = start; x != end; ++x) {
                 Index_ current = *x - secondary_start;
-                my_cache_index[my_cache_offsets[current] + static_cast<size_t>(my_cache_count[current])] = primary_to_add;
+                my_cache_index[my_cache_offsets[current] + static_cast<std::size_t>(my_cache_count[current])] = primary_to_add;
             }
         }
 
@@ -160,7 +164,7 @@ private:
 
             for (auto x = start; x != end; ++x) {
                 Index_ current = *x - secondary_start;
-                my_cache_data[my_cache_offsets[current] + static_cast<size_t>(my_cache_count[current])] = my_data_buffer[x - start];
+                my_cache_data[my_cache_offsets[current] + static_cast<std::size_t>(my_cache_count[current])] = my_data_buffer[x - start];
             }
         }
 
@@ -239,6 +243,10 @@ public:
 
         // Protect pointer differences against overflow when refining primary limits.
         sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim);
+
+        // Check that resizing will work correctly for these vectors.
+        tatami::can_cast_Index_to_container_size<decltype(my_index_buffer)>(my_secondary_dim);
+        tatami::can_cast_Index_to_container_size<decltype(my_data_buffer)>(my_secondary_dim);
     }
 
     ~OracularSecondaryCore() {
@@ -324,7 +332,7 @@ private:
         if (count == 0) {
             return;
         }
-        tatami::resize_container_to_Index_size(my_index_buffer, count); // this is legal as count <= dimension extents, which are stored as Index_.
+        my_index_buffer.resize(count);
 
         my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
         my_h5comp->memspace.setExtentSimple(1, &count);
