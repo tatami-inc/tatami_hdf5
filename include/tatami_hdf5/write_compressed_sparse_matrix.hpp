@@ -142,16 +142,14 @@ inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteS
     return create_1d_compressed_hdf5_dataset(location, *dtype, name, length, deflate_level, chunk);
 }
 
-template<typename Native>
-bool fits_upper_limit(int64_t max) {
-    int64_t limit = std::numeric_limits<Native>::max();
-    return limit >= max;
+template<typename Native_, typename Max_>
+bool fits_upper_limit(Max_ max) {
+    return sanisizer::is_greater_than_or_equal(std::numeric_limits<Native_>::max(), max);
 }
 
-template<typename Native>
-bool fits_lower_limit(int64_t min) {
-    int64_t limit = std::numeric_limits<Native>::min();
-    return limit <= min;
+template<typename Native_, typename Min_>
+bool fits_lower_limit(Min_ min) {
+    return sanisizer::is_less_than_or_equal(std::numeric_limits<Native_>::min(), min);
 }
 /**
  * @endcond
@@ -191,6 +189,7 @@ struct WriteSparseHdf5Statistics {
 
 template<typename Value_, typename Index_>
 void update_hdf5_stats(const tatami::SparseRange<Value_, Index_>& extracted, WriteSparseHdf5Statistics<Value_, Index_>& output, bool infer_value, bool infer_index) {
+    // We need to protect the addition just in case it overflows from having too many non-zero elements.
     output.non_zeros = sanisizer::sum<hsize_t>sum(output.non_zeros, extracted.number);
 
     if (infer_value) {
@@ -208,15 +207,19 @@ void update_hdf5_stats(const tatami::SparseRange<Value_, Index_>& extracted, Wri
 
 template<typename Value_, typename Index_>
 void update_hdf5_stats(const Value_* extracted, Index_ n, WriteSparseHdf5Statistics<Value_, Index_>& output) {
+    Index_ local_nonzero = 0;
     for (Index_ i = 0; i < n; ++i) {
         auto val = extracted[i];
         if (val == 0) {
             continue;
         }
-        ++output.non_zeros;
+        ++local_nonzeros;
         output.add_value(val);
         output.add_index(i);
     }
+
+    // Checking that there aren't overflows outside of the hot loop.
+    output.non_zeros = sanisizer::sum<hsize_t>sum(output.non_zeros, local_nonzeros);
 }
 
 template<typename Value_, typename Index_>
@@ -320,17 +323,17 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>* mat, H
             auto lower_data = stats.lower_data;
             auto upper_data = stats.upper_data;
             if (lower_data < 0) {
-                if (fits_lower_limit<int8_t>(lower_data) && fits_upper_limit<int8_t>(upper_data)) {
+                if (fits_lower_limit<std::int8_t>(lower_data) && fits_upper_limit<std::int8_t>(upper_data)) {
                     data_type = WriteStorageType::INT8;
-                } else if (fits_lower_limit<int16_t>(lower_data) && fits_upper_limit<int16_t>(upper_data)) {
+                } else if (fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t>(upper_data)) {
                     data_type = WriteStorageType::INT16;
                 } else {
                     data_type = WriteStorageType::INT32;
                 }
             } else {
-                if (fits_upper_limit<uint8_t>(upper_data)) {
+                if (fits_upper_limit<std::uint8_t>(upper_data)) {
                     data_type = WriteStorageType::UINT8;
-                } else if (fits_upper_limit<uint16_t>(upper_data)) {
+                } else if (fits_upper_limit<std::uint16_t>(upper_data)) {
                     data_type = WriteStorageType::UINT16;
                 } else {
                     data_type = WriteStorageType::UINT32;
@@ -341,9 +344,9 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>* mat, H
 
     if (use_auto_index_type) {
         auto upper_index = stats.upper_index;
-        if (fits_upper_limit<uint8_t>(upper_index)) {
+        if (fits_upper_limit<std::uint8_t>(upper_index)) {
             index_type = WriteStorageType::UINT8;
-        } else if (fits_upper_limit<uint16_t>(upper_index)) {
+        } else if (fits_upper_limit<std::uint16_t>(upper_index)) {
             index_type = WriteStorageType::UINT16;
         } else {
             index_type = WriteStorageType::UINT32;
