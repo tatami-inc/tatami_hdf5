@@ -16,11 +16,22 @@
 
 namespace tatami_hdf5 {
 
+// For a compressed sparse matrix, secondary extraction involves extracting elements of the "secondary" dimension, i.e., the one that is not used for grouping non-zero values. 
+// So, for a CSC matrix, this would involve extraction of individual rows; for CSR matrices, columns instead.
+// This cannot be efficiently done without reading through the entire file, but we can mitigate this pain by caching.
+//
+// In the myopic case, we allocate one big slab based on what our cache size can afford.
+// We then scan through the file and cache all values/indices that fall within the chunk interval spanned by the slab.
+// If the next request doesn't fall inside the chunk interval, we define a new chunk interval and repeat this process.
+// This strategy reduces the number of full file scans to the extent of the secondary dimension divided by the chunk length.
+//
+// For the oracular case, we also allocate a big slab, but this time, we know exactly which secondary dimension elements are requested.
+// So for each prediction cycle, we perform a full file scan and accumulate the values/indices that correspond to the requested elements.
+
 namespace CompressedSparseMatrix_internal {
 
 template<typename CachedValue_, typename Index_>
 Index_ choose_chunk_length_for_myopic_secondary(const MatrixDetails<Index_>& details, Index_ primary_extract_length, bool needs_value, bool needs_index) {
-    // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford.
     std::size_t elsize = CompressedSparseMatrix_internal::size_of_cached_element<CachedValue_, Index_>(needs_value, needs_index);
     if (elsize == 0 || primary_extract_length == 0) {
         return details.secondary_dim; // caching the entire secondary dimension, if possible.

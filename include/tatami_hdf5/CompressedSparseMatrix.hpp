@@ -102,6 +102,8 @@ public:
         my_csr(csr),
         my_slab_cache_size(options.maximum_cache_size)
     {
+        // Here, the 'primary' dimension refers to the dimension by which the non-zero elements are grouped.
+        // The secondary dimension is, well, the other dimension.
         Index_ primary_dim = my_csr ? my_nrow : my_ncol;
         Index_ secondary_dim = my_csr ? my_ncol : my_nrow;
 

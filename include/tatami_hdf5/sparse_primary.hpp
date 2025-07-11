@@ -17,6 +17,18 @@
 
 namespace tatami_hdf5 {
 
+// For a compressed sparse matrix, primary extraction involves extracting elements of the "primary" dimension, i.e., that along which non-zero entries are grouped.
+// So, for a CSC matrix, this would involve extraction of individual columns; for CSR matrices, rows instead.
+// This can be efficiently done as it involves a single contiguous read from the file.
+//
+// In the myopic case, we cache slabs where each slab contains one primary dimension element.
+// The slab itself has enough memory to hold the maximum number of zeros in any dimension element, to ensure that any slab can hold any dimension element.
+// This is initially conservative but slabs are re-used across requests, and with enough re-use, eventually all slabs will have capacity equal to the maximum number of zeros.
+//
+// In the oracular case, we use variable slabs where we read an entire stretch of values/indices from file at once according to the predictions.
+// The cache memory pool is contiguous, so in the best case, this amounts to a single read call through the HDF5 library.
+// Some shuffling is required to handle situations where the same primary dimension element is re-used or only a subset of the element is required.
+
 namespace CompressedSparseMatrix_internal {
 
 /***************************
