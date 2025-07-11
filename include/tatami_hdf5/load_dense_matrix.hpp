@@ -43,7 +43,7 @@ std::shared_ptr<tatami::Matrix<Value_, Index_> > load_dense_matrix(const std::st
     auto dhandle = open_and_check_dataset<false>(fhandle, name);
 
     auto dims = get_array_dimensions<2>(dhandle, name);
-    ValueStorage_ values(sanisizer::product<decltype<ValueStorage_>().size())>(dims[0], dims[1]);
+    ValueStorage_ values(sanisizer::product<decltype(std::declval<ValueStorage_>().size())>(dims[0], dims[1]));
     dhandle.read(values.data(), define_mem_type<tatami::ElementType<ValueStorage_> >());
 
     if (transpose) {

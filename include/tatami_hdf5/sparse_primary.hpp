@@ -347,7 +347,7 @@ public:
         PrimaryLruCoreBase<Index_, CachedValue_, CachedIndex_>(
             details,
             std::move(oracle), 
-            std::min(details.max_non_zeros, sanisizer::cast<std::size_t>(block_length)), // Tighten the bounds if we can, to fit more elements into the cache.
+            std::min(details.max_non_zeros, block_length), // Tighten the bounds if we can, to fit more elements into the cache.
             needs_value, 
             needs_index
         ),
@@ -356,7 +356,7 @@ public:
         my_block_past_end(block_start + block_length)
     {
         // Protect pointer differences against overflow when refining primary limits.
-        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(details.primary_dim);
+        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim);
     }
 
 private:
@@ -428,7 +428,7 @@ public:
         PrimaryLruCoreBase<Index_, CachedValue_, CachedIndex_>(
             details, 
             std::move(oracle), 
-            std::min(details.max_non_zeros, sanisizer::cast<std::size_t>(indices.size())), // Tighten the bounds to fit more elements into the cache.
+            std::min(details.max_non_zeros, sanisizer::cast<Index_>(indices.size())), // Tighten the bounds to fit more elements into the cache.
             needs_value, 
             needs_index
         ),
@@ -437,7 +437,7 @@ public:
         populate_sparse_remap_vector<sparse_>(indices, my_remap, my_first_index, my_past_last_index);
 
         // Protect pointer differences against overflow when refining primary limits.
-        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(details.primary_dim);
+        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim);
     }
 
 private:
@@ -665,7 +665,7 @@ protected:
         sort_by_field(to_populate, [&](const std::pair<Index_, std::size_t>& p) -> hsize_t { return my_pointers[p.first]; });
 
         auto num_needed = to_populate.size();
-        decltype(num_needed) so_far = 0;
+        decltype(num_needed) sofar = 0;
         hsize_t combined_len = 0;
         my_h5comp->dataspace.selectNone();
 
@@ -761,7 +761,7 @@ public:
         my_needs_index(needs_index)
     {
         // Protect pointer differences against overflow when refining primary limits.
-        sanisizer::can_ptrdiff<decltype(this->my_full_index_buffer.begin())>(details.primary_dim);
+        sanisizer::can_ptrdiff<decltype(this->my_full_index_buffer.begin())>(my_secondary_dim);
     }
 
 private:
@@ -865,7 +865,7 @@ public:
         populate_sparse_remap_vector<sparse_>(indices, remap, first_index, past_last_index);
 
         // Protect pointer differences against overflow when refining primary limits.
-        sanisizer::can_ptrdiff<decltype(this->my_full_index_buffer.begin())>(details.primary_dim);
+        sanisizer::can_ptrdiff<decltype(this->my_full_index_buffer.begin())>(secondary_dim);
     }
 
 private:

@@ -144,12 +144,20 @@ inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteS
 
 template<typename Native_, typename Max_>
 bool fits_upper_limit(Max_ max) {
-    return sanisizer::is_greater_than_or_equal(std::numeric_limits<Native_>::max(), max);
+    if constexpr(std::is_integral<Max_>::value) {
+        return sanisizer::is_greater_than_or_equal(std::numeric_limits<Native_>::max(), max);
+    } else {
+        return false;
+    }
 }
 
 template<typename Native_, typename Min_>
 bool fits_lower_limit(Min_ min) {
-    return sanisizer::is_less_than_or_equal(std::numeric_limits<Native_>::min(), min);
+    if constexpr(std::is_integral<Min_>::value) {
+        return sanisizer::is_less_than_or_equal(std::numeric_limits<Native_>::min(), min);
+    } else {
+        return false;
+    }
 }
 /**
  * @endcond
@@ -190,7 +198,7 @@ struct WriteSparseHdf5Statistics {
 template<typename Value_, typename Index_>
 void update_hdf5_stats(const tatami::SparseRange<Value_, Index_>& extracted, WriteSparseHdf5Statistics<Value_, Index_>& output, bool infer_value, bool infer_index) {
     // We need to protect the addition just in case it overflows from having too many non-zero elements.
-    output.non_zeros = sanisizer::sum<hsize_t>sum(output.non_zeros, extracted.number);
+    output.non_zeros = sanisizer::sum<hsize_t>(output.non_zeros, extracted.number);
 
     if (infer_value) {
         for (Index_ i = 0; i < extracted.number; ++i) {
@@ -213,13 +221,13 @@ void update_hdf5_stats(const Value_* extracted, Index_ n, WriteSparseHdf5Statist
         if (val == 0) {
             continue;
         }
-        ++local_nonzeros;
+        ++local_nonzero;
         output.add_value(val);
         output.add_index(i);
     }
 
     // Checking that there aren't overflows outside of the hot loop.
-    output.non_zeros = sanisizer::sum<hsize_t>sum(output.non_zeros, local_nonzeros);
+    output.non_zeros = sanisizer::sum<hsize_t>(output.non_zeros, local_nonzero);
 }
 
 template<typename Value_, typename Index_>

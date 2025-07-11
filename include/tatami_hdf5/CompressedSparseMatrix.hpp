@@ -102,6 +102,8 @@ public:
         my_csr(csr),
         my_slab_cache_size(options.maximum_cache_size)
     {
+        Index_ primary_dim = my_csr ? my_nrow : my_ncol;
+
         serialize([&]() -> void {
             H5::H5File file_handle(my_file_name, H5F_ACC_RDONLY);
             auto dhandle = open_and_check_dataset<false>(file_handle, my_value_name);
@@ -114,7 +116,7 @@ public:
 
             auto phandle = open_and_check_dataset<true>(file_handle, pointer_name);
             auto ptr_size = get_array_dimensions<1>(phandle, "pointer_name")[0];
-            if (ptr_size == 0 || !sanisizer::is_equal(ptr_size - 1, my_csr ? my_nrow : my_ncol)) {
+            if (ptr_size == 0 || !sanisizer::is_equal(ptr_size - 1, primary_dim)) {
                 throw std::runtime_error("'pointer_name' dataset should have length equal to the number of " + (my_csr ? std::string("rows") : std::string("columns")) + " plus 1");
             }
 
@@ -165,8 +167,8 @@ public:
         });
 
         my_max_non_zeros = 0;
-        for (decltype(ptr_size) i = 1; i < ptr_size; ++i) {
-            Index_ diff = pointers[i] - pointers[i-1];
+        for (Index_ i = 0; i < primary_dim; ++i) {
+            Index_ diff = pointers[i+1] - pointers[i];
             if (diff > my_max_non_zeros) {
                 my_max_non_zeros = diff;
             }

@@ -56,12 +56,12 @@ public:
 
         auto cache_size_in_elements = sanisizer::product<std::size_t>(my_secondary_dim_stats.chunk_length, extract_length);
         if (my_needs_value) {
-            my_cache_data.resize(sanisizer::cast<decltype(my_cache_data.size()>(cache_size_in_elements));
+            my_cache_data.resize(sanisizer::cast<decltype(my_cache_data.size())>(cache_size_in_elements));
         }
         if (my_needs_index) {
             my_cache_index.resize(sanisizer::cast<decltype(my_cache_index.size())>(cache_size_in_elements));
         }
-        tatami::resize_container_to_Index_size(my_cache_count.resize, my_secondary_dim_stats.chunk_length);
+        tatami::resize_container_to_Index_size(my_cache_count, my_secondary_dim_stats.chunk_length);
 
         // Precomputing the offsets so we don't have to do the multiplication every time.
         my_cache_offsets.reserve(my_secondary_dim_stats.chunk_length);
@@ -216,7 +216,7 @@ public:
         my_needs_index(needs_index),
         my_cache(
             std::move(oracle),
-            tatami_chunked::SlabCacheStats(
+            tatami_chunked::SlabCacheStats<Index_>(
                 /* target_length = */ 1,
                 /* non_target_length = */ extract_length,
                 /* target_num_chunks = */ my_secondary_dim,
@@ -238,7 +238,7 @@ public:
         my_slab_ptrs.resize(tatami::cast_Index_to_container_size<decltype(my_slab_ptrs)>(my_secondary_dim), NULL);
 
         // Protect pointer differences against overflow when refining primary limits.
-        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim_stats.dimension_extent);
+        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim);
     }
 
     ~OracularSecondaryCore() {

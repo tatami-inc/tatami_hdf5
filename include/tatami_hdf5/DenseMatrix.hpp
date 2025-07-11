@@ -203,7 +203,7 @@ public:
     {
         initialize(file_name, dataset_name, my_h5comp);
         if constexpr(!by_h5_row_) {
-            my_transposition_buffer.resize(sanisizer::cast<decltype(my_transposition_buffer.size()>(slab_stats.slab_size_in_elements));
+            my_transposition_buffer.resize(sanisizer::cast<decltype(my_transposition_buffer.size())>(slab_stats.slab_size_in_elements));
         }
     }
 
@@ -478,7 +478,7 @@ public:
         my_dim_stats(std::move(target_dim_stats)),
         my_factory(slab_stats), 
         my_cache(std::move(oracle), slab_stats.max_slabs_in_cache),
-        my_transposition_buffer(sanisizer::cast<decltype(my_transposition_buffer.size()>(slab_stats.slab_size_in_elements)),
+        my_transposition_buffer(sanisizer::cast<decltype(my_transposition_buffer.size())>(slab_stats.slab_size_in_elements)),
         my_transposition_buffer_ptr(my_transposition_buffer.data())
     {
         initialize(file_name, dataset_name, my_h5comp);
