@@ -11,30 +11,37 @@
 #include <vector>
 #include <random>
 
-static void dump_to_file(const tatami_test::SimulateCompressedSparseResult<double, int>& triplets, const std::string& fpath, const std::string& name, int chunk_size = 50) {
+static void dump_to_file(const tatami_test::SimulateCompressedSparseResult<double, int>& triplets, const std::string& fpath, const std::string& name, hsize_t chunk_size = 50) {
     H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
     auto ghandle = fhandle.createGroup(name);
 
-    H5::DSetCreatPropList plist(H5::DSetCreatPropList::DEFAULT.getId());
-    if (chunk_size == 0) {
-        plist.setLayout(H5D_CONTIGUOUS);
-    } else {
-        plist.setLayout(H5D_CHUNKED);
-        hsize_t chunkdim = std::min(triplets.data.size(), static_cast<size_t>(chunk_size));
-        plist.setChunk(1, &chunkdim);
-    }
+    auto create_plist = [&](hsize_t max_size) -> H5::DSetCreatPropList {
+        if (chunk_size > max_size) {
+            chunk_size = max_size;
+        }
+        H5::DSetCreatPropList plist(H5::DSetCreatPropList::DEFAULT.getId());
+        if (chunk_size == 0) {
+            plist.setLayout(H5D_CONTIGUOUS);
+        } else {
+            plist.setLayout(H5D_CHUNKED);
+            plist.setChunk(1, &chunk_size);
+        }
+        return plist;
+    };
 
-    hsize_t dims = triplets.data.size();
-    H5::DataSpace dspace(1, &dims);
     {
+        hsize_t dims = triplets.data.size();
+        H5::DataSpace dspace(1, &dims);
         H5::DataType dtype(H5::PredType::NATIVE_DOUBLE);
-        auto dhandle = ghandle.createDataSet("data", dtype, dspace, plist);
+        auto dhandle = ghandle.createDataSet("data", dtype, dspace, create_plist(dims));
         dhandle.write(triplets.data.data(), H5::PredType::NATIVE_DOUBLE);
     }
 
     {
+        hsize_t dims = triplets.index.size();
+        H5::DataSpace dspace(1, &dims);
         H5::DataType dtype(H5::PredType::NATIVE_UINT16);
-        auto dhandle = ghandle.createDataSet("index", dtype, dspace, plist);
+        auto dhandle = ghandle.createDataSet("index", dtype, dspace, create_plist(dims));
         dhandle.write(triplets.index.data(), H5::PredType::NATIVE_INT);
     }
 
@@ -607,6 +614,101 @@ INSTANTIATE_TEST_SUITE_P(
         ::testing::Values(true, false)  // oracle usage
     )
 );
+
+/*************************************
+ *************************************/
+
+TEST(SparseMatrix, Errors) {
+    auto fpath = temp_file_path("tatami-sparse-test.h5");
+    std::string name = "stuff";
+    tatami_hdf5::CompressedSparseMatrixOptions hopt;
+
+    {
+        tatami_test::SimulateCompressedSparseResult<double, int> triplets;
+        triplets.data.resize(10);
+        dump_to_file(triplets, fpath, name);
+
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::CompressedSparseMatrix<double, int>(10, 20, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt);
+        }, "not consistent");
+    }
+
+    {
+        tatami_test::SimulateCompressedSparseResult<double, int> triplets;
+        triplets.data.resize(10);
+        triplets.index.resize(10);
+        dump_to_file(triplets, fpath, name);
+
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::CompressedSparseMatrix<double, int>(10, 20, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt);
+        }, "should have length");
+    }
+
+    {
+        tatami_test::SimulateCompressedSparseResult<double, int> triplets;
+        triplets.data.resize(10);
+        triplets.index.resize(10);
+        triplets.indptr.resize(10);
+        dump_to_file(triplets, fpath, name);
+
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::CompressedSparseMatrix<double, int>(10, 20, fpath, name + "/data", name + "/index", name + "/indptr", false, hopt);
+        }, "should have length");
+    }
+
+    {
+        tatami_test::SimulateCompressedSparseResult<double, int> triplets;
+        triplets.data.resize(10);
+        triplets.index.resize(10);
+        triplets.indptr.resize(11, 1);
+        dump_to_file(triplets, fpath, name);
+
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::CompressedSparseMatrix<double, int>(10, 20, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt);
+        }, "should be zero");
+    }
+
+    {
+        tatami_test::SimulateCompressedSparseResult<double, int> triplets;
+        triplets.data.resize(10);
+        triplets.index.resize(10);
+        triplets.indptr.resize(11);
+        dump_to_file(triplets, fpath, name);
+
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::CompressedSparseMatrix<double, int>(10, 20, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt);
+        }, "last index pointer");
+    }
+
+    {
+        tatami_test::SimulateCompressedSparseResult<double, int> triplets;
+        triplets.data.resize(10);
+        triplets.index.resize(10);
+        triplets.indptr.resize(11);
+        triplets.indptr[1] = 2;
+        triplets.indptr[2] = 1;
+        triplets.indptr.back() = 10;
+        dump_to_file(triplets, fpath, name);
+
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::CompressedSparseMatrix<double, int>(10, 20, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt);
+        }, "should be ordered");
+    }
+
+    {
+        tatami_test::SimulateCompressedSparseResult<double, int> triplets;
+        triplets.data.resize(10);
+        triplets.index.resize(10);
+        triplets.indptr.resize(11);
+        triplets.indptr[1] = 100;
+        triplets.indptr.back() = 10;
+        dump_to_file(triplets, fpath, name);
+
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::CompressedSparseMatrix<double, int>(10, 20, fpath, name + "/data", name + "/index", name + "/indptr", true, hopt);
+        }, "should be no greater than");
+    }
+}
 
 /*************************************
  *************************************/
