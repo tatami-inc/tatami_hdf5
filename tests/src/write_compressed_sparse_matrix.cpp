@@ -11,6 +11,41 @@
 
 #include <vector>
 #include <random>
+#include <cstdint>
+
+TEST(WriteCompressedSparseMatrix, IsLessThanOrEqual) {
+    EXPECT_TRUE(tatami_hdf5::is_less_than_or_equal(static_cast<std::int8_t>(1), 2));
+    EXPECT_TRUE(tatami_hdf5::is_less_than_or_equal(static_cast<std::int8_t>(-1), 2));
+    EXPECT_FALSE(tatami_hdf5::is_less_than_or_equal(static_cast<std::int8_t>(3), 2));
+
+    EXPECT_TRUE(tatami_hdf5::is_less_than_or_equal(static_cast<std::uint8_t>(1), 2u));
+    EXPECT_FALSE(tatami_hdf5::is_less_than_or_equal(static_cast<std::uint8_t>(3), 2u));
+
+    EXPECT_TRUE(tatami_hdf5::is_less_than_or_equal(static_cast<std::int8_t>(1), 2u));
+    EXPECT_TRUE(tatami_hdf5::is_less_than_or_equal(static_cast<std::int8_t>(-1), 0u));
+    EXPECT_TRUE(tatami_hdf5::is_less_than_or_equal(static_cast<std::int8_t>(0), 0u));
+    EXPECT_FALSE(tatami_hdf5::is_less_than_or_equal(static_cast<std::int8_t>(10), 0u));
+
+    EXPECT_TRUE(tatami_hdf5::is_less_than_or_equal(static_cast<std::uint8_t>(1), 1));
+    EXPECT_FALSE(tatami_hdf5::is_less_than_or_equal(static_cast<std::uint8_t>(1), -1));
+    EXPECT_TRUE(tatami_hdf5::is_less_than_or_equal(static_cast<std::uint8_t>(0), 0));
+    EXPECT_FALSE(tatami_hdf5::is_less_than_or_equal(static_cast<std::uint8_t>(10), 0));
+}
+
+TEST(WriteCompressedSparseMatrix, FitsLimit) {
+    EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::int8_t>(-1000));
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-10));
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(10));
+
+    EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::int8_t>(1000));
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(10));
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(-10));
+
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-10.0));
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(10.0));
+    EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::int8_t>(-1000.0f));
+    EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::int8_t>(1000.0f));
+}
 
 /*****************************************
  *****************************************/

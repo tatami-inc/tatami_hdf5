@@ -236,7 +236,7 @@ TEST_P(DenseMatrixCacheTypeTest, CastToInt) {
     assemble(SimulationParameters(std::make_pair(9, 13), 1));
 
     tatami_hdf5::DenseMatrix<double, int, int> mat(fpath, name, false);
-    auto altref = tatami::convert_to_dense<double, int, int>(ref.get(), true);
+    auto altref = tatami::convert_to_dense<double, int, int>(*ref, true, {});
 
     auto tparam = GetParam();
     tatami_test::TestAccessOptions opts;

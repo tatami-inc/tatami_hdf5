@@ -1,16 +1,19 @@
 #ifndef TATAMI_HDF5_SPARSE_PRIMARY_HPP
 #define TATAMI_HDF5_SPARSE_PRIMARY_HPP
 
+#include "serialize.hpp"
+#include "utils.hpp"
+
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
 #include <type_traits>
+#include <cstddef>
+#include <string>
 
 #include "tatami/tatami.hpp"
 #include "tatami_chunked/tatami_chunked.hpp"
-
-#include "serialize.hpp"
-#include "utils.hpp"
+#include "sanisizer/sanisizer.hpp"
 
 namespace tatami_hdf5 {
 
@@ -21,7 +24,7 @@ namespace CompressedSparseMatrix_internal {
  ***************************/
 
 template<typename CachedValue_, typename CachedIndex_>
-size_t size_of_cached_element(bool needs_cached_value, bool needs_cached_index) {
+std::size_t size_of_cached_element(bool needs_cached_value, bool needs_cached_index) {
     return (needs_cached_index ? sizeof(CachedIndex_) : 0) + (needs_cached_value ? sizeof(CachedValue_) : 0);
 }
 
@@ -31,8 +34,12 @@ struct Components {
     H5::DataSet index_dataset;
     H5::DataSpace dataspace;
     H5::DataSpace memspace;
-    size_t chunk_size;
 };
+
+// In all cases, we know that max_non_zeros can be safely casted between hsize_t and Index_,
+// because the value is derived from differences between hsize_t pointers.
+// We also know that it can be safely cast to std::size_t, as max_non_zeros is no greater than the dimension extents,
+// and we know that the dimension extents must be representable as a std::size_t as per the tatami contract.
 
 template<typename Index_>
 struct MatrixDetails {
@@ -43,9 +50,10 @@ struct MatrixDetails {
         Index_ primary_dim, 
         Index_ secondary_dim, 
         const std::vector<hsize_t>& pointers, 
-        size_t slab_cache_size,
-        size_t max_non_zeros,
-        size_t chunk_cache_size) :
+        std::size_t slab_cache_size,
+        Index_ max_non_zeros,
+        hsize_t chunk_cache_size
+    ) :
         file_name(file_name), 
         value_name(value_name), 
         index_name(index_name), 
@@ -65,10 +73,9 @@ struct MatrixDetails {
     Index_ secondary_dim;
     const std::vector<hsize_t>& pointers;
 
-    // We distinguish between our own cache of slabs versus HDF5's cache of uncompressed chunks.
-    size_t slab_cache_size;
-    size_t max_non_zeros;
-    size_t chunk_cache_size;
+    std::size_t slab_cache_size; // size for our own cache of slabs.
+    Index_ max_non_zeros;
+    hsize_t chunk_cache_size; // size for HDF5's cache of uncompressed chunks.
 };
 
 // All HDF5-related members are stored in a separate pointer so we can serialize construction and destruction.
@@ -147,7 +154,7 @@ void refine_primary_limits(IndexIt_& indices_start, IndexIt_& indices_end, Index
 }
 
 template<bool sparse_, typename Index_>
-using SparseRemapVector = typename std::conditional<sparse_, std::vector<uint8_t>, std::vector<Index_> >::type;
+using SparseRemapVector = typename std::conditional<sparse_, std::vector<unsigned char>, std::vector<Index_> >::type;
 
 template<bool sparse_, typename Index_>
 void populate_sparse_remap_vector(const std::vector<Index_>& indices, SparseRemapVector<sparse_, Index_>& remap, Index_& first_index, Index_& past_last_index) {
@@ -158,8 +165,8 @@ void populate_sparse_remap_vector(const std::vector<Index_>& indices, SparseRema
     }
 
     first_index = indices.front();
-    past_last_index = indices.back() + 1;
-    remap.resize(past_last_index - first_index);
+    past_last_index = indices.back() + 1; // increment is safe as Index_ should be large enough to store the dimension extent.
+    tatami::resize_container_to_Index_size(remap, past_last_index - first_index);
 
     if constexpr(sparse_) {
         for (auto i : indices) {
@@ -224,24 +231,23 @@ Index_ scan_for_indices_in_remap_vector(
 template<typename Index_, typename CachedValue_, typename CachedIndex_>
 class PrimaryLruCoreBase {
 public:
-    PrimaryLruCoreBase(const MatrixDetails<Index_>& details, tatami::MaybeOracle<false, Index_>, size_t max_non_zeros, bool needs_value, bool needs_index) : 
+    PrimaryLruCoreBase(const MatrixDetails<Index_>& details, tatami::MaybeOracle<false, Index_>, Index_ max_non_zeros, bool needs_value, bool needs_index) : 
         my_pointers(details.pointers),
-        my_cache([&]() -> size_t {
+        my_cache([&]() -> Index_ {
             if (max_non_zeros == 0) {
                 return 1; // always return at least one slab, so that cache.find() is valid.
             }
-
-            size_t elsize = size_of_cached_element<CachedValue_, CachedIndex_>(needs_value, needs_index);
+            std::size_t elsize = size_of_cached_element<CachedValue_, CachedIndex_>(needs_value, needs_index);
             if (elsize == 0) {
                 return details.primary_dim; // cache everything if we're not storing anything in each slab.
             }
 
-            size_t num_slabs = details.slab_cache_size / (max_non_zeros * elsize);
-            if (num_slabs == 0) {
-                return 1; // again, return at least one slab so that cache.find() works.
+            auto max_num_slabs = details.slab_cache_size / (max_non_zeros * elsize);
+            if (max_num_slabs == 0) {
+                return 1; // return at least one slab so that cache.find() works.
             }
 
-            return num_slabs;
+            return max_num_slabs;
         }()),
         my_needs_value(needs_value),
         my_needs_index(needs_index),
@@ -249,12 +255,12 @@ public:
     {
         initialize(details, my_h5comp);
 
-        size_t pool_size = max_non_zeros * my_cache.get_max_slabs();
+        auto pool_size = sanisizer::product<std::size_t>(max_non_zeros, my_cache.get_max_slabs());
         if (needs_value) {
-            my_value_pool.resize(pool_size);
+            my_value_pool.resize(sanisizer::cast<decltype(my_value_pool.size())>(pool_size));
         }
         if (needs_index) {
-            my_index_pool.resize(pool_size);
+            my_index_pool.resize(sanisizer::cast<decltype(my_index_pool.size())>(pool_size));
         }
     }
 
@@ -271,8 +277,8 @@ protected:
 private:
     std::vector<CachedValue_> my_value_pool;
     std::vector<CachedIndex_> my_index_pool;
-    size_t my_max_non_zeros;
-    size_t my_offset = 0;
+    Index_ my_max_non_zeros;
+    std::size_t my_offset = 0; // use size_t here as we're doing pointer arithmetic below.
 
 public:
     Slab<Index_, CachedValue_, CachedIndex_> create() {
@@ -292,7 +298,14 @@ template<typename Index_, typename CachedValue_, typename CachedIndex_>
 class PrimaryLruFullCore : private PrimaryLruCoreBase<Index_, CachedValue_, CachedIndex_> {
 public:
     PrimaryLruFullCore(const MatrixDetails<Index_>& details, tatami::MaybeOracle<false, Index_> oracle, bool needs_value, bool needs_index) : 
-        PrimaryLruCoreBase<Index_, CachedValue_, CachedIndex_>(details, std::move(oracle), details.max_non_zeros, needs_value, needs_index) {}
+        PrimaryLruCoreBase<Index_, CachedValue_, CachedIndex_>(
+            details,
+            std::move(oracle),
+            details.max_non_zeros,
+            needs_value,
+            needs_index
+        )
+    {}
 
 public:
     const Slab<Index_, CachedValue_, CachedIndex_>& fetch_raw(Index_ i) {
@@ -338,14 +351,17 @@ public:
         PrimaryLruCoreBase<Index_, CachedValue_, CachedIndex_>(
             details,
             std::move(oracle), 
-            std::min(details.max_non_zeros, static_cast<size_t>(block_length)), // Tighten the bounds if we can, to fit more elements into the cache.
+            std::min(details.max_non_zeros, block_length), // Tighten the bounds if we can, to fit more elements into the cache.
             needs_value, 
             needs_index
         ),
         my_secondary_dim(details.secondary_dim),
         my_block_start(block_start),
         my_block_past_end(block_start + block_length)
-    {}
+    {
+        // Protect pointer differences against overflow when refining primary limits.
+        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim);
+    }
 
 private:
     Index_ my_secondary_dim;
@@ -368,7 +384,7 @@ public:
                     current_cache.number = 0;
                     return;
                 }
-                my_index_buffer.resize(extraction_len);
+                tatami::resize_container_to_Index_size(my_index_buffer, extraction_len); // this is legal as extract_len <= dimension extents, which are stored as Index_.
 
                 serialize([&]() -> void {
                     auto& comp = *(this->my_h5comp);
@@ -416,13 +432,16 @@ public:
         PrimaryLruCoreBase<Index_, CachedValue_, CachedIndex_>(
             details, 
             std::move(oracle), 
-            std::min(details.max_non_zeros, indices.size()), // Tighten the bounds to fit more elements into the cache.
+            std::min(details.max_non_zeros, static_cast<Index_>(indices.size())), // Tighten the bounds to fit more elements into the cache.
             needs_value, 
             needs_index
         ),
         my_secondary_dim(details.secondary_dim)
     {
         populate_sparse_remap_vector<sparse_>(indices, my_remap, my_first_index, my_past_last_index);
+
+        // Protect pointer differences against overflow when refining primary limits.
+        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim);
     }
 
 private:
@@ -447,7 +466,7 @@ public:
                     current_cache.number = 0;
                     return;
                 }
-                my_index_buffer.resize(extraction_len);
+                tatami::resize_container_to_Index_size(my_index_buffer, extraction_len); // this is legal as extract_len <= dimension extents, which are stored as Index_.
 
                 serialize([&]() -> void {
                     auto& comp = *(this->my_h5comp);
@@ -462,7 +481,16 @@ public:
 
                     Index_ num_found = 0;
                     if (indices_start != indices_end) {
-                        num_found = scan_for_indices_in_remap_vector<sparse_>(indices_start, indices_end, my_first_index, current_cache.index, my_found, my_remap, this->my_needs_value, this->my_needs_index);
+                        num_found = scan_for_indices_in_remap_vector<sparse_>(
+                            indices_start,
+                            indices_end,
+                            my_first_index,
+                            current_cache.index,
+                            my_found,
+                            my_remap,
+                            this->my_needs_value,
+                            this->my_needs_index
+                        );
 
                         if (this->my_needs_value && num_found > 0) {
                             hsize_t new_start = extraction_start + (indices_start - my_index_buffer.begin());
@@ -504,23 +532,23 @@ public:
         bool needs_cached_value, 
         bool needs_cached_index) : 
         my_pointers(details.pointers),
-        my_cache(std::move(oracle), [&]() -> size_t {
-            size_t elsize = size_of_cached_element<CachedIndex_, CachedValue_>(needs_cached_value, needs_cached_index);
+        my_cache(std::move(oracle), [&]() -> std::size_t {
+            std::size_t elsize = size_of_cached_element<CachedIndex_, CachedValue_>(needs_cached_value, needs_cached_index);
             if (elsize == 0) {
                 return -1; // i.e., there is no limit on the number of slabs.
             } else {
-                size_t proposed = details.slab_cache_size / elsize;
-                return std::max(details.max_non_zeros, proposed); // make sure we always have enough space to store at least one dimension element.
+                std::size_t proposed = details.slab_cache_size / elsize;
+                return std::max(static_cast<std::size_t>(details.max_non_zeros), proposed); // make sure we always have enough space to store at least one dimension element.
             } 
         }())
     {
         initialize(details, my_h5comp);
 
         if (needs_cached_value) {
-            my_full_value_buffer.resize(my_cache.get_max_size());
+            my_full_value_buffer.resize(sanisizer::cast<decltype(my_full_value_buffer.size())>(my_cache.get_max_size()));
         }
         if (needs_cached_index) {
-            my_full_index_buffer.resize(my_cache.get_max_size());
+            my_full_index_buffer.resize(sanisizer::cast<decltype(my_full_index_buffer.size())>(my_cache.get_max_size()));
         }
     }
 
@@ -533,8 +561,8 @@ protected:
     const std::vector<hsize_t>& my_pointers;
 
     struct SlabPrecursor {
-        size_t mem_offset;
-        size_t length;
+        std::size_t mem_offset;
+        std::size_t length;
     };
 
 protected:
@@ -551,12 +579,12 @@ protected:
     std::vector<CachedIndex_> my_full_index_buffer;
 
 private:
-    tatami_chunked::OracularVariableSlabCache<Index_, Index_, SlabPrecursor, size_t> my_cache;
+    tatami_chunked::OracularVariableSlabCache<Index_, Index_, SlabPrecursor, std::size_t> my_cache;
 
 private:
     template<class Function_>
-    static void sort_by_field(std::vector<std::pair<Index_, size_t> >& indices, Function_ field) {
-        auto comp = [&field](const std::pair<Index_, size_t>& l, const std::pair<Index_, size_t>& r) -> bool {
+    static void sort_by_field(std::vector<std::pair<Index_, std::size_t> >& indices, Function_ field) {
+        auto comp = [&field](const std::pair<Index_, std::size_t>& l, const std::pair<Index_, std::size_t>& r) -> bool {
             return field(l) < field(r);
         };
         if (!std::is_sorted(indices.begin(), indices.end(), comp)) {
@@ -579,17 +607,17 @@ public:
             /* identify = */ [](Index_ i) -> std::pair<Index_, Index_> { 
                 return std::pair<Index_, Index_>(i, 0); 
             },
-            /* estimated_size = */ [&](Index_ i) -> size_t {
-                return my_pointers[i + 1] - my_pointers[i];
+            /* estimated_size = */ [&](Index_ i) -> std::size_t {
+                return my_pointers[i + 1] - my_pointers[i]; // cast on return is safe as we know this value is <= max_non_zeros.
             },
-            /* actual_size = */ [&](Index_, const SlabPrecursor& preslab) -> size_t {
+            /* actual_size = */ [&](Index_, const SlabPrecursor& preslab) -> std::size_t {
                 return preslab.length;
             },
             /* create = */ [&]() -> SlabPrecursor {
                 return SlabPrecursor();
             },
-            /* populate = */ [&](std::vector<std::pair<Index_, size_t> >& to_populate, std::vector<std::pair<Index_, size_t> >& to_reuse, std::vector<SlabPrecursor>& all_preslabs) -> void {
-                size_t dest_offset = 0;
+            /* populate = */ [&](std::vector<std::pair<Index_, std::size_t> >& to_populate, std::vector<std::pair<Index_, std::size_t> >& to_reuse, std::vector<SlabPrecursor>& all_preslabs) -> void {
+                std::size_t dest_offset = 0;
 
                 if (to_reuse.size()) {
                     // Shuffling all re-used elements to the start of the buffer,
@@ -597,7 +625,7 @@ public:
                     // elements in the rest of the buffer. This needs some sorting
                     // to ensure that we're not clobbering one re-used element's
                     // contents when shifting another element to the start.
-                    sort_by_field(to_reuse, [&](const std::pair<Index_, size_t>& p) -> size_t { return all_preslabs[p.second].mem_offset; });
+                    sort_by_field(to_reuse, [&](const std::pair<Index_, std::size_t>& p) -> std::size_t { return all_preslabs[p.second].mem_offset; });
 
                     for (const auto& p : to_reuse) {
                         auto& preslab = all_preslabs[p.second];
@@ -635,12 +663,13 @@ protected:
     // consecutive extraction by just pulling out a strip of indices at once.
     // Technically, this just sets up the H5::DataSpaces for extraction; the
     // actual extraction is done in each of the subclasses.
-    void prepare_contiguous_index_spaces(size_t dest_offset, std::vector<std::pair<Index_, size_t> >& to_populate, std::vector<SlabPrecursor>& all_preslabs) {
+    void prepare_contiguous_index_spaces(std::size_t dest_offset, std::vector<std::pair<Index_, std::size_t> >& to_populate, std::vector<SlabPrecursor>& all_preslabs) {
         // Sorting so that we get consecutive accesses in the hyperslab construction.
         // This should improve re-use of partially read HDF5 chunks inside DataSet::read(). 
-        sort_by_field(to_populate, [&](const std::pair<Index_, size_t>& p) -> hsize_t { return my_pointers[p.first]; });
+        sort_by_field(to_populate, [&](const std::pair<Index_, std::size_t>& p) -> hsize_t { return my_pointers[p.first]; });
 
-        size_t sofar = 0, num_needed = to_populate.size();
+        auto num_needed = to_populate.size();
+        decltype(num_needed) sofar = 0;
         hsize_t combined_len = 0;
         my_h5comp->dataspace.selectNone();
 
@@ -664,7 +693,7 @@ protected:
                 auto& next_preslab = all_preslabs[pnext.second];
                 next_preslab.mem_offset = first_preslab.mem_offset + src_len;
                 hsize_t next_len = my_pointers[pnext.first + 1] - my_pointers[pnext.first];
-                next_preslab.length = next_len;
+                next_preslab.length = next_len; // cast is safe, as we know that this is <= max_non_zeros, and we already checked for a safe cast in the constructor.
                 src_len += next_len;
             }
 
@@ -693,8 +722,8 @@ public:
     Slab<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
         typedef typename PrimaryOracularCoreBase<Index_, CachedValue_, CachedIndex_>::SlabPrecursor SlabPrecursor;
         return this->next([&](
-            size_t dest_offset,
-            std::vector<std::pair<Index_, size_t> >& to_populate, 
+            std::size_t dest_offset,
+            std::vector<std::pair<Index_, std::size_t> >& to_populate, 
             std::vector<SlabPrecursor>& all_preslabs, 
             std::vector<CachedValue_>& full_value_buffer, 
             std::vector<CachedIndex_>& full_index_buffer) -> void {
@@ -734,7 +763,10 @@ public:
         my_block_past_end(block_start + block_length),
         my_needs_value(needs_value),
         my_needs_index(needs_index)
-    {}
+    {
+        // Protect pointer differences against overflow when refining primary limits.
+        sanisizer::can_ptrdiff<decltype(this->my_full_index_buffer.begin())>(my_secondary_dim);
+    }
 
 private:
     Index_ my_secondary_dim;
@@ -745,8 +777,8 @@ public:
     Slab<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
         typedef typename PrimaryOracularCoreBase<Index_, CachedValue_, CachedIndex_>::SlabPrecursor SlabPrecursor;
         return this->next([&](
-            size_t dest_offset,
-            std::vector<std::pair<Index_, size_t> >& to_populate,
+            std::size_t dest_offset,
+            std::vector<std::pair<Index_, std::size_t> >& to_populate,
             std::vector<SlabPrecursor>& all_preslabs, 
             std::vector<CachedValue_>& full_value_buffer, 
             std::vector<CachedIndex_>& full_index_buffer) -> void {
@@ -755,7 +787,7 @@ public:
                     auto& comp = *(this->my_h5comp);
                     comp.index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
 
-                    size_t post_shift_len = 0;
+                    std::size_t post_shift_len = 0;
                     if (my_needs_value) {
                         comp.dataspace.selectNone();
                     }
@@ -772,7 +804,7 @@ public:
                         auto indices_end = indices_start + current_preslab.length;
                         refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_block_start, my_block_past_end);
 
-                        size_t new_len = indices_end - indices_start;
+                        Index_ new_len = indices_end - indices_start; // pointer subtraction is safe as we checked this in the constructor.
                         if (new_len) {
                             if (my_needs_index) {
                                 // Shifting the desired block of indices backwards in the same full_index_buffer,
@@ -785,8 +817,8 @@ public:
                                 if constexpr(!sparse_) {
                                     // For dense extraction, we remove the block start so that the resulting
                                     // indices can be directly used to index into the output buffer.
-                                    for (size_t i = 0; i < new_len; ++i, ++indices_dest) {
-                                        *indices_dest -= my_block_start;
+                                    for (decltype(new_len) i = 0; i < new_len; ++i) {
+                                        *(indices_dest + i) -= my_block_start;
                                     }
                                 }
                             }
@@ -822,7 +854,7 @@ public:
         // Don't try to tighten the max_non_zeros like in the LRU case; we need
         // to keep enough space to ensure that every primary dimension element
         // can be extracted in its entirety (as we don't have a separate
-        // index_buffer class to perform the initial HDF5 extraction).
+        // index_buffer object to perform the initial HDF5 extraction).
         PrimaryOracularCoreBase<Index_, CachedValue_, CachedIndex_>(
             details, 
             std::move(oracle), 
@@ -835,6 +867,9 @@ public:
         needs_index(needs_index)
     {
         populate_sparse_remap_vector<sparse_>(indices, remap, first_index, past_last_index);
+
+        // Protect pointer differences against overflow when refining primary limits.
+        sanisizer::can_ptrdiff<decltype(this->my_full_index_buffer.begin())>(secondary_dim);
     }
 
 private:
@@ -848,8 +883,8 @@ public:
     Slab<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
         typedef typename PrimaryOracularCoreBase<Index_, CachedValue_, CachedIndex_>::SlabPrecursor SlabPrecursor;
         return this->next([&](
-            size_t dest_offset,
-            std::vector<std::pair<Index_, size_t> >& to_populate,
+            std::size_t dest_offset,
+            std::vector<std::pair<Index_, std::size_t> >& to_populate,
             std::vector<SlabPrecursor>& all_preslabs, 
             std::vector<CachedValue_>& full_value_buffer, 
             std::vector<CachedIndex_>& full_index_buffer) -> void {
@@ -858,7 +893,7 @@ public:
                     auto& comp = *(this->my_h5comp);
                     comp.index_dataset.read(full_index_buffer.data() + dest_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
 
-                    size_t post_shift_len = 0;
+                    std::size_t post_shift_len = 0;
                     if (this->needs_value) {
                         comp.dataspace.selectNone();
                     }
@@ -877,11 +912,20 @@ public:
                         Index_ num_found = 0;
                         if (indices_start != indices_end) {
                             auto fiIt = full_index_buffer.begin() + current_preslab.mem_offset;
-                            num_found = scan_for_indices_in_remap_vector<sparse_>(indices_start, indices_end, first_index, fiIt, found, remap, this->needs_value, this->needs_index);
+                            num_found = scan_for_indices_in_remap_vector<sparse_>(
+                                indices_start,
+                                indices_end,
+                                first_index,
+                                fiIt,
+                                found,
+                                remap,
+                                this->needs_value,
+                                this->needs_index
+                            );
 
                             if (this->needs_value && !found.empty()) {
                                 // We fill up the dataspace on each primary element, rather than accumulating
-                                // indices in 'found' across 'needed', to reduce the memory usage of 'found';
+                                // indices in 'found' across 'to_populate', to reduce the memory usage of 'found';
                                 // otherwise we grossly exceed the cache limits during extraction.
                                 hsize_t new_start = this->my_pointers[p.first] + (indices_start - original_start);
                                 tatami::process_consecutive_indices<Index_>(
