@@ -142,21 +142,36 @@ inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteS
     return create_1d_compressed_hdf5_dataset(location, *dtype, name, length, deflate_level, chunk);
 }
 
+template<typename Left_, typename Right_>
+bool is_less_than_or_equal(Left_ l, Right_ r) {
+    constexpr bool lsigned = std::is_signed<Left_>::value;
+    constexpr bool rsigned = std::is_signed<Right_>::value;
+    if constexpr(lsigned == rsigned) {
+        return l <= r;
+    } else if constexpr(lsigned) {
+        return l <= 0 || static_cast<typename std::make_unsigned<Left_>::type>(l) <= r;
+    } else {
+        return r >= 0 && l <= static_cast<typename std::make_unsigned<Right_>::type>(r);
+    }
+}
+
 template<typename Native_, typename Max_>
 bool fits_upper_limit(Max_ max) {
-    if constexpr(std::is_integral<Max_>::value) {
-        return sanisizer::is_greater_than_or_equal(std::numeric_limits<Native_>::max(), max);
+    constexpr auto native_max = std::numeric_limits<Native_>::max();
+    if constexpr(std::is_integral<Max_>::value) { // Native_ is already integral, so no need to check that.
+        return is_less_than_or_equal(max, native_max);
     } else {
-        return false;
+        return max <= static_cast<double>(native_max);
     }
 }
 
 template<typename Native_, typename Min_>
 bool fits_lower_limit(Min_ min) {
+    constexpr auto native_min = std::numeric_limits<Native_>::min();
     if constexpr(std::is_integral<Min_>::value) {
-        return sanisizer::is_less_than_or_equal(std::numeric_limits<Native_>::min(), min);
+        return is_less_than_or_equal(native_min, min);
     } else {
-        return false;
+        return min >= static_cast<double>(native_min);
     }
 }
 /**
