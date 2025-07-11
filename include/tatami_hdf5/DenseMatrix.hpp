@@ -203,7 +203,7 @@ public:
     {
         initialize(file_name, dataset_name, my_h5comp);
         if constexpr(!by_h5_row_) {
-            my_transposition_buffer.resize(slab_stats.slab_size_in_elements);
+            my_transposition_buffer.resize(sanisizer::cast<decltype(my_transposition_buffer.size()>(slab_stats.slab_size_in_elements));
         }
     }
 
@@ -383,7 +383,7 @@ private:
                     auto start_offset = running_offset;
                     running_offset += my_slab_size;
 
-                    for (size_t ci = 1, cend = chunks.size(); ci < cend; ++ci) {
+                    for (decltype(chunks.size()) ci = 1, cend = chunks.size(); ci < cend; ++ci) {
                         auto& current_chunk = chunks[ci];
                         Index_ current_chunk_id = current_chunk.first;
 

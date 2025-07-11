@@ -1,16 +1,18 @@
 #ifndef TATAMI_HDF5_SPARSE_SECONDARY_HPP
 #define TATAMI_HDF5_SPARSE_SECONDARY_HPP
 
-#include <vector>
-#include <algorithm>
-#include <type_traits>
-
-#include "tatami/tatami.hpp"
-#include "tatami_chunked/tatami_chunked.hpp"
-
 #include "sparse_primary.hpp"
 #include "serialize.hpp"
 #include "utils.hpp"
+
+#include <vector>
+#include <algorithm>
+#include <type_traits>
+#include <cstddef>
+
+#include "tatami/tatami.hpp"
+#include "tatami_chunked/tatami_chunked.hpp"
+#include "sanisizer/sanisizer.hpp"
 
 namespace tatami_hdf5 {
 
@@ -30,20 +32,20 @@ public:
         my_pointers(details.pointers),
         my_secondary_dim_stats(
             details.secondary_dim,
-            [&]() -> size_t {
+            [&]() -> Index_ {
                 // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford.
-                size_t elsize = CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, needs_index);
-                size_t denom = elsize * static_cast<size_t>(extract_length);
+                std::size_t elsize = CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, needs_index);
+                std::size_t denom = sanisizer::product<std::size_t>(elsize, extract_length);
                 if (denom == 0) {
                     return details.secondary_dim; // caching the entire secondary dimension, if possible.
                 }
 
-                size_t primary_chunkdim = details.slab_cache_size / denom;
+                std::size_t primary_chunkdim = details.slab_cache_size / denom;
                 if (primary_chunkdim < 1) {
-                    return 1;
+                    return 1; // ensure we have at least one dimension.
                 }
 
-                return std::min(primary_chunkdim, static_cast<size_t>(details.secondary_dim));
+                return std::min(primary_chunkdim, sanisizer::cast<std::size_t>(details.secondary_dim));
             }()
         ),
         my_extract_length(extract_length),
@@ -52,21 +54,24 @@ public:
     {
         initialize(details, my_h5comp);
 
-        size_t cache_size_in_elements = static_cast<size_t>(my_secondary_dim_stats.chunk_length) * extract_length; // cast to avoid overflow.
+        auto cache_size_in_elements = sanisizer::product<std::size_t>(my_secondary_dim_stats.chunk_length, extract_length);
         if (my_needs_value) {
-            my_cache_data.resize(cache_size_in_elements);
+            my_cache_data.resize(sanisizer::cast<decltype(my_cache_data.size()>(cache_size_in_elements));
         }
         if (my_needs_index) {
-            my_cache_index.resize(cache_size_in_elements);
+            my_cache_index.resize(sanisizer::cast<decltype(my_cache_index.size())>(cache_size_in_elements));
         }
-        my_cache_count.resize(my_secondary_dim_stats.chunk_length);
+        tatami::resize_container_to_Index_size(my_cache_count.resize, my_secondary_dim_stats.chunk_length);
 
         // Precomputing the offsets so we don't have to do the multiplication every time.
         my_cache_offsets.reserve(my_secondary_dim_stats.chunk_length);
-        size_t current_offset = 0;
+        std::size_t current_offset = 0;
         for (Index_ i = 0; i < my_secondary_dim_stats.chunk_length; ++i, current_offset += extract_length) {
             my_cache_offsets.push_back(current_offset);
         }
+
+        // Protect pointer differences against overflow when refining primary limits.
+        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim_stats.dimension_extent);
     }
 
     ~MyopicSecondaryCore() {
@@ -77,7 +82,7 @@ private:
     std::unique_ptr<Components> my_h5comp;
     const std::vector<hsize_t>& my_pointers;
     tatami_chunked::ChunkDimensionStats<Index_> my_secondary_dim_stats;
-    size_t my_extract_length; // store as a size_t to avoid overflow in offset calculations.
+    Index_ my_extract_length;
     bool my_needs_value;
     bool my_needs_index;
 
@@ -88,7 +93,7 @@ private:
     std::vector<Index_> my_cache_index;
     std::vector<CachedValue_> my_cache_data;
     std::vector<Index_> my_cache_count;
-    std::vector<size_t> my_cache_offsets;
+    std::vector<std::size_t> my_cache_offsets;
     bool my_first = true;
 
 private:
@@ -109,7 +114,7 @@ private:
         }
 
         tatami::SparseRange<CachedValue_, Index_> output(my_cache_count[chunk_offset]);
-        size_t offset = static_cast<size_t>(chunk_offset) * my_extract_length; // cast to avoid overflow.
+        auto offset = sanisizer::product_unsafe<std::size_t>(chunk_offset, my_extract_length); // cast to avoid overflow.
         if (my_needs_value) {
             output.value = my_cache_data.data() + offset;
         }
@@ -121,12 +126,12 @@ private:
 
     // Serial locks should be applied by the callers before calling this.
     void extract_and_append(Index_ primary, Index_ secondary_start, Index_ secondary_length, Index_ primary_to_add) {
-        hsize_t left = my_pointers[primary], right = my_pointers[primary + 1];
+        auto left = my_pointers[primary], right = my_pointers[primary + 1];
         hsize_t count = right - left;
         if (count == 0) {
             return;
         }
-        my_index_buffer.resize(count);
+        tatami::resize_container_to_Index_size(my_index_buffer, count); // this is legal as count <= dimension extents, which are stored as Index_.
 
         my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
         my_h5comp->memspace.setExtentSimple(1, &count);
@@ -144,7 +149,7 @@ private:
         }
 
         if (start != end && my_needs_value) {
-            hsize_t better_left = left + (start - my_index_buffer.begin());
+            hsize_t better_left = left + (start - my_index_buffer.begin()); // pointer difference won't overflow as we checked can_ptrdiff() in the constructor.
             hsize_t better_count = end - start;
             my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &better_count, &better_left);
             my_h5comp->memspace.setExtentSimple(1, &better_count);
@@ -153,10 +158,9 @@ private:
             my_data_buffer.resize(better_count);
             my_h5comp->data_dataset.read(my_data_buffer.data(), define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
 
-            size_t y = 0;
-            for (auto x = start; x != end; ++x, ++y) {
+            for (auto x = start; x != end; ++x) {
                 Index_ current = *x - secondary_start;
-                my_cache_data[my_cache_offsets[current] + static_cast<size_t>(my_cache_count[current])] = my_data_buffer[y];
+                my_cache_data[my_cache_offsets[current] + static_cast<size_t>(my_cache_count[current])] = my_data_buffer[x - start];
             }
         }
 
@@ -224,14 +228,17 @@ public:
     {
         initialize(details, my_h5comp);
 
-        size_t alloc = static_cast<size_t>(my_cache.get_max_slabs()) * my_extract_length; // cast to avoid overflow.
+        auto alloc = sanisizer::product<std::size_t>(my_cache.get_max_slabs(), my_extract_length);
         if (my_needs_index) {
-            my_cache_index.resize(alloc);
+            my_cache_index.resize(sanisizer::cast<decltype(my_cache_index.size())>(alloc));
         }
         if (my_needs_value) {
-            my_cache_data.resize(alloc);
+            my_cache_data.resize(sanisizer::cast<decltype(my_cache_data.size())>(alloc));
         }
-        my_slab_ptrs.resize(my_secondary_dim, NULL);
+        my_slab_ptrs.resize(tatami::cast_Index_to_container_size<decltype(my_slab_ptrs)>(my_secondary_dim), NULL);
+
+        // Protect pointer differences against overflow when refining primary limits.
+        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim_stats.dimension_extent);
     }
 
     ~OracularSecondaryCore() {
@@ -243,7 +250,7 @@ protected:
     const std::vector<hsize_t>& my_pointers;
 
     Index_ my_secondary_dim;
-    size_t my_extract_length; // store this as a size_t to avoid overflow when computing offsets.
+    Index_ my_extract_length;
     bool my_needs_value;
     bool my_needs_index;
 
@@ -258,7 +265,7 @@ protected:
     // the overhead of allocating a lot of little vectors.
     std::vector<Index_> my_cache_index;
     std::vector<CachedValue_> my_cache_data;
-    size_t my_offset = 0;
+    std::size_t my_offset = 0;
 
     // Temporary buffers for the HDF5 library to read in values/indices for each dimension element.
     std::vector<Index_> my_index_buffer;
@@ -317,7 +324,7 @@ private:
         if (count == 0) {
             return;
         }
-        my_index_buffer.resize(count);
+        tatami::resize_container_to_Index_size(my_index_buffer, count); // this is legal as count <= dimension extents, which are stored as Index_.
 
         my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
         my_h5comp->memspace.setExtentSimple(1, &count);
@@ -332,8 +339,7 @@ private:
             my_found.clear();
         }
 
-        Index_ counter = 0;
-        for (auto x = start; x != end; ++x, ++counter) {
+        for (auto x = start; x != end; ++x) {
             auto slab_ptr = my_slab_ptrs[*x];
             if (slab_ptr != NULL) {
                 if (my_needs_index) {
@@ -341,7 +347,7 @@ private:
                 }
                 if (my_needs_value) {
                     my_value_ptrs.push_back(slab_ptr->value + slab_ptr->number);
-                    my_found.push_back(counter);
+                    my_found.push_back(x - start); // pointer subtraction is safe as we checked can_ptrdiff in the constructor.
                 }
                 ++(slab_ptr->number);
             }

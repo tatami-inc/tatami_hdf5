@@ -165,8 +165,8 @@ public:
         });
 
         my_max_non_zeros = 0;
-        for (size_t i = 1; i < pointers.size(); ++i) {
-            hsize_t diff = pointers[i] - pointers[i-1];
+        for (decltype(ptr_size) i = 1; i < ptr_size; ++i) {
+            Index_ diff = pointers[i] - pointers[i-1];
             if (diff > my_max_non_zeros) {
                 my_max_non_zeros = diff;
             }

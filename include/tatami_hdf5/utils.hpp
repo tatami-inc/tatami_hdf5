@@ -75,6 +75,8 @@ const H5::PredType& define_mem_type() {
         return H5::PredType::NATIVE_UINT64;
     } else if (std::is_same<int64_t, T>::value) {
         return H5::PredType::NATIVE_INT64;
+    } else if (std::is_same<hsize_t, T>::value) {
+        return H5::PredType::NATIVE_HSIZE;
     }
     static_assert("unsupported HDF5 type for template parameter 'T'");
 }
