@@ -234,20 +234,14 @@ public:
     PrimaryLruCoreBase(const MatrixDetails<Index_>& details, tatami::MaybeOracle<false, Index_>, Index_ max_non_zeros, bool needs_value, bool needs_index) : 
         my_pointers(details.pointers),
         my_cache([&]() -> Index_ {
-            if (max_non_zeros == 0) {
-                return 1; // always return at least one slab, so that cache.find() is valid.
-            }
-            std::size_t elsize = size_of_cached_element<CachedValue_, CachedIndex_>(needs_value, needs_index);
-            if (elsize == 0) {
-                return details.primary_dim; // cache everything if we're not storing anything in each slab.
-            }
-
-            auto max_num_slabs = details.slab_cache_size / (max_non_zeros * elsize);
-            if (max_num_slabs == 0) {
-                return 1; // return at least one slab so that cache.find() works.
-            }
-
-            return max_num_slabs;
+            return tatami_chunked::SlabCacheStats<Index_>(
+                /* target_length = */ 1,
+                /* non_target_length = */ max_non_zeros,
+                /* target_num_chunks = */ details.primary_dim,
+                /* cache_size_in_bytes = */ details.slab_cache_size,
+                /* element_size = */ size_of_cached_element<CachedValue_, CachedIndex_>(needs_value, needs_index),
+                /* require_minimum_cache = */ true
+            ).max_slabs_in_cache;
         }()),
         my_needs_value(needs_value),
         my_needs_index(needs_index),
@@ -523,6 +517,25 @@ public:
  **** Oraclular base extractor classes ****
  ******************************************/
 
+template<typename CachedValue_, typename CachedIndex_, typename Index_>
+std::size_t choose_cache_size_for_primary_oracular(const MatrixDetails<Index_>& details, bool needs_cached_value, bool needs_cached_index) {
+    std::size_t elsize = size_of_cached_element<CachedValue_, CachedIndex_>(needs_cached_value, needs_cached_index);
+    if (elsize == 0) {
+        // Just return the largest possible value. The exact value doesn't matter here as we won't actually be storing anything.
+        // Importantly, we won't be resizing the vectors either as both needs_cached_value and needs_cached_index are false.
+        return -1;
+    }
+
+    std::size_t proposed = details.slab_cache_size / elsize;
+    if (sanisizer::is_greater_than(proposed, details.pointers.back())) {
+        return details.pointers.back(); // no point in exceeding the maximum number of non-zero elements, as we've already cached everything. 
+    }
+
+    // Take the max() to make sure we can hold the largest dimension element.
+    // The cast is safe here, as we know that dimension extents can fit into std::size_t.
+    return std::max(static_cast<std::size_t>(details.max_non_zeros), proposed);
+}
+
 template<typename Index_, typename CachedValue_, typename CachedIndex_>
 class PrimaryOracularCoreBase {
 public:
@@ -532,15 +545,7 @@ public:
         bool needs_cached_value, 
         bool needs_cached_index) : 
         my_pointers(details.pointers),
-        my_cache(std::move(oracle), [&]() -> std::size_t {
-            std::size_t elsize = size_of_cached_element<CachedIndex_, CachedValue_>(needs_cached_value, needs_cached_index);
-            if (elsize == 0) {
-                return -1; // i.e., there is no limit on the number of slabs.
-            } else {
-                std::size_t proposed = details.slab_cache_size / elsize;
-                return std::max(static_cast<std::size_t>(details.max_non_zeros), proposed); // make sure we always have enough space to store at least one dimension element.
-            } 
-        }())
+        my_cache(std::move(oracle), choose_cache_size_for_primary_oracular<CachedValue_, CachedIndex_>(details, needs_cached_value, needs_cached_index))
     {
         initialize(details, my_h5comp);
 

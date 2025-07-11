@@ -618,6 +618,62 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
+TEST(SparseMatrix, PrimaryOracularCacheSize) {
+    std::string placeholder = "placeholder";
+
+    int NR = 8, NC = 20;
+    std::vector<hsize_t> pointers { 0, 10, 11, 20, 22, 30, 33, 40, 44 };
+    std::size_t slab_size = 10000;
+    int max_non_zeros = 4;
+    hsize_t chunk_size = 10;
+
+    tatami_hdf5::CompressedSparseMatrix_internal::MatrixDetails<int> deets(placeholder, placeholder, placeholder, NR, NC, pointers, slab_size, max_non_zeros, chunk_size);
+    auto chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_cache_size_for_primary_oracular<double, int>(deets, true, true);
+    EXPECT_EQ(chosen, 44);
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_cache_size_for_primary_oracular<double, int>(deets, false, false);
+    EXPECT_EQ(chosen, static_cast<std::size_t>(-1));
+
+    deets.slab_cache_size = 100;
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_cache_size_for_primary_oracular<double, int>(deets, true, true);
+    EXPECT_EQ(chosen, 8);
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_cache_size_for_primary_oracular<double, int>(deets, true, false);
+    EXPECT_EQ(chosen, 12);
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_cache_size_for_primary_oracular<double, int>(deets, false, true);
+    EXPECT_EQ(chosen, 25);
+
+    deets.slab_cache_size = 10;
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_cache_size_for_primary_oracular<double, int>(deets, true, true);
+    EXPECT_EQ(chosen, 4); // must be at least equal to the maximum number of non-zeros in any primary dimension element.
+}
+
+TEST(SparseMatrix, MyopicSecondaryChunkLength) {
+    std::string placeholder = "placeholder";
+
+    int NR = 10, NC = 20;
+    std::vector<hsize_t> pointers { 0, 10, 11, 20, 22, 30, 33, 40, 44, 50, 55 };
+    std::size_t slab_size = 10000;
+    int max_non_zeros = 4;
+    hsize_t chunk_size = 10;
+
+    tatami_hdf5::CompressedSparseMatrix_internal::MatrixDetails<int> deets(placeholder, placeholder, placeholder, NR, NC, pointers, slab_size, max_non_zeros, chunk_size);
+    auto chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_chunk_length_for_myopic_secondary<double, int>(deets, NR, true, true);
+    EXPECT_EQ(chosen, 20);
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_chunk_length_for_myopic_secondary<double, int>(deets, NR, false, false);
+    EXPECT_EQ(chosen, 20);
+
+    deets.slab_cache_size = 0;
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_chunk_length_for_myopic_secondary<double, int>(deets, NR, true, true);
+    EXPECT_EQ(chosen, 1);
+
+    deets.slab_cache_size = 1000;
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_chunk_length_for_myopic_secondary<double, int>(deets, NR, true, true);
+    EXPECT_EQ(chosen, 8);
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_chunk_length_for_myopic_secondary<double, int>(deets, NR, true, false);
+    EXPECT_EQ(chosen, 12);
+    chosen = tatami_hdf5::CompressedSparseMatrix_internal::choose_chunk_length_for_myopic_secondary<double, int>(deets, NR, false, true);
+    EXPECT_EQ(chosen, 20);
+}
+
 TEST(SparseMatrix, Errors) {
     auto fpath = temp_file_path("tatami-sparse-test.h5");
     std::string name = "stuff";

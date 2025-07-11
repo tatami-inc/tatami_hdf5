@@ -18,6 +18,22 @@ namespace tatami_hdf5 {
 
 namespace CompressedSparseMatrix_internal {
 
+template<typename CachedValue_, typename Index_>
+Index_ choose_chunk_length_for_myopic_secondary(const MatrixDetails<Index_>& details, Index_ primary_extract_length, bool needs_value, bool needs_index) {
+    // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford.
+    std::size_t elsize = CompressedSparseMatrix_internal::size_of_cached_element<CachedValue_, Index_>(needs_value, needs_index);
+    if (elsize == 0 || primary_extract_length == 0) {
+        return details.secondary_dim; // caching the entire secondary dimension, if possible.
+    }
+
+    std::size_t secondary_chunkdim = (details.slab_cache_size / elsize) / primary_extract_length;
+    if (secondary_chunkdim < 1) {
+        return 1; // ensure we have at least one dimension.
+    }
+
+    return std::min(secondary_chunkdim, static_cast<std::size_t>(details.secondary_dim));
+}
+
 // We don't use CachedIndex_, as this may be too small to store the other
 // dimension; use Index_ instead as this is guaranteed.
 template<typename Index_, typename CachedValue_>
@@ -26,35 +42,18 @@ public:
     MyopicSecondaryCore(
         const MatrixDetails<Index_>& details,
         tatami::MaybeOracle<false, Index_>, // oracle, for consistency with the oracular constructor.
-        Index_ extract_length,
+        Index_ primary_extract_length,
         bool needs_value,
         bool needs_index) :
         my_pointers(details.pointers),
-        my_secondary_dim_stats(
-            details.secondary_dim,
-            [&]() -> Index_ {
-                // The general strategy here is to allocate a single giant slab based on what the 'cache_size' can afford.
-                std::size_t elsize = CompressedSparseMatrix_internal::size_of_cached_element<Index_, CachedValue_>(needs_value, needs_index);
-                std::size_t denom = sanisizer::product<std::size_t>(elsize, extract_length);
-                if (denom == 0) {
-                    return details.secondary_dim; // caching the entire secondary dimension, if possible.
-                }
-
-                std::size_t primary_chunkdim = details.slab_cache_size / denom;
-                if (primary_chunkdim < 1) {
-                    return 1; // ensure we have at least one dimension.
-                }
-
-                return std::min(primary_chunkdim, static_cast<std::size_t>(details.secondary_dim));
-            }()
-        ),
-        my_extract_length(extract_length),
+        my_secondary_dim_stats(details.secondary_dim, choose_chunk_length_for_myopic_secondary<CachedValue_>(details, primary_extract_length, needs_value, needs_index)),
+        my_primary_extract_length(primary_extract_length),
         my_needs_value(needs_value),
         my_needs_index(needs_index)
     {
         initialize(details, my_h5comp);
 
-        auto cache_size_in_elements = sanisizer::product<std::size_t>(my_secondary_dim_stats.chunk_length, extract_length);
+        auto cache_size_in_elements = sanisizer::product<std::size_t>(my_secondary_dim_stats.chunk_length, primary_extract_length);
         if (my_needs_value) {
             my_cache_data.resize(sanisizer::cast<decltype(my_cache_data.size())>(cache_size_in_elements));
         }
@@ -66,7 +65,7 @@ public:
         // Precomputing the offsets so we don't have to do the multiplication every time.
         my_cache_offsets.reserve(my_secondary_dim_stats.chunk_length);
         std::size_t current_offset = 0;
-        for (Index_ i = 0; i < my_secondary_dim_stats.chunk_length; ++i, current_offset += extract_length) {
+        for (Index_ i = 0; i < my_secondary_dim_stats.chunk_length; ++i, current_offset += primary_extract_length) {
             my_cache_offsets.push_back(current_offset);
         }
 
@@ -86,7 +85,7 @@ private:
     std::unique_ptr<Components> my_h5comp;
     const std::vector<hsize_t>& my_pointers;
     tatami_chunked::ChunkDimensionStats<Index_> my_secondary_dim_stats;
-    Index_ my_extract_length;
+    Index_ my_primary_extract_length;
     bool my_needs_value;
     bool my_needs_index;
 
@@ -118,7 +117,7 @@ private:
         }
 
         tatami::SparseRange<CachedValue_, Index_> output(my_cache_count[chunk_offset]);
-        auto offset = sanisizer::product_unsafe<std::size_t>(chunk_offset, my_extract_length);
+        auto offset = sanisizer::product_unsafe<std::size_t>(chunk_offset, my_primary_extract_length);
         if (my_needs_value) {
             output.value = my_cache_data.data() + offset;
         }
@@ -210,29 +209,29 @@ public:
     OracularSecondaryCore(
         const MatrixDetails<Index_>& details,
         std::shared_ptr<const tatami::Oracle<Index_> > oracle, 
-        Index_ extract_length,
+        Index_ primary_extract_length,
         bool needs_value,
         bool needs_index) :
         my_pointers(details.pointers),
         my_secondary_dim(details.secondary_dim),
-        my_extract_length(extract_length),
+        my_primary_extract_length(primary_extract_length),
         my_needs_value(needs_value),
         my_needs_index(needs_index),
         my_cache(
             std::move(oracle),
             tatami_chunked::SlabCacheStats<Index_>(
                 /* target_length = */ 1,
-                /* non_target_length = */ extract_length,
+                /* non_target_length = */ primary_extract_length,
                 /* target_num_chunks = */ my_secondary_dim,
                 /* cache_size_in_bytes = */ details.slab_cache_size,
-                /* element_size = */ size_of_cached_element<Index_, CachedValue_>(needs_value, needs_index),
+                /* element_size = */ size_of_cached_element<CachedValue_, Index_>(needs_value, needs_index),
                 /* require_minimum_cache = */ true
             ).max_slabs_in_cache
         )
     {
         initialize(details, my_h5comp);
 
-        auto alloc = sanisizer::product<std::size_t>(my_cache.get_max_slabs(), my_extract_length);
+        auto alloc = sanisizer::product<std::size_t>(my_cache.get_max_slabs(), my_primary_extract_length);
         if (my_needs_index) {
             my_cache_index.resize(sanisizer::cast<decltype(my_cache_index.size())>(alloc));
         }
@@ -258,7 +257,7 @@ protected:
     const std::vector<hsize_t>& my_pointers;
 
     Index_ my_secondary_dim;
-    Index_ my_extract_length;
+    Index_ my_primary_extract_length;
     bool my_needs_value;
     bool my_needs_index;
 
@@ -299,7 +298,7 @@ private:
                 if (my_needs_index) {
                     latest.index = my_cache_index.data() + my_offset;
                 }
-                my_offset += my_extract_length;
+                my_offset += my_primary_extract_length;
                 return latest;
             },
             /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks) -> void {
