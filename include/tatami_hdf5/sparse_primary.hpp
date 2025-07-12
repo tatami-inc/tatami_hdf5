@@ -396,8 +396,8 @@ public:
         my_block_start(block_start),
         my_block_past_end(block_start + block_length)
     {
-        // Protect pointer differences against overflow when refining primary limits.
-        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim);
+        tatami::can_cast_Index_to_container_size<decltype(my_index_buffer)>(details.max_non_zeros); // Ensure that we can resize my_index_buffer safely.
+        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(details.max_non_zeros); // Protect pointer differences against overflow when refining primary limits.
     }
 
 private:
@@ -421,7 +421,7 @@ public:
                     current_cache.number = 0;
                     return;
                 }
-                tatami::resize_container_to_Index_size(my_index_buffer, extraction_len); // this is legal as extract_len <= dimension extents, which are stored as Index_.
+                my_index_buffer.resize(extraction_len); // implicit cast is safe against overflows as we checked it in the constructor.
 
                 serialize([&]() -> void {
                     auto& comp = *(this->my_h5comp);
@@ -433,7 +433,7 @@ public:
                     auto indices_start = my_index_buffer.begin();
                     auto indices_end = my_index_buffer.end();
                     refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_block_start, my_block_past_end);
-                    current_cache.number = indices_end - indices_start;
+                    current_cache.number = indices_end - indices_start; // pointer difference is safe against overflows as we checked it in the constructor.
 
                     if (current_cache.number) {
                         if (this->my_needs_index) {
@@ -477,8 +477,8 @@ public:
     {
         populate_sparse_remap_vector<sparse_>(indices, my_remap, my_first_index, my_past_last_index);
 
-        // Protect pointer differences against overflow when refining primary limits.
-        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(my_secondary_dim);
+        tatami::can_cast_Index_to_container_size<decltype(my_index_buffer)>(details.max_non_zeros); // Ensure that we can resize my_index_buffer safely.
+        sanisizer::can_ptrdiff<decltype(my_index_buffer.begin())>(details.max_non_zeros); // Protect pointer differences against overflow when refining primary limits.
     }
 
 private:
@@ -503,7 +503,7 @@ public:
                     current_cache.number = 0;
                     return;
                 }
-                tatami::resize_container_to_Index_size(my_index_buffer, extraction_len); // this is legal as extract_len <= dimension extents, which are stored as Index_.
+                my_index_buffer.resize(extraction_len); // implicit cast is safe as we checked it in the constructor.
 
                 serialize([&]() -> void {
                     auto& comp = *(this->my_h5comp);
@@ -530,7 +530,7 @@ public:
                         );
 
                         if (this->my_needs_value && num_found > 0) {
-                            hsize_t new_start = extraction_start + (indices_start - my_index_buffer.begin());
+                            hsize_t new_start = extraction_start + (indices_start - my_index_buffer.begin()); // pointer differences are safe, we checked in the constructor.
                             comp.dataspace.selectNone();
                             tatami::process_consecutive_indices<Index_>(
                                 my_found.data(),
