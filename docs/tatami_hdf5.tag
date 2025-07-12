@@ -72,8 +72,8 @@
       <type></type>
       <name>CompressedSparseMatrix</name>
       <anchorfile>classtatami__hdf5_1_1CompressedSparseMatrix.html</anchorfile>
-      <anchor>a1003d0dacaf33924cdb62284f9d8f3f7</anchor>
-      <arglist>(Index_ ncsr, Index_ ncol, std::string file_name, std::string value_name, std::string index_name, std::string pointer_name, bool csr)</arglist>
+      <anchor>ad36c8b5f2b7e016aa6d60666a49730f8</anchor>
+      <arglist>(Index_ nrow, Index_ ncol, std::string file_name, std::string value_name, std::string index_name, std::string pointer_name, bool csr)</arglist>
     </member>
   </compound>
   <compound kind="struct">
