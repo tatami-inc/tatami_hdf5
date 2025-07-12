@@ -81,8 +81,8 @@ class CompressedSparseMatrix final : public tatami::Matrix<Value_, Index_> {
 
 public:
     /**
-     * @param nr Number of rows in the matrix.
-     * @param nc Number of columns in the matrix.
+     * @param nrow Number of rows in the matrix.
+     * @param ncol Number of columns in the matrix.
      * @param file_name Path to the file.
      * @param value_name Name of the 1D dataset inside `file_name` containing the values of the structural non-zero elements.
      * @param index_name Name of the 1D dataset inside `file_name` containing the indices of the structural non-zero elements.
@@ -93,7 +93,16 @@ public:
      * If false, the matrix is assumed to be stored in compressed sparse column format.
      * @param options Further options.
      */
-    CompressedSparseMatrix(Index_ nrow, Index_ ncol, std::string file_name, std::string value_name, std::string index_name, std::string pointer_name, bool csr, const CompressedSparseMatrixOptions& options) :
+    CompressedSparseMatrix(
+        Index_ nrow,
+        Index_ ncol,
+        std::string file_name,
+        std::string value_name,
+        std::string index_name,
+        std::string pointer_name,
+        bool csr,
+        const CompressedSparseMatrixOptions& options
+    ) :
         my_nrow(nrow), 
         my_ncol(ncol), 
         my_file_name(std::move(file_name)), 
@@ -202,8 +211,8 @@ public:
      * @param pointer_name Name of the 1D dataset inside `file_name` containing the index pointers for the start and end of each csr (if `csr = true`) or column (otherwise).
      * @param csr Whether the matrix is stored in compressed sparse csr format.
      */
-    CompressedSparseMatrix(Index_ ncsr, Index_ ncol, std::string file_name, std::string value_name, std::string index_name, std::string pointer_name, bool csr) :
-        CompressedSparseMatrix(ncsr, ncol, std::move(file_name), std::move(value_name), std::move(index_name), std::move(pointer_name), csr, CompressedSparseMatrixOptions()) {}
+    CompressedSparseMatrix(Index_ nrow, Index_ ncol, std::string file_name, std::string value_name, std::string index_name, std::string pointer_name, bool csr) :
+        CompressedSparseMatrix(nrow, ncol, std::move(file_name), std::move(value_name), std::move(index_name), std::move(pointer_name), csr, CompressedSparseMatrixOptions()) {}
 
 public:
     Index_ nrow() const {
