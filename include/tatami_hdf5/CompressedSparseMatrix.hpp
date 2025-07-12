@@ -140,46 +140,18 @@ public:
                 throw std::runtime_error("'pointer_name' dataset should have length equal to the number of " + dim_as_str(my_csr) + " plus 1");
             }
 
-            // Consider the case where we're iterating across primary dimension elements and extracting its contents from file.
-            // At each iteration, we will have a partially-read chunk that spans the ending values of the latest primary dimension element.
-            // (Unless we're going backwards, in which case the partially-read chunk would span the starting values.)
-            // We want to cache this chunk so that its contents can be fully read upon scanning the next primary dimension element.
-            //
-            // In practice, we want the cache to be large enough to hold three chunks simultaneously;
-            // one for the partially read chunk at the start of a primary dimension element, one for the partially read chunk at the end,
-            // and another just in case HDF5 needs to cache the middle chunks before copying them to the user buffer.
-            // This arrangement ensures that we can hold both partially read chunks while storing and evicting the fully read chunks,
-            // no matter what order the HDF5 library uses to read chunks to satisfy our request.
-            //
-            // In any case, we also ensure that the HDF5 chunk cache is at least 1 MB (the default).
-            // This allows us to be at least as good as the default in cases where reads are non-contiguous and we've got partially read chunks everywhere.
-            {
-                auto compute_chunk_cache_size = [nonzeros](hsize_t chunk_length, std::size_t element_size) -> hsize_t {
-                    auto cache_size = chunk_length;
-                    if (nonzeros - cache_size <= chunk_length) { // subtraction is safe as chunk_length <= nonzeros.
-                        return nonzeros;
-                    }
-                    cache_size += chunk_length;
-                    if (nonzeros - cache_size <= chunk_length) {
-                        return nonzeros;
-                    }
-                    cache_size += chunk_length;
-                    return std::max(sanisizer::product<hsize_t>(cache_size, element_size), sanisizer::cap<hsize_t>(1000000));
-                };
+            auto dparms = dhandle.getCreatePlist();
+            if (dparms.getLayout() == H5D_CHUNKED) {
+                hsize_t dchunk_length;
+                dparms.getChunk(1, &dchunk_length);
+                my_chunk_cache_sizes.value = CompressedSparseMatrix_internal::compute_chunk_cache_size(nonzeros, dchunk_length, dhandle.getDataType().getSize());
+            }
 
-                auto dparms = dhandle.getCreatePlist();
-                if (dparms.getLayout() == H5D_CHUNKED) {
-                    hsize_t dchunk_length;
-                    dparms.getChunk(1, &dchunk_length);
-                    my_chunk_cache_sizes.value = compute_chunk_cache_size(dchunk_length, dhandle.getDataType().getSize());
-                }
-
-                auto iparms = ihandle.getCreatePlist();
-                if (iparms.getLayout() == H5D_CHUNKED) {
-                    hsize_t ichunk_length;
-                    iparms.getChunk(1, &ichunk_length);
-                    my_chunk_cache_sizes.index = compute_chunk_cache_size(ichunk_length, ihandle.getDataType().getSize());
-                }
+            auto iparms = ihandle.getCreatePlist();
+            if (iparms.getLayout() == H5D_CHUNKED) {
+                hsize_t ichunk_length;
+                iparms.getChunk(1, &ichunk_length);
+                my_chunk_cache_sizes.index = CompressedSparseMatrix_internal::compute_chunk_cache_size(nonzeros, ichunk_length, ihandle.getDataType().getSize());
             }
 
             // Checking the contents of the index pointers.

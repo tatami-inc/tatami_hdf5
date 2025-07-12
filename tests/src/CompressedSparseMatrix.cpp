@@ -672,6 +672,15 @@ TEST(SparseMatrix, MyopicSecondaryChunkLength) {
     EXPECT_EQ(chosen, 20);
 }
 
+TEST(SparseMatrix, ComputeChunkCacheSize) {
+    int elsize = 500;
+    EXPECT_EQ(tatami_hdf5::CompressedSparseMatrix_internal::compute_chunk_cache_size(0, 0, elsize), 0);
+    EXPECT_EQ(tatami_hdf5::CompressedSparseMatrix_internal::compute_chunk_cache_size(10000, 2000, elsize), 6000 * elsize);
+    EXPECT_EQ(tatami_hdf5::CompressedSparseMatrix_internal::compute_chunk_cache_size(10000, 4000, elsize), 12000 * elsize);
+    EXPECT_EQ(tatami_hdf5::CompressedSparseMatrix_internal::compute_chunk_cache_size(10000, 7000, elsize), 14000 * elsize);
+    EXPECT_EQ(tatami_hdf5::CompressedSparseMatrix_internal::compute_chunk_cache_size(10000, 10, elsize), 1000000);
+}
+
 TEST(SparseMatrix, Errors) {
     auto fpath = temp_file_path("tatami-sparse-test.h5");
     std::string name = "stuff";
