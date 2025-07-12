@@ -77,7 +77,7 @@ class CompressedSparseMatrix final : public tatami::Matrix<Value_, Index_> {
 
     std::size_t my_slab_cache_size; // our own cache of slabs.
     Index_ my_max_non_zeros;
-    hsize_t my_chunk_cache_size; // HDF5's cache of uncompressed chunks.
+    CompressedSparseMatrix_internal::ChunkCacheSizes my_chunk_cache_sizes; // HDF5's cache of uncompressed chunks.
 
 public:
     /**
@@ -140,40 +140,19 @@ public:
                 throw std::runtime_error("'pointer_name' dataset should have length equal to the number of " + dim_as_str(my_csr) + " plus 1");
             }
 
-            // We aim to store two chunks in HDF5's chunk cache; one overlapping the start of the primary dimension element's range, and one overlapping the end.
-            // This ensures that we don't re-read the content for the next/previous primary dimension element, depending on which direction we're going.
-            // To simplify matters, we just read the chunk sizes (in bytes) for both the index/data datasets and use the larger chunk size for both datasets.
-            // Hopefully the chunks are not too big...
-            hsize_t dchunk_length = 0;
-            std::size_t dchunk_element_size = 0;
             auto dparms = dhandle.getCreatePlist();
             if (dparms.getLayout() == H5D_CHUNKED) {
+                hsize_t dchunk_length;
                 dparms.getChunk(1, &dchunk_length);
-                dchunk_element_size = dhandle.getDataType().getSize();
+                my_chunk_cache_sizes.value = CompressedSparseMatrix_internal::compute_chunk_cache_size(nonzeros, dchunk_length, dhandle.getDataType().getSize());
             }
 
-            hsize_t ichunk_length = 0;
-            std::size_t ichunk_element_size = 0;
             auto iparms = ihandle.getCreatePlist();
             if (iparms.getLayout() == H5D_CHUNKED) {
+                hsize_t ichunk_length;
                 iparms.getChunk(1, &ichunk_length);
-                ichunk_element_size = ihandle.getDataType().getSize();
+                my_chunk_cache_sizes.index = CompressedSparseMatrix_internal::compute_chunk_cache_size(nonzeros, ichunk_length, ihandle.getDataType().getSize());
             }
-
-            auto non_overflow_double_min = [nonzeros](hsize_t chunk_length) -> hsize_t {
-                // Basically computes std::min(chunk_length * 2, nonzeros) without
-                // overflowing hsize_t, for a potentially silly choice of hsize_t...
-                if (chunk_length < nonzeros) {
-                    return nonzeros;
-                } else {
-                    return chunk_length + std::min(chunk_length, nonzeros - chunk_length);
-                }
-            };
-
-            my_chunk_cache_size = std::max(
-                sanisizer::product<hsize_t>(non_overflow_double_min(ichunk_length), ichunk_element_size), 
-                sanisizer::product<hsize_t>(non_overflow_double_min(dchunk_length), dchunk_element_size)
-            );
 
             // Checking the contents of the index pointers.
             pointers.resize(sanisizer::cast<decltype(pointers.size())>(ptr_size));
@@ -261,7 +240,7 @@ private:
             pointers, 
             my_slab_cache_size,
             my_max_non_zeros,
-            my_chunk_cache_size
+            my_chunk_cache_sizes
         );
     }
 

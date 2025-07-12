@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <cstddef>
 #include <string>
+#include <limits>
 
 #include "tatami/tatami.hpp"
 #include "tatami_chunked/tatami_chunked.hpp"
@@ -48,6 +49,13 @@ struct Components {
     H5::DataSpace memspace;
 };
 
+struct ChunkCacheSizes {
+    ChunkCacheSizes() = default;
+    ChunkCacheSizes(hsize_t value, hsize_t index) : value(value), index(index) {}
+    hsize_t value = 0;
+    hsize_t index = 0;
+};
+
 // In all cases, we know that max_non_zeros can be safely casted between hsize_t and Index_,
 // because the value is derived from differences between hsize_t pointers.
 // We also know that it can be safely cast to std::size_t, as max_non_zeros is no greater than the dimension extents,
@@ -64,7 +72,7 @@ struct MatrixDetails {
         const std::vector<hsize_t>& pointers, 
         std::size_t slab_cache_size,
         Index_ max_non_zeros,
-        hsize_t chunk_cache_size
+        ChunkCacheSizes chunk_cache_sizes
     ) :
         file_name(file_name), 
         value_name(value_name), 
@@ -74,7 +82,7 @@ struct MatrixDetails {
         pointers(pointers), 
         slab_cache_size(slab_cache_size),
         max_non_zeros(max_non_zeros),
-        chunk_cache_size(chunk_cache_size) 
+        chunk_cache_sizes(std::move(chunk_cache_sizes))
     {}
 
     const std::string& file_name;
@@ -87,8 +95,30 @@ struct MatrixDetails {
 
     std::size_t slab_cache_size; // size for our own cache of slabs.
     Index_ max_non_zeros;
-    hsize_t chunk_cache_size; // size for HDF5's cache of uncompressed chunks.
+    ChunkCacheSizes chunk_cache_sizes; // size for HDF5's cache of uncompressed chunks.
 };
+
+// Consider the case where we're iterating across primary dimension elements and extracting its contents from file.
+// At each iteration, we will have a partially-read chunk that spans the ending values of the latest primary dimension element.
+// (Unless we're going backwards, in which case the partially-read chunk would span the starting values.)
+// We want to cache this chunk so that its contents can be fully read upon scanning the next primary dimension element.
+//
+// In practice, we want the cache to be large enough to hold three chunks simultaneously;
+// one for the partially read chunk at the start of a primary dimension element, one for the partially read chunk at the end,
+// and another just in case HDF5 needs to cache the middle chunks before copying them to the user buffer.
+// This arrangement ensures that we can hold both partially read chunks while storing and evicting the fully read chunks,
+// no matter what order the HDF5 library uses to read chunks to satisfy our request.
+//
+// In any case, we also ensure that the HDF5 chunk cache is at least 1 MB (the default).
+// This allows us to be at least as good as the default in cases where reads are non-contiguous and we've got partially read chunks everywhere.
+inline hsize_t compute_chunk_cache_size(hsize_t nonzeros, hsize_t chunk_length, std::size_t element_size) {
+    if (chunk_length == 0) {
+        return 0;
+    }
+    hsize_t num_chunks = std::min(nonzeros / chunk_length + (nonzeros % chunk_length > 0), static_cast<hsize_t>(3));
+    hsize_t cache_size = sanisizer::product<hsize_t>(num_chunks, chunk_length);
+    return std::max(sanisizer::product<hsize_t>(cache_size, element_size), sanisizer::cap<hsize_t>(1000000));
+}
 
 // All HDF5-related members are stored in a separate pointer so we can serialize construction and destruction.
 template<typename Index_>
@@ -96,15 +126,16 @@ void initialize(const MatrixDetails<Index_>& details, std::unique_ptr<Components
     serialize([&]() -> void {
         h5comp.reset(new Components);
 
-        // Using some kinda-big prime number as the number of slots. This
-        // doesn't really matter too much as we only intend to store two
-        // chunks at most - see CompressedSparseMatrix.hpp for the rationale.
-        H5::FileAccPropList fapl(H5::FileAccPropList::DEFAULT.getId());
-        fapl.setCache(0, 511, details.chunk_cache_size, 0);
+        auto create_dapl = [&](hsize_t cache_size) -> H5::DSetAccPropList {
+            // passing an ID is the only way to get the constructor to make a copy, not a reference (who knows why???).
+            H5::DSetAccPropList dapl(H5::DSetAccPropList::DEFAULT.getId());
+            dapl.setChunkCache(H5D_CHUNK_CACHE_NSLOTS_DEFAULT, cache_size, H5D_CHUNK_CACHE_W0_DEFAULT);
+            return dapl;
+        };
 
-        h5comp->file.openFile(details.file_name, H5F_ACC_RDONLY, fapl);
-        h5comp->data_dataset = h5comp->file.openDataSet(details.value_name);
-        h5comp->index_dataset = h5comp->file.openDataSet(details.index_name);
+        h5comp->file.openFile(details.file_name, H5F_ACC_RDONLY);
+        h5comp->data_dataset = h5comp->file.openDataSet(details.value_name, create_dapl(details.chunk_cache_sizes.value));
+        h5comp->index_dataset = h5comp->file.openDataSet(details.index_name, create_dapl(details.chunk_cache_sizes.index));
         h5comp->dataspace = h5comp->data_dataset.getSpace();
     });
 }
