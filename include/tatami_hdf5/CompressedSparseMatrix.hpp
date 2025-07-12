@@ -140,35 +140,45 @@ public:
                 throw std::runtime_error("'pointer_name' dataset should have length equal to the number of " + dim_as_str(my_csr) + " plus 1");
             }
 
-            // We aim to store two chunks in HDF5's chunk cache; one overlapping the start of the primary dimension element's range, and one overlapping the end.
-            // This ensures that we don't re-read the content for the next/previous primary dimension element, depending on which direction we're going.
-            // To simplify matters, we just read the chunk sizes (in bytes) for both the index/data datasets and use the larger chunk size for both datasets.
-            // Hopefully the chunks are not too big...
+            // Consider the case where we're iterating across primary dimension elements and extracting its contents from file.
+            // At each iteration, we will have a partially-read chunk that spans the ending values of the latest primary dimension element.
+            // (Unless we're going backwards, in which case the partially-read chunk would span the starting values.)
+            // We want to cache this chunk so that its contents can be fully read upon scanning the next primary dimension element.
+            //
+            // In practice, we want the cache to be large enough to hold three chunks simultaneously;
+            // one for the partially read chunk at the start of a primary dimension element, one for the partially read chunk at the end,
+            // and another just in case HDF5 needs to cache the middle chunks before copying them to the user buffer.
+            // This arrangement ensures that we can hold both partially read chunks while storing and evicting the fully read chunks,
+            // no matter what order the HDF5 library uses to read chunks to satisfy our request.
+            //
+            // In any case, we also ensure that the HDF5 chunk cache is at least 1 MB (the default).
+            // This allows us to be at least as good as the default in cases where reads are non-contiguous and we've got partially read chunks everywhere.
             {
-                auto non_overflow_double_min = [nonzeros](hsize_t chunk_length) -> hsize_t {
-                    // Basically computes std::min(chunk_length * 2, nonzeros) without
-                    // overflowing hsize_t, for a potentially silly choice of hsize_t...
-                    if (chunk_length < nonzeros) {
+                auto compute_chunk_cache_size = [nonzeros](hsize_t chunk_length, std::size_t element_size) -> hsize_t {
+                    auto cache_size = chunk_length;
+                    if (nonzeros - cache_size <= chunk_length) { // subtraction is safe as chunk_length <= nonzeros.
                         return nonzeros;
-                    } else {
-                        return chunk_length + std::min(chunk_length, nonzeros - chunk_length);
                     }
+                    cache_size += chunk_length;
+                    if (nonzeros - cache_size <= chunk_length) {
+                        return nonzeros;
+                    }
+                    cache_size += chunk_length;
+                    return std::max(sanisizer::product<hsize_t>(cache_size, element_size), sanisizer::cap<hsize_t>(1000000));
                 };
 
                 auto dparms = dhandle.getCreatePlist();
                 if (dparms.getLayout() == H5D_CHUNKED) {
                     hsize_t dchunk_length;
                     dparms.getChunk(1, &dchunk_length);
-                    std::size_t dchunk_element_size = dhandle.getDataType().getSize();
-                    my_chunk_cache_sizes.value = sanisizer::product<hsize_t>(non_overflow_double_min(dchunk_length), dchunk_element_size);
+                    my_chunk_cache_sizes.value = compute_chunk_cache_size(dchunk_length, dhandle.getDataType().getSize());
                 }
 
                 auto iparms = ihandle.getCreatePlist();
                 if (iparms.getLayout() == H5D_CHUNKED) {
                     hsize_t ichunk_length;
                     iparms.getChunk(1, &ichunk_length);
-                    std::size_t ichunk_element_size = ihandle.getDataType().getSize();
-                    my_chunk_cache_sizes.index = sanisizer::product<hsize_t>(non_overflow_double_min(ichunk_length), ichunk_element_size);
+                    my_chunk_cache_sizes.index = compute_chunk_cache_size(ichunk_length, ihandle.getDataType().getSize());
                 }
             }
 

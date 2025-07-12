@@ -104,13 +104,9 @@ void initialize(const MatrixDetails<Index_>& details, std::unique_ptr<Components
         h5comp.reset(new Components);
 
         auto create_dapl = [&](hsize_t cache_size) -> H5::DSetAccPropList {
+            // passing an ID is the only way to get the constructor to make a copy, not a reference (who knows why???).
             H5::DSetAccPropList dapl(H5::DSetAccPropList::DEFAULT.getId());
-            dapl.setChunkCache(
-                511,        // Using some kinda-big prime number as the number of slots.
-                            // This doesn't really matter too much as we only intend to store two chunks at most. 
-                cache_size, // This should be large enouh to store two chunks.
-                1           // Set to 1 to discard fully-read chunks first, as we want to keep chunks with unread data.
-            );
+            dapl.setChunkCache(H5D_CHUNK_CACHE_NSLOTS_DEFAULT, cache_size, H5D_CHUNK_CACHE_W0_DEFAULT);
             return dapl;
         };
 
