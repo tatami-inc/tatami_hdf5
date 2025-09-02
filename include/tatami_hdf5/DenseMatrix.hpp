@@ -758,8 +758,14 @@ public:
                 dparms.getChunk(2, chunk_dims);
             }
 
-            my_firstdim_stats = tatami_chunked::ChunkDimensionStats<Index_>(dims[0], chunk_dims[0]);
-            my_seconddim_stats = tatami_chunked::ChunkDimensionStats<Index_>(dims[1], chunk_dims[1]);
+            my_firstdim_stats = tatami_chunked::ChunkDimensionStats<Index_>(
+                sanisizer::cast<Index_>(dims[0]),
+                sanisizer::cast<Index_>(chunk_dims[0])
+            );
+            my_seconddim_stats = tatami_chunked::ChunkDimensionStats<Index_>(
+                sanisizer::cast<Index_>(dims[1]),
+                sanisizer::cast<Index_>(chunk_dims[1])
+            );
         });
 
         // Favoring extraction on the dimension that involves pulling out fewer
