@@ -343,6 +343,7 @@ public:
         initialize(file_name, dataset_name, my_h5comp);
         if (!my_h5_row_is_target) {
             sanisizer::resize(my_transposition_buffer, my_slab_size);
+            my_transposition_buffer_ptr = my_transposition_buffer.data();
         }
     }
 
@@ -355,7 +356,10 @@ private:
     tatami_chunked::ChunkDimensionStats<Index_> my_dim_stats;
 
     struct Slab {
-        std::size_t offset;
+        union {
+            std::size_t offset;
+            CachedValue_* data;
+        };
     };
 
     tatami_chunked::OracularSlabCache<Index_, Index_, Slab, true> my_cache;
@@ -365,6 +369,7 @@ private:
 
     bool my_h5_row_is_target;
     std::vector<CachedValue_> my_transposition_buffer;
+    CachedValue_* my_transposition_buffer_ptr;
 
     std::vector<CachedValue_> my_non_target_buffer_for_indexed;
 
@@ -379,6 +384,25 @@ private:
         }
     }
 
+    void transpose_chunks(std::vector<std::pair<Index_, Slab*> >& chunks, const Index_ non_target_length) {
+        if (non_target_length <= 1) {
+            return;
+        }
+
+        for (const auto& current_chunk : chunks) {
+            const Index_ chunk_length = tatami_chunked::get_chunk_length(my_dim_stats, current_chunk.first);
+            if (chunk_length <= 1) {
+                continue;
+            }
+
+            // We actually swap the pointers here, so the slab pointers might not point to the factory pool after this!
+            // Shouldn't matter as long as neither of them leave this class.
+            auto& dest = current_chunk.second->data;
+            tatami::transpose(dest, non_target_length, chunk_length, my_transposition_buffer_ptr);
+            std::swap(dest, my_transposition_buffer_ptr);
+        }
+    }
+    
 public:
     template<typename Value_>
     const Value_* fetch_block([[maybe_unused]] Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
@@ -388,7 +412,11 @@ public:
             }, 
             /* create = */ [&]() -> Slab {
                 Slab output;
-                output.offset = my_offset;
+                if (my_h5_row_is_target) {
+                    output.offset = my_offset;
+                } else {
+                    output.data = my_memory_pool.data() + my_offset;
+                }
                 my_offset += my_slab_size;
                 return output;
             },
@@ -468,23 +496,19 @@ public:
                     offset[0] = block_start;
 
                     serialize([&]() -> void {
-                        for (const auto& c : chunks) {
-                            const auto chunk_length = tatami_chunked::get_chunk_length(my_dim_stats, c.first);
+                        for (const auto& current_chunk : chunks) {
+                            const auto chunk_length = tatami_chunked::get_chunk_length(my_dim_stats, current_chunk.first);
                             count[1] = chunk_length;
-                            offset[1] = c.first * my_dim_stats.chunk_length;
+                            offset[1] = current_chunk.first * my_dim_stats.chunk_length;
                             my_h5comp->memspace.setExtentSimple(2, count);
                             my_h5comp->memspace.selectAll();
                             my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, count, offset);
-
-                            const auto dest = my_memory_pool.data() + c.second->offset;
-                            if (block_length > 1 && chunk_length > 1) {
-                                my_h5comp->dataset.read(my_transposition_buffer.data(), define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
-                                tatami::transpose(my_transposition_buffer.data(), block_length, chunk_length, dest);
-                            } else {
-                                my_h5comp->dataset.read(dest, define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
-                            }
+                            my_h5comp->dataset.read(current_chunk.second->data, define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
                         }
                     });
+
+                    // Transposition is done outside the serial section to unblock other threads.
+                    transpose_chunks(chunks, block_length);
                 }
             }
         );
@@ -503,27 +527,29 @@ public:
             }, 
             /* create = */ [&]() -> Slab {
                 Slab output;
-                output.offset = my_offset;
+                output.data = my_memory_pool.data() + my_offset;
                 my_offset += my_slab_size;
                 return output;
             },
             /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks, std::vector<std::pair<Index_, Slab*> >&) -> void {
                 serialize([&]() -> void {
-                    for (const auto& c : chunks) {
-                        const auto chunk_length = tatami_chunked::get_chunk_length(my_dim_stats, c.first);
-                        const auto chunk_start = c.first * my_dim_stats.chunk_length;
-                        const auto dest = my_memory_pool.data() + c.second->offset;
-
-                        if (my_h5_row_is_target) {
-                            extract_indices(true, chunk_start, chunk_length, indices, my_non_target_buffer_for_indexed.data(), dest, *my_h5comp);
-                        } else if (num_indices > 1 && chunk_length > 1) {
-                            extract_indices(false, chunk_start, chunk_length, indices, my_non_target_buffer_for_indexed.data(), my_transposition_buffer.data(), *my_h5comp);
-                            tatami::transpose(my_transposition_buffer.data(), num_indices, chunk_length, dest);
-                        } else {
-                            extract_indices(false, chunk_start, chunk_length, indices, my_non_target_buffer_for_indexed.data(), dest, *my_h5comp);
-                        }
+                    for (const auto& current_chunk : chunks) {
+                        extract_indices(
+                            my_h5_row_is_target,
+                            current_chunk.first * my_dim_stats.chunk_length,
+                            tatami_chunked::get_chunk_length(my_dim_stats, current_chunk.first),
+                            indices,
+                            my_non_target_buffer_for_indexed.data(),
+                            current_chunk.second->data,
+                            *my_h5comp
+                        );
                     }
                 });
+
+                // Transposition is done outside the serial section to unblock other threads.
+                if (!my_h5_row_is_target) {
+                    transpose_chunks(chunks, num_indices);
+                }
             }
         );
 
