@@ -384,6 +384,10 @@ private:
         }
     }
 
+    std::pair<Index_, Index_> identify_chunk(Index_ current) const { 
+        return std::pair<Index_, Index_>(current / my_dim_stats.chunk_length, current % my_dim_stats.chunk_length);
+    }
+
     void transpose_chunks(std::vector<std::pair<Index_, Slab*> >& chunks, const Index_ non_target_length) {
         if (non_target_length <= 1) {
             return;
@@ -402,120 +406,143 @@ private:
             std::swap(dest, my_transposition_buffer_ptr);
         }
     }
-    
-public:
+
+private:
     template<typename Value_>
-    const Value_* fetch_block([[maybe_unused]] Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
+    const Value_* fetch_block_normal([[maybe_unused]] Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
         auto info = my_cache.next(
             /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
-                return std::pair<Index_, Index_>(current / my_dim_stats.chunk_length, current % my_dim_stats.chunk_length);
+                return identify_chunk(current);
             }, 
             /* create = */ [&]() -> Slab {
                 Slab output;
-                if (my_h5_row_is_target) {
-                    output.offset = my_offset;
-                } else {
-                    output.data = my_memory_pool.data() + my_offset;
-                }
+                output.offset = my_offset;
                 my_offset += my_slab_size;
                 return output;
             },
             /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks, std::vector<std::pair<Index_, Slab*> >& to_reuse) -> void {
-                if (my_h5_row_is_target) {
-                    // Defragmenting the existing chunks. We sort by offset to make 
-                    // sure that we're not clobbering in-use slabs during the copy().
-                    sort_by_field(to_reuse, [](const std::pair<Index_, Slab*>& x) -> std::size_t { return x.second->offset; });
+                // Defragmenting the existing chunks. We sort by offset to make 
+                // sure that we're not clobbering in-use slabs during the copy().
+                sort_by_field(to_reuse, [](const std::pair<Index_, Slab*>& x) -> std::size_t { return x.second->offset; });
 
-                    const auto dest = my_memory_pool.data();
-                    std::size_t reused_offset = 0;
-                    for (auto& x : to_reuse) {
-                        auto& cur_offset = x.second->offset;
-                        if (cur_offset != reused_offset) {
-                            std::copy_n(dest + cur_offset, my_slab_size, dest + reused_offset);
-                            cur_offset = reused_offset;
-                        }
-                        reused_offset += my_slab_size;
+                const auto dest = my_memory_pool.data();
+                std::size_t reused_offset = 0;
+                for (auto& x : to_reuse) {
+                    auto& cur_offset = x.second->offset;
+                    if (cur_offset != reused_offset) {
+                        std::copy_n(dest + cur_offset, my_slab_size, dest + reused_offset);
+                        cur_offset = reused_offset;
                     }
+                    reused_offset += my_slab_size;
+                }
 
-                    // If we don't have to transpose, we can extract data directly into the cache buffer.
-                    // To do so, we try to form as many contiguous hyperslabs as possible, reducing the number of calls into the HDF5 library.
-                    // Then we update the slab pointers to refer to the relevant slices of memory in the cache.
-                    // We don't use hyperslab unions because they're slow as shit for non-contiguous hyperslabs.
-                    sort_by_field(chunks, [](const std::pair<Index_, Slab*>& x) -> Index_ { return x.first; });
+                // If we don't have to transpose, we can extract data directly into the cache buffer.
+                // To do so, we try to form as many contiguous hyperslabs as possible, reducing the number of calls into the HDF5 library.
+                // Then we update the slab pointers to refer to the relevant slices of memory in the cache.
+                // We don't use hyperslab unions because they're slow as shit for non-contiguous hyperslabs.
+                sort_by_field(chunks, [](const std::pair<Index_, Slab*>& x) -> Index_ { return x.first; });
 
-                    Index_ run_chunk_id = chunks.front().first;
-                    Index_ run_length = tatami_chunked::get_chunk_length(my_dim_stats, run_chunk_id);
-                    auto run_offset = reused_offset;
-                    chunks.front().second->offset = run_offset;
-                    auto total_used_offset = run_offset + my_slab_size;
-                    Index_ last_chunk_id = run_chunk_id;
+                Index_ run_chunk_id = chunks.front().first;
+                Index_ run_length = tatami_chunked::get_chunk_length(my_dim_stats, run_chunk_id);
+                auto run_offset = reused_offset;
+                chunks.front().second->offset = run_offset;
+                auto total_used_offset = run_offset + my_slab_size;
+                Index_ last_chunk_id = run_chunk_id;
 
-                    hsize_t count[2];
-                    hsize_t offset[2];
-                    count[1] = block_length;
-                    offset[1] = block_start;
+                hsize_t count[2];
+                hsize_t offset[2];
+                count[1] = block_length;
+                offset[1] = block_start;
 
-                    serialize([&]() -> void {
-                        for (decltype(chunks.size()) ci = 1, cend = chunks.size(); ci < cend; ++ci) {
-                            const auto& current_chunk = chunks[ci];
-                            const auto current_chunk_id = current_chunk.first;
+                serialize([&]() -> void {
+                    for (decltype(chunks.size()) ci = 1, cend = chunks.size(); ci < cend; ++ci) {
+                        const auto& current_chunk = chunks[ci];
+                        const auto current_chunk_id = current_chunk.first;
 
-                            if (current_chunk_id - last_chunk_id > 1) { // save the existing run of chunks as one hyperslab, and start a new run.
-                                count[0] = run_length;
-                                offset[0] = run_chunk_id * my_dim_stats.chunk_length;
-                                my_h5comp->memspace.setExtentSimple(2, count);
-                                my_h5comp->memspace.selectAll();
-                                my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, count, offset);
-                                my_h5comp->dataset.read(dest + run_offset, define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
-
-                                run_chunk_id = current_chunk_id;
-                                run_length = 0;
-                                run_offset = total_used_offset;
-                            }
-
-                            run_length += tatami_chunked::get_chunk_length(my_dim_stats, current_chunk_id);
-                            current_chunk.second->offset = total_used_offset;
-                            total_used_offset += my_slab_size;
-                            last_chunk_id = current_chunk.first;
-                        }
-
-                        count[0] = run_length;
-                        offset[0] = run_chunk_id * my_dim_stats.chunk_length;
-                        my_h5comp->memspace.setExtentSimple(2, count);
-                        my_h5comp->memspace.selectAll();
-                        my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, count, offset);
-                        my_h5comp->dataset.read(dest + run_offset, define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
-                    });
-
-                } else {
-                    // If we have to transpose, we extract slab-by-slab and transpose each one as it comes in.
-                    // It's too hard to try to do an in-place transposition after reading everything into the cache.
-                    hsize_t count[2];
-                    hsize_t offset[2];
-                    count[0] = block_length;
-                    offset[0] = block_start;
-
-                    serialize([&]() -> void {
-                        for (const auto& current_chunk : chunks) {
-                            const auto chunk_length = tatami_chunked::get_chunk_length(my_dim_stats, current_chunk.first);
-                            count[1] = chunk_length;
-                            offset[1] = current_chunk.first * my_dim_stats.chunk_length;
+                        if (current_chunk_id - last_chunk_id > 1) { // save the existing run of chunks as one hyperslab, and start a new run.
+                            count[0] = run_length;
+                            offset[0] = run_chunk_id * my_dim_stats.chunk_length;
                             my_h5comp->memspace.setExtentSimple(2, count);
                             my_h5comp->memspace.selectAll();
                             my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, count, offset);
-                            my_h5comp->dataset.read(current_chunk.second->data, define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
-                        }
-                    });
+                            my_h5comp->dataset.read(dest + run_offset, define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
 
-                    // Transposition is done outside the serial section to unblock other threads.
-                    transpose_chunks(chunks, block_length);
-                }
+                            run_chunk_id = current_chunk_id;
+                            run_length = 0;
+                            run_offset = total_used_offset;
+                        }
+
+                        run_length += tatami_chunked::get_chunk_length(my_dim_stats, current_chunk_id);
+                        current_chunk.second->offset = total_used_offset;
+                        total_used_offset += my_slab_size;
+                        last_chunk_id = current_chunk.first;
+                    }
+
+                    count[0] = run_length;
+                    offset[0] = run_chunk_id * my_dim_stats.chunk_length;
+                    my_h5comp->memspace.setExtentSimple(2, count);
+                    my_h5comp->memspace.selectAll();
+                    my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, count, offset);
+                    my_h5comp->dataset.read(dest + run_offset, define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
+                });
             }
         );
 
         auto ptr = my_memory_pool.data() + info.first->offset + sanisizer::product_unsafe<std::size_t>(block_length, info.second);
         std::copy_n(ptr, block_length, buffer);
         return buffer;
+    }
+
+    template<typename Value_>
+    const Value_* fetch_block_transposed([[maybe_unused]] Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
+        auto info = my_cache.next(
+            /* identify = */ [&](Index_ current) -> std::pair<Index_, Index_> {
+                return identify_chunk(current);
+            }, 
+            /* create = */ [&]() -> Slab {
+                Slab output;
+                output.data = my_memory_pool.data() + my_offset;
+                my_offset += my_slab_size;
+                return output;
+            },
+            /* populate = */ [&](std::vector<std::pair<Index_, Slab*> >& chunks, std::vector<std::pair<Index_, Slab*> >&) -> void {
+                // If we have to transpose, we extract slab-by-slab and transpose each one as it comes in.
+                // It's too hard to try to do an in-place transposition after reading everything into the cache.
+                hsize_t count[2];
+                hsize_t offset[2];
+                count[0] = block_length;
+                offset[0] = block_start;
+
+                serialize([&]() -> void {
+                    for (const auto& current_chunk : chunks) {
+                        const auto chunk_length = tatami_chunked::get_chunk_length(my_dim_stats, current_chunk.first);
+                        count[1] = chunk_length;
+                        offset[1] = current_chunk.first * my_dim_stats.chunk_length;
+                        my_h5comp->memspace.setExtentSimple(2, count);
+                        my_h5comp->memspace.selectAll();
+                        my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, count, offset);
+                        my_h5comp->dataset.read(current_chunk.second->data, define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
+                    }
+                });
+
+                // Transposition is done outside the serial section to unblock other threads.
+                transpose_chunks(chunks, block_length);
+            }
+        );
+
+        auto ptr = info.first->data + sanisizer::product_unsafe<std::size_t>(block_length, info.second);
+        std::copy_n(ptr, block_length, buffer);
+        return buffer;
+    }
+
+public:
+    template<typename Value_>
+    const Value_* fetch_block(Index_ i, Index_ block_start, Index_ block_length, Value_* buffer) {
+        if (my_h5_row_is_target) {
+            return fetch_block_normal(i, block_start, block_length, buffer);
+        } else {
+            return fetch_block_transposed(i, block_start, block_length, buffer);
+        }
     }
 
     template<typename Value_>
@@ -553,7 +580,7 @@ public:
             }
         );
 
-        auto ptr = my_memory_pool.data() + info.first->offset + sanisizer::product_unsafe<std::size_t>(num_indices, info.second);
+        auto ptr = info.first->data + sanisizer::product_unsafe<std::size_t>(num_indices, info.second);
         std::copy_n(ptr, num_indices, buffer);
         return buffer;
     }
@@ -561,9 +588,16 @@ public:
 
 // COMMENT: technically, for all oracular extractors, we could pretend that the chunk length on the target dimension is 1.
 // This would allow us to only extract the desired indices on each call, allowing for more efficient use of the cache.
-// (In the transposed case, we would also reduce the amount of transposition that we need to perform.)
+//
 // The problem is that we would get harshly penalized for any chunk reuse outside of the current prediction cycle,
 // where the chunk would need to be read from disk again if the exact elements weren't already in the cache.
+// Consider a chunk length of 2 where we want to access the following indices {0, 2, 4, 5, 2, 3} and our cache is large enough to hold 4 elements.
+//
+// - With our current approach, the first prediction cycle would load the first and second chunks, i.e., {0, 1, 2, 3}.
+//   The next prediction cycle would load the third chunk and re-use the second chunk to get {2, 3, 4, 5}.
+// - With a chunk length of 1, the first prediction cycle would load all three chunks but only keep {0, 2, 4, 5}.
+//   The next prediction cycle would need to reload the second chunk to get {3}.
+//
 // This access pattern might not be uncommon after applying a DelayedSubset with shuffled rows/columns. 
 
 template<bool solo_, bool oracle_, typename Index_, typename CachedValue_>
