@@ -225,6 +225,22 @@ INSTANTIATE_TEST_SUITE_P(
     )
 );
 
+class DenseEmptyIndexedTest : public ::testing::Test, public DenseMatrixTestCore {};
+
+TEST_F(DenseEmptyIndexedTest, Basic) {
+    assemble(SimulationParameters{ { 200, 100 }, 0.01 });
+
+    // Also checking for correct behavior if indices are empty.
+    auto empty = std::make_shared<std::vector<int> >();
+    auto ext = mat->dense_row(empty);
+    auto res = tatami_test::fetch(*ext, 0, 0);
+    EXPECT_TRUE(res.empty());
+
+    auto text = tmat->dense_row(empty);
+    auto tres = tatami_test::fetch(*text, 0, 0);
+    EXPECT_TRUE(tres.empty());
+}
+
 /*************************************
  *************************************/
 

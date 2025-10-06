@@ -373,8 +373,9 @@ private:
 
         if (!my_found.empty()) {
             // Extracting a contiguous range of elements and then taking the values that correspond to our secondary elements of interest.
-            const hsize_t new_start = left + static_cast<hsize_t>(start - my_index_buffer.begin()) + my_found.front();
-            const hsize_t new_len = my_found.back() - my_found.front() + 1;
+            const auto first_found = my_found.front();
+            const hsize_t new_start = left + static_cast<hsize_t>(start - my_index_buffer.begin()) + first_found;
+            const hsize_t new_len = my_found.back() - first_found + 1;
 
             my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &new_len, &new_start);
             my_h5comp->memspace.setExtentSimple(1, &new_len);
@@ -384,7 +385,7 @@ private:
 
             const Index_ num_found = my_found.size();
             for (Index_ i = 0; i < num_found; ++i) {
-                *(my_value_ptrs[i]) = my_data_buffer[my_found[i] - my_found.front()];
+                *(my_value_ptrs[i]) = my_data_buffer[my_found[i] - first_found];
             }
         }
     }
