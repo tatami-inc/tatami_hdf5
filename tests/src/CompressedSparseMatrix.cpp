@@ -292,6 +292,22 @@ INSTANTIATE_TEST_SUITE_P(
     )
 );
 
+class SparseEmptyIndexedTest : public ::testing::Test, public SparseMatrixTestCore {};
+
+TEST_F(SparseEmptyIndexedTest, Basic) {
+    assemble(FullSimulationParameters{ { 200, 100 }, { 0.01 } });
+
+    // Also checking for correct behavior if indices are empty.
+    auto empty = std::make_shared<std::vector<int> >();
+    auto ext = mat->sparse_row(empty);
+    auto res = tatami_test::fetch(*ext, 0, 0);
+    EXPECT_TRUE(res.index.empty());
+
+    auto text = tmat->sparse_row(empty);
+    auto tres = tatami_test::fetch(*text, 0, 0);
+    EXPECT_TRUE(tres.index.empty());
+}
+
 /*************************************
  *************************************/
 
