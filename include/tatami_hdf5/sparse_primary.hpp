@@ -523,37 +523,34 @@ public:
                     auto indices_end = my_index_buffer.end();
                     refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_first_index, my_past_last_index);
 
-                    Index_ num_found = 0;
-                    if (indices_start != indices_end) {
-                        num_found = scan_for_indices_in_remap_vector<sparse_>(
-                            indices_start,
-                            indices_end,
-                            my_first_index,
-                            current_cache.index,
-                            my_found,
-                            my_remap,
-                            this->my_needs_value,
-                            this->my_needs_index
-                        );
+                    const Index_ num_found = scan_for_indices_in_remap_vector<sparse_>(
+                        indices_start,
+                        indices_end,
+                        my_first_index,
+                        current_cache.index,
+                        my_found,
+                        my_remap,
+                        this->my_needs_value,
+                        this->my_needs_index
+                    );
 
-                        if (this->my_needs_value && num_found > 0) {
-                            const auto first_found = my_found.front();
+                    if (this->my_needs_value && num_found > 0) {
+                        const auto first_found = my_found.front();
 
-                            // The idea is to extract the entire range spanned by the indices and then only store what we need in the cache.
-                            // This avoids using hyperslab unions that are incredibly slow as of time of writing (HDF5 1.14.6 and earlier).
-                            // Note that pointer differences are safe for the cast below, we already checked in the constructor.
-                            const hsize_t range_start = extraction_start + static_cast<hsize_t>(indices_start - my_index_buffer.begin()) + first_found;
-                            const hsize_t range_len = my_found.back() - first_found + 1;
-                            my_data_buffer.resize(range_len); // implicit cast is safe as we checked it in the constructor.
+                        // The idea is to extract the entire range spanned by the indices and then only store what we need in the cache.
+                        // This avoids using hyperslab unions that are incredibly slow as of time of writing (HDF5 1.14.6 and earlier).
+                        // Note that pointer differences are safe for the cast below, we already checked in the constructor.
+                        const hsize_t range_start = extraction_start + static_cast<hsize_t>(indices_start - my_index_buffer.begin()) + first_found;
+                        const hsize_t range_len = my_found.back() - first_found + 1;
+                        my_data_buffer.resize(range_len); // implicit cast is safe as we checked it in the constructor.
 
-                            comp.dataspace.selectHyperslab(H5S_SELECT_SET, &range_len, &range_start);
-                            comp.memspace.setExtentSimple(1, &range_len);
-                            comp.memspace.selectAll();
-                            comp.data_dataset.read(my_data_buffer.data(), define_mem_type<CachedValue_>(), comp.memspace, comp.dataspace);
+                        comp.dataspace.selectHyperslab(H5S_SELECT_SET, &range_len, &range_start);
+                        comp.memspace.setExtentSimple(1, &range_len);
+                        comp.memspace.selectAll();
+                        comp.data_dataset.read(my_data_buffer.data(), define_mem_type<CachedValue_>(), comp.memspace, comp.dataspace);
 
-                            for (Index_ f = 0; f < num_found; ++f) {
-                                current_cache.value[f] = my_data_buffer[my_found[f] - first_found];
-                            }
+                        for (Index_ f = 0; f < num_found; ++f) {
+                            current_cache.value[f] = my_data_buffer[my_found[f] - first_found];
                         }
                     }
 
@@ -978,10 +975,6 @@ public:
                                 auto indices_start = original_start;
                                 auto indices_end = indices_start + current_preslab.length;
                                 refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_first_index, my_past_last_index);
-                                if (indices_start == indices_end) {
-                                    current_preslab.length = 0;
-                                    continue;
-                                }
 
                                 const auto num_found = scan_for_indices_in_remap_vector<sparse_>(
                                     indices_start,
