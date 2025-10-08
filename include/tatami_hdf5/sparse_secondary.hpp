@@ -32,7 +32,7 @@ namespace CompressedSparseMatrix_internal {
 
 template<typename CachedValue_, typename Index_>
 Index_ choose_chunk_length_for_myopic_secondary(const MatrixDetails<Index_>& details, Index_ primary_extract_length, bool needs_value, bool needs_index) {
-    std::size_t elsize = CompressedSparseMatrix_internal::size_of_cached_element<CachedValue_, Index_>(needs_value, needs_index);
+    std::size_t elsize = size_of_cached_element<CachedValue_, Index_>(needs_value, needs_index);
     if (elsize == 0 || primary_extract_length == 0) {
         return details.secondary_dim; // caching the entire secondary dimension, if possible.
     }
