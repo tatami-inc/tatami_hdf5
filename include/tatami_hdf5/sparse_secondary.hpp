@@ -1,7 +1,7 @@
 #ifndef TATAMI_HDF5_SPARSE_SECONDARY_HPP
 #define TATAMI_HDF5_SPARSE_SECONDARY_HPP
 
-#include "sparse_primary.hpp"
+#include "sparse_utils.hpp"
 #include "serialize.hpp"
 #include "utils.hpp"
 
@@ -140,40 +140,49 @@ private:
 
     // Serial locks should be applied by the callers before calling this.
     void extract_and_append(Index_ primary, Index_ secondary_start, Index_ secondary_length, Index_ primary_to_add) {
-        auto left = my_pointers[primary], right = my_pointers[primary + 1];
-        hsize_t count = right - left;
-        if (count == 0) {
+        const Index_ secondary_end = secondary_start + secondary_length;
+        const auto narrowed = narrow_primary_extraction_range(
+            my_pointers[primary],
+            my_pointers[primary + 1],
+            secondary_start,
+            secondary_end,
+            my_secondary_dim_stats.dimension_extent
+        );
+        const auto extraction_start = narrowed.first;
+        const auto extraction_len = narrowed.second - extraction_start;
+        if (extraction_len == 0) {
             return;
         }
-        my_index_buffer.resize(count);
+        my_index_buffer.resize(extraction_len); // implicit cast is safe, we checked in the constructor.
 
-        my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &count, &left);
-        my_h5comp->memspace.setExtentSimple(1, &count);
+        my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
+        my_h5comp->memspace.setExtentSimple(1, &extraction_len);
         my_h5comp->memspace.selectAll();
         my_h5comp->index_dataset.read(my_index_buffer.data(), define_mem_type<Index_>(), my_h5comp->memspace, my_h5comp->dataspace);
 
         auto start = my_index_buffer.begin(), end = my_index_buffer.end();
-        refine_primary_limits(start, end, my_secondary_dim_stats.dimension_extent, secondary_start, secondary_start + secondary_length);
+        refine_primary_limits(start, end, my_secondary_dim_stats.dimension_extent, secondary_start, secondary_end);
 
         if (my_needs_index) {
             for (auto x = start; x != end; ++x) {
-                Index_ current = *x - secondary_start;
+                const auto current = *x - secondary_start;
                 my_cache_index[my_cache_offsets[current] + static_cast<std::size_t>(my_cache_count[current])] = primary_to_add;
             }
         }
 
         if (start != end && my_needs_value) {
-            hsize_t better_left = left + (start - my_index_buffer.begin()); // pointer difference won't overflow as we checked can_ptrdiff() in the constructor.
-            hsize_t better_count = end - start;
-            my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &better_count, &better_left);
-            my_h5comp->memspace.setExtentSimple(1, &better_count);
+            // pointer difference won't overflow as we checked can_ptrdiff() in the constructor.
+            const hsize_t refined_extraction_start = extraction_start + static_cast<hsize_t>(start - my_index_buffer.begin());
+            const hsize_t refined_extraction_len = end - start;
+            my_h5comp->dataspace.selectHyperslab(H5S_SELECT_SET, &refined_extraction_len, &refined_extraction_start);
+            my_h5comp->memspace.setExtentSimple(1, &refined_extraction_len);
             my_h5comp->memspace.selectAll();
 
-            my_data_buffer.resize(better_count);
+            my_data_buffer.resize(refined_extraction_len); // implicit cast is okay, we checked in the constructor.
             my_h5comp->data_dataset.read(my_data_buffer.data(), define_mem_type<CachedValue_>(), my_h5comp->memspace, my_h5comp->dataspace);
 
             for (auto x = start; x != end; ++x) {
-                Index_ current = *x - secondary_start;
+                const auto current = *x - secondary_start;
                 my_cache_data[my_cache_offsets[current] + static_cast<std::size_t>(my_cache_count[current])] = my_data_buffer[x - start];
             }
         }

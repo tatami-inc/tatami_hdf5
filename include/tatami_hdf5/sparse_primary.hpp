@@ -1,6 +1,7 @@
 #ifndef TATAMI_HDF5_SPARSE_PRIMARY_HPP
 #define TATAMI_HDF5_SPARSE_PRIMARY_HPP
 
+#include "sparse_utils.hpp"
 #include "serialize.hpp"
 #include "utils.hpp"
 
@@ -183,18 +184,6 @@ Value_* slab_to_dense(const Slab_& slab, Value_* buffer, Index_ extract_length) 
 /*************************************
  **** Subset extraction utilities ****
  *************************************/
-
-template<class IndexIt_, typename Index_>
-void refine_primary_limits(IndexIt_& indices_start, IndexIt_& indices_end, Index_ extent, Index_ smallest, Index_ largest_plus_one) {
-    if (smallest) {
-        // Using custom comparator to ensure that we cast to Index_ for signedness-safe comparisons.
-        indices_start = std::lower_bound(indices_start, indices_end, smallest, [](Index_ a, Index_ b) -> bool { return a < b; });
-    }
-
-    if (largest_plus_one != extent) {
-        indices_end = std::lower_bound(indices_start, indices_end, largest_plus_one, [](Index_ a, Index_ b) -> bool { return a < b; });
-    }
-}
 
 template<bool sparse_, typename Index_>
 using SparseRemapVector = typename std::conditional<sparse_, std::vector<unsigned char>, std::vector<Index_> >::type;
@@ -413,10 +402,15 @@ public:
                 return this->create();
             },
             /* populate = */ [&](Index_ i, Slab<Index_, CachedValue_, CachedIndex_>& current_cache) -> void {
-                const auto& pointers = this->my_pointers;
-                hsize_t extraction_start = pointers[i];
-                hsize_t extraction_len = pointers[i + 1] - pointers[i];
-
+                const auto narrowed = narrow_primary_extraction_range(
+                    this->my_pointers[i],
+                    this->my_pointers[i + 1],
+                    my_block_start,
+                    my_block_past_end,
+                    my_secondary_dim
+                );
+                const hsize_t extraction_start = narrowed.first;
+                const hsize_t extraction_len = narrowed.second - extraction_start;
                 if (extraction_len == 0) {
                     current_cache.number = 0;
                     return;
@@ -448,8 +442,9 @@ public:
                         }
 
                         if (this->my_needs_value) {
-                            hsize_t new_start = extraction_start + (indices_start - my_index_buffer.begin());
-                            hsize_t new_len = current_cache.number;
+                            // Pointer difference is fine, we checked this in the constructor.
+                            const hsize_t new_start = extraction_start + static_cast<hsize_t>(indices_start - my_index_buffer.begin()); 
+                            const hsize_t new_len = current_cache.number;
                             comp.dataspace.selectHyperslab(H5S_SELECT_SET, &new_len, &new_start);
                             comp.memspace.setExtentSimple(1, &new_len);
                             comp.memspace.selectAll();
@@ -503,9 +498,15 @@ public:
                 return this->create();
             },
             /* populate = */ [&](Index_ i, Slab<Index_, CachedValue_, CachedIndex_>& current_cache) -> void {
-                const auto& pointers = this->my_pointers;
-                hsize_t extraction_start = pointers[i];
-                hsize_t extraction_len = pointers[i + 1] - pointers[i];
+                const auto narrowed = narrow_primary_extraction_range(
+                    this->my_pointers[i],
+                    this->my_pointers[i + 1],
+                    my_first_index,
+                    my_past_last_index,
+                    my_secondary_dim
+                );
+                const hsize_t extraction_start = narrowed.first;
+                const hsize_t extraction_len = narrowed.second - extraction_start;
                 if (extraction_len == 0) {
                     current_cache.number = 0;
                     return;
@@ -634,7 +635,7 @@ protected:
 private:
     tatami_chunked::OracularVariableSlabCache<Index_, Index_, SlabPrecursor, std::size_t> my_cache;
 
-private:
+protected:
     template<class Function_>
     static void sort_by_field(std::vector<std::pair<Index_, std::size_t> >& indices, Function_ field) {
         auto comp = [&field](const std::pair<Index_, std::size_t>& l, const std::pair<Index_, std::size_t>& r) -> bool {
@@ -654,15 +655,13 @@ public:
     // cases, needs_cached_index=true but we might have needs_index=false,
     // hence the separate arguments here versus the constructor. We just do the
     // same for needs_(cached_)value just for consistency.
-    template<class Extract_>
-    Slab<Index_, CachedValue_, CachedIndex_> next(Extract_ extract, bool needs_value, bool needs_index) {
+    template<class GuessSize_, class Extract_>
+    Slab<Index_, CachedValue_, CachedIndex_> next(GuessSize_ guess_size, Extract_ extract, bool needs_value, bool needs_index) {
         auto out = my_cache.next(
             /* identify = */ [](Index_ i) -> std::pair<Index_, Index_> { 
                 return std::pair<Index_, Index_>(i, 0); 
             },
-            /* estimated_size = */ [&](Index_ i) -> std::size_t {
-                return my_pointers[i + 1] - my_pointers[i]; // cast on return is safe as we know this value is <= max_non_zeros.
-            },
+            /* estimated_size = */ std::move(guess_size),
             /* actual_size = */ [&](Index_, const SlabPrecursor& preslab) -> std::size_t {
                 return preslab.length;
             },
@@ -713,60 +712,6 @@ public:
         }
         return output;
     }
-
-protected:
-    // This helper function finds contiguous slabs of indices for extraction,
-    // improving performance for consecutive extraction by just pulling out a strip of indices at once.
-    template<typename Harvest_>
-    void harvest_runs(
-        std::size_t dest_offset,
-        std::vector<std::pair<Index_, std::size_t> >& to_populate,
-        std::vector<SlabPrecursor>& all_preslabs,
-        Harvest_ harvest
-    ) {
-        // Sorting so that we get consecutive accesses in the hyperslab construction.
-        // This should improve re-use of partially read HDF5 chunks inside DataSet::read(). 
-        sort_by_field(to_populate, [&](const std::pair<Index_, std::size_t>& p) -> hsize_t { return my_pointers[p.first]; });
-
-        auto num_needed = to_populate.size();
-        decltype(num_needed) sofar = 0;
-        std::size_t used_offset = dest_offset;
-
-        while (sofar < num_needed) {
-            const auto first_in_run = sofar;
-            const auto& pfirst = to_populate[sofar];
-            hsize_t run_offset = my_pointers[pfirst.first];
-            hsize_t run_len = my_pointers[pfirst.first + 1] - run_offset;
-
-            auto& first_preslab = all_preslabs[pfirst.second];
-            first_preslab.mem_offset = used_offset;
-            first_preslab.length = run_len;
-            ++sofar;
-
-            Index_ previous = pfirst.first;
-            for (; sofar < num_needed; ++sofar) {
-                const auto& pnext = to_populate[sofar];
-                if (previous + 1 < pnext.first) {
-                    break;
-                }
-
-                auto& next_preslab = all_preslabs[pnext.second];
-                next_preslab.mem_offset = used_offset + run_len;
-                hsize_t next_len = my_pointers[pnext.first + 1] - my_pointers[pnext.first];
-                next_preslab.length = next_len; // cast is safe, as we know that this is <= max_non_zeros, and we already checked for a safe cast in the constructor.
-                run_len += next_len;
-                previous = pnext.first;
-            }
-
-            auto& comp = *(this->my_h5comp);
-            comp.memspace.setExtentSimple(1, &run_len);
-            comp.memspace.selectAll();
-            comp.dataspace.selectHyperslab(H5S_SELECT_SET, &run_len, &run_offset);
-            harvest(used_offset, first_in_run, sofar);
-
-            used_offset += run_len;
-        }
-    }
 };
 
 template<typename Index_, typename CachedValue_, typename CachedIndex_>
@@ -789,30 +734,72 @@ private:
 public:
     Slab<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
         typedef typename PrimaryOracularCoreBase<Index_, CachedValue_, CachedIndex_>::SlabPrecursor SlabPrecursor;
-        return this->next([&](
-            std::size_t dest_offset,
-            std::vector<std::pair<Index_, std::size_t> >& to_populate, 
-            std::vector<SlabPrecursor>& all_preslabs, 
-            std::vector<CachedValue_>& full_value_buffer, 
-            std::vector<CachedIndex_>& full_index_buffer
-        ) -> void {
-                serialize([&]() -> void {
-                    typedef decltype(to_populate.size()) Counter; 
-                    this->harvest_runs(
-                        dest_offset,
-                        to_populate,
-                        all_preslabs,
-                        [&](std::size_t res_offset, Counter, Counter) -> void {
-                            auto& comp = *(this->my_h5comp);
-                            if (my_needs_index) {
-                                comp.index_dataset.read(full_index_buffer.data() + res_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
-                            }
-                            if (my_needs_value) {
-                                comp.data_dataset.read(full_value_buffer.data() + res_offset, define_mem_type<CachedValue_>(), comp.memspace, comp.dataspace);
-                            }
+        return this->next(
+            [&](Index_ i) -> std::size_t {
+                // cast on return is safe as we know this value is <= max_non_zeros <= secondary_dim, which fits in a size_t.
+                return this->my_pointers[i + 1] - this->my_pointers[i];
+            },
+            [&](
+                const std::size_t dest_offset,
+                std::vector<std::pair<Index_, std::size_t> >& to_populate, 
+                std::vector<SlabPrecursor>& all_preslabs, 
+                std::vector<CachedValue_>& full_value_buffer, 
+                std::vector<CachedIndex_>& full_index_buffer
+            ) -> void {
+                // Sorting so that we get consecutive accesses in the hyperslab construction.
+                // This should improve re-use of partially read HDF5 chunks inside DataSet::read().
+                const auto& pointers = this->my_pointers;
+                PrimaryOracularCoreBase<Index_, CachedValue_, CachedIndex_>::sort_by_field(
+                    to_populate,
+                    [&](const std::pair<Index_, std::size_t>& p) -> hsize_t { return pointers[p.first]; }
+                );
+
+                auto num_needed = to_populate.size();
+                decltype(num_needed) sofar = 0;
+                std::size_t used_offset = dest_offset;
+
+                // Finds contiguous slabs of indices to consolidate extraction into a single HDF5 call for efficiency.
+                while (sofar < num_needed) {
+                    const auto& pfirst = to_populate[sofar];
+                    const hsize_t run_offset = pointers[pfirst.first];
+                    hsize_t run_len = pointers[pfirst.first + 1] - run_offset;
+
+                    auto& first_preslab = all_preslabs[pfirst.second];
+                    first_preslab.mem_offset = used_offset;
+                    first_preslab.length = run_len;
+                    ++sofar;
+
+                    Index_ previous = pfirst.first;
+                    for (; sofar < num_needed; ++sofar) {
+                        const auto& pnext = to_populate[sofar];
+                        if (previous + 1 < pnext.first) {
+                            break;
                         }
-                    );
-                });
+
+                        auto& next_preslab = all_preslabs[pnext.second];
+                        next_preslab.mem_offset = used_offset + run_len;
+                        hsize_t next_len = pointers[pnext.first + 1] - pointers[pnext.first];
+                        next_preslab.length = next_len; // cast is safe, as we know that this is <= max_non_zeros <= secondary_dim, which fits in a size_t.
+                        run_len += next_len;
+                        previous = pnext.first;
+                    }
+
+                    serialize([&]() -> void {
+                        auto& comp = *(this->my_h5comp);
+                        comp.memspace.setExtentSimple(1, &run_len);
+                        comp.memspace.selectAll();
+                        comp.dataspace.selectHyperslab(H5S_SELECT_SET, &run_len, &run_offset);
+
+                        if (my_needs_index) {
+                            comp.index_dataset.read(full_index_buffer.data() + used_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
+                        }
+                        if (my_needs_value) {
+                            comp.data_dataset.read(full_value_buffer.data() + used_offset, define_mem_type<CachedValue_>(), comp.memspace, comp.dataspace);
+                        }
+                    });
+
+                    used_offset += run_len;
+                }
             },
             my_needs_value,
             my_needs_index
@@ -860,50 +847,81 @@ public:
     Slab<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
         typedef typename PrimaryOracularCoreBase<Index_, CachedValue_, CachedIndex_>::SlabPrecursor SlabPrecursor;
         return this->next(
+            [&](Index_ i) -> std::size_t {
+                const auto narrowed = narrow_primary_extraction_range(
+                    this->my_pointers[i],
+                    this->my_pointers[i + 1],
+                    my_block_start,
+                    my_block_past_end,
+                    my_secondary_dim
+                );
+                // cast on return is safe as we know this value is <= max_non_zeros <= secondary_dim, which fits in a size_t.
+                return narrowed.second - narrowed.first;
+            },
             [&](
-                std::size_t dest_offset,
+                const std::size_t dest_offset,
                 std::vector<std::pair<Index_, std::size_t> >& to_populate,
                 std::vector<SlabPrecursor>& all_preslabs, 
                 std::vector<CachedValue_>& full_value_buffer, 
                 std::vector<CachedIndex_>& full_index_buffer
             ) -> void {
                 serialize([&]() -> void {
-                    typedef decltype(to_populate.size()) Counter; 
-                    this->harvest_runs(
-                        dest_offset,
-                        to_populate,
-                        all_preslabs,
-                        [&](std::size_t res_offset, Counter run_start, Counter run_end) -> void {
-                            auto& comp = *(this->my_h5comp);
-                            comp.index_dataset.read(full_index_buffer.data() + res_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
-                            if (my_needs_value) {
-                                comp.data_dataset.read(full_value_buffer.data() + res_offset, define_mem_type<CachedValue_>(), comp.memspace, comp.dataspace);
-                            }
+                    std::size_t used_offset = dest_offset;
+                    for (auto& pop : to_populate) {
+                        auto& current_preslab = all_preslabs[pop.second];
+                        current_preslab.mem_offset = used_offset;
 
-                            for (Counter run_index = run_start; run_index < run_end; ++run_index) {
-                                auto& current_preslab = all_preslabs[to_populate[run_index].second];
+                        const auto narrowed = narrow_primary_extraction_range(
+                            this->my_pointers[pop.first],
+                            this->my_pointers[pop.first + 1],
+                            my_block_start,
+                            my_block_past_end,
+                            my_secondary_dim
+                        );
+                        const hsize_t extraction_start = narrowed.first;
+                        const hsize_t extraction_len = narrowed.second - extraction_start;
+                        if (extraction_len == 0) {
+                            current_preslab.length = 0;
+                            continue;
+                        }
 
-                                const auto original_start = full_index_buffer.begin() + current_preslab.mem_offset;
-                                auto indices_start = original_start;
-                                auto indices_end = indices_start + current_preslab.length;
-                                refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_block_start, my_block_past_end);
+                        auto& comp = *(this->my_h5comp);
+                        comp.memspace.setExtentSimple(1, &extraction_len);
+                        comp.memspace.selectAll();
+                        comp.dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
+                        comp.index_dataset.read(full_index_buffer.data() + used_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
 
-                                // We just update the pointers to the cache buffer instead of moving values around.
-                                // Also, pointer subtraction is safe as we checked this in the constructor.
-                                current_preslab.mem_offset += indices_start - original_start;
-                                current_preslab.length = indices_end - indices_start;
+                        const auto original_start = full_index_buffer.begin() + used_offset;
+                        auto indices_start = original_start;
+                        auto indices_end = indices_start + extraction_len;
+                        refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_block_start, my_block_past_end);
 
-                                // For dense extraction, we subtract block start so that the resulting indices can be used to directly index the output buffer.
-                                if constexpr(!sparse_) {
-                                    if (my_needs_index) {
-                                        for (auto it = indices_start; it != indices_end; ++it) {
-                                            *it -= my_block_start;
-                                        }
-                                    }
+                        // We just update the pointers to the cache buffer instead of moving values around.
+                        // Also, pointer subtraction is safe as we checked this in the constructor.
+                        const auto refined_shift = indices_start - original_start;
+                        current_preslab.mem_offset += refined_shift;
+                        current_preslab.length = indices_end - indices_start;
+
+                        // For dense extraction, we subtract block start so that the resulting indices can be used to directly index the output buffer.
+                        if constexpr(!sparse_) {
+                            if (my_needs_index) {
+                                for (auto it = indices_start; it != indices_end; ++it) {
+                                    *it -= my_block_start;
                                 }
                             }
                         }
-                    );
+
+                        if (my_needs_value) {
+                            const hsize_t refined_extraction_len = current_preslab.length;
+                            const hsize_t refined_extraction_start = refined_shift + extraction_start;
+                            comp.memspace.setExtentSimple(1, &refined_extraction_len);
+                            comp.memspace.selectAll();
+                            comp.dataspace.selectHyperslab(H5S_SELECT_SET, &refined_extraction_len, &refined_extraction_start);
+                            comp.data_dataset.read(full_value_buffer.data() + current_preslab.mem_offset, define_mem_type<CachedValue_>(), comp.memspace, comp.dataspace);
+                        }
+
+                        used_offset += extraction_len;
+                    } 
                 });
             },
             my_needs_value,
@@ -915,7 +933,13 @@ public:
 template<bool sparse_, typename Index_, typename CachedValue_, typename CachedIndex_>
 class PrimaryOracularIndexCore : private PrimaryOracularCoreBase<Index_, CachedValue_, CachedIndex_> {
 public:
-    PrimaryOracularIndexCore(const MatrixDetails<Index_>& details, std::shared_ptr<const tatami::Oracle<Index_> > oracle, const std::vector<Index_>& indices, bool needs_value, bool needs_index) : 
+    PrimaryOracularIndexCore(
+        const MatrixDetails<Index_>& details,
+        std::shared_ptr<const tatami::Oracle<Index_> > oracle,
+        const std::vector<Index_>& indices,
+        const bool needs_value,
+        const bool needs_index
+    ) : 
         // Don't try to tighten the max_non_zeros like in the LRU case; we need
         // to keep enough space to ensure that every primary dimension element
         // can be extracted in its entirety (as we don't have a separate
@@ -926,7 +950,6 @@ public:
             needs_value, 
             true // We always need indices to figure out what to keep.
         ), 
-
         my_secondary_dim(details.secondary_dim),
         my_needs_value(needs_value),
         my_needs_index(needs_index)
@@ -948,6 +971,17 @@ public:
     Slab<Index_, CachedValue_, CachedIndex_> fetch_raw(Index_ /* ignored, for consistency only.*/) {
         typedef typename PrimaryOracularCoreBase<Index_, CachedValue_, CachedIndex_>::SlabPrecursor SlabPrecursor;
         return this->next(
+            [&](Index_ i) -> std::size_t {
+                const auto narrowed = narrow_primary_extraction_range(
+                    this->my_pointers[i],
+                    this->my_pointers[i + 1],
+                    my_first_index,
+                    my_past_last_index,
+                    my_secondary_dim
+                );
+                // cast on return is safe as we know this value is <= max_non_zeros <= secondary_dim, which fits in a size_t.
+                return narrowed.second - narrowed.first;
+            },
             [&](
                 std::size_t dest_offset,
                 std::vector<std::pair<Index_, std::size_t> >& to_populate,
@@ -956,48 +990,66 @@ public:
                 std::vector<CachedIndex_>& full_index_buffer
             ) -> void {
                 serialize([&]() -> void {
-                    typedef decltype(to_populate.size()) Counter; 
-                    this->harvest_runs(
-                        dest_offset,
-                        to_populate,
-                        all_preslabs,
-                        [&](std::size_t res_offset, Counter run_start, Counter run_end) -> void {
-                            auto& comp = *(this->my_h5comp);
-                            comp.index_dataset.read(full_index_buffer.data() + res_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
-                            if (my_needs_value) {
-                                comp.data_dataset.read(full_value_buffer.data() + res_offset, define_mem_type<CachedValue_>(), comp.memspace, comp.dataspace);
-                            }
+                    std::size_t used_offset = dest_offset;
+                    for (auto& pop : to_populate) {
+                        auto& current_preslab = all_preslabs[pop.second];
+                        current_preslab.mem_offset = used_offset;
 
-                            for (Counter run_index = run_start; run_index < run_end; ++run_index) {
-                                auto& current_preslab = all_preslabs[to_populate[run_index].second];
+                        const auto narrowed = narrow_primary_extraction_range(
+                            this->my_pointers[pop.first],
+                            this->my_pointers[pop.first + 1],
+                            my_first_index,
+                            my_past_last_index,
+                            my_secondary_dim
+                        );
+                        const hsize_t extraction_start = narrowed.first;
+                        const hsize_t extraction_len = narrowed.second - extraction_start;
+                        if (extraction_len == 0) {
+                            current_preslab.length = 0;
+                            continue;
+                        }
 
-                                const auto original_start = full_index_buffer.begin() + current_preslab.mem_offset;
-                                auto indices_start = original_start;
-                                auto indices_end = indices_start + current_preslab.length;
-                                refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_first_index, my_past_last_index);
+                        auto& comp = *(this->my_h5comp);
+                        comp.memspace.setExtentSimple(1, &extraction_len);
+                        comp.memspace.selectAll();
+                        comp.dataspace.selectHyperslab(H5S_SELECT_SET, &extraction_len, &extraction_start);
+                        comp.index_dataset.read(full_index_buffer.data() + used_offset, define_mem_type<CachedIndex_>(), comp.memspace, comp.dataspace);
 
-                                const auto num_found = scan_for_indices_in_remap_vector<sparse_>(
-                                    indices_start,
-                                    indices_end,
-                                    my_first_index,
-                                    full_index_buffer.begin() + current_preslab.mem_offset,
-                                    my_found,
-                                    my_remap,
-                                    my_needs_value,
-                                    my_needs_index
-                                );
-                                current_preslab.length = num_found;
+                        const auto original_start = full_index_buffer.begin() + used_offset;
+                        auto indices_start = original_start;
+                        auto indices_end = indices_start + extraction_len;
+                        refine_primary_limits(indices_start, indices_end, my_secondary_dim, my_first_index, my_past_last_index);
 
-                                if (my_needs_value) {
-                                    // Cast is safe as we checked this in the constructor.
-                                    const std::size_t refined_offset = current_preslab.mem_offset + static_cast<std::size_t>(indices_start - original_start);
-                                    for (Index_ f = 0; f < num_found; ++f) {
-                                        full_value_buffer[current_preslab.mem_offset + f] = full_value_buffer[refined_offset + my_found[f]];
-                                    }
-                                }
+                        const auto num_found = scan_for_indices_in_remap_vector<sparse_>(
+                            indices_start,
+                            indices_end,
+                            my_first_index,
+                            full_index_buffer.begin() + current_preslab.mem_offset,
+                            my_found,
+                            my_remap,
+                            my_needs_value,
+                            my_needs_index
+                        );
+                        current_preslab.length = num_found;
+
+                        if (my_needs_value) {
+                            // Pointer difference is safe as we checked this in the constructor.
+                            const hsize_t refined_shift = static_cast<std::size_t>(indices_start - original_start);
+                            const hsize_t refined_extraction_start = extraction_start + refined_shift;
+                            const hsize_t refined_extraction_len = (indices_end - indices_start); 
+
+                            comp.memspace.setExtentSimple(1, &refined_extraction_len);
+                            comp.memspace.selectAll();
+                            comp.dataspace.selectHyperslab(H5S_SELECT_SET, &refined_extraction_len, &refined_extraction_start);
+                            comp.data_dataset.read(full_value_buffer.data() + used_offset, define_mem_type<CachedValue_>(), comp.memspace, comp.dataspace);
+
+                            for (Index_ f = 0; f < num_found; ++f) {
+                                full_value_buffer[used_offset + f] = full_value_buffer[used_offset + my_found[f]];
                             }
                         }
-                    );
+
+                        used_offset += num_found;
+                    }
                 });
             },
             my_needs_value,

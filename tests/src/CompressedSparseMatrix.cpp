@@ -411,6 +411,100 @@ INSTANTIATE_TEST_SUITE_P(
 /*************************************
  *************************************/
 
+class SparseMatrixNarrowingTest : public ::testing::Test {
+protected:
+    inline static std::shared_ptr<tatami::Matrix<double, int> > ref;
+    inline static std::string fpath, name;
+
+    static void SetUpTestSuite() {
+        int NR = 150, NC = 200;
+        tatami_test::SimulateCompressedSparseResult<double, int> simdetails;
+        simdetails.indptr.resize(NC + 1);
+
+        // Creating a matrix with increasing density across columns.
+        // This checks for correct narrowing of the extraction range with varying numbers of non-zero elements.
+        for (int c = 0; c < NC; ++c) {
+            const double jump = std::max(1.0, static_cast<double>(NR) / (c + 1));
+            const auto total = simdetails.index.size();
+            for (double val = jump - 1; val < NR; ++val) {
+                simdetails.index.push_back(val);
+                simdetails.data.push_back(val / 2); // for some variety.
+            }
+            simdetails.indptr[c + 1] = simdetails.indptr[c] + (simdetails.index.size() - total);
+        }
+
+        fpath = temp_file_path("tatami-sparse-test.h5");
+        name = "stuff";
+        dump_to_file(simdetails, fpath, name);
+
+        ref.reset(new tatami::CompressedSparseMatrix<double, int, decltype(simdetails.data), decltype(simdetails.index), decltype(simdetails.indptr)>(
+            NR, NC, simdetails.data, simdetails.index, simdetails.indptr, false
+        ));
+    }
+};
+
+TEST_F(SparseMatrixNarrowingTest, Primary) {
+    const auto rfull = ref->nrow();
+    const auto cfull = ref->ncol();
+
+    auto hopt = create_options(rfull, cfull, 0.1);
+    auto mat = std::make_shared<tatami_hdf5::CompressedSparseMatrix<double, int> >(
+        rfull, cfull, fpath, name + "/data", name + "/index", name + "/indptr", false, hopt
+    );
+
+    std::vector<double> limits{0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0};
+    for (auto startprop : limits) {
+        for (auto endprop : limits) {
+            if (endprop < startprop) {
+                continue;
+            }
+
+            int rstart = rfull * startprop, rlen = rfull * (endprop - startprop);
+            auto ridx = std::make_shared<std::vector<int> >(rlen);
+            std::iota(ridx->begin(), ridx->end(), rstart);
+
+            auto rwork = ref->dense_column(rstart, rlen);
+            auto bwork = mat->dense_column(rstart, rlen);
+            auto iwork = mat->dense_column(ridx);
+
+            const auto oracle = std::make_shared<tatami::ConsecutiveOracle<int> >(0, cfull);
+            auto bwork2 = mat->dense_column(oracle, rstart, rlen);
+            auto iwork2 = mat->dense_column(oracle, ridx);
+
+            for (int c = 0; c < cfull; ++c) {
+                auto expected = tatami_test::fetch(*rwork, c, rlen);
+                EXPECT_EQ(expected, tatami_test::fetch(*bwork, c, rlen));
+                EXPECT_EQ(expected, tatami_test::fetch(*iwork, c, rlen));
+                EXPECT_EQ(expected, tatami_test::fetch(*bwork2, rlen));
+                EXPECT_EQ(expected, tatami_test::fetch(*iwork2, rlen));
+            }
+        }
+    }
+}
+
+TEST_F(SparseMatrixNarrowingTest, Secondary) {
+    const auto rfull = ref->nrow();
+    const auto cfull = ref->ncol();
+
+    // Using caches of varying size to encourage different types of narrowing.
+    for (auto cache : std::vector<double>{ 0, 0.01, 0.1, 0.2, 0.5 }) { 
+        auto hopt = create_options(rfull, cfull, cache);
+        auto mat = std::make_shared<tatami_hdf5::CompressedSparseMatrix<double, int> >(
+            rfull, cfull, fpath, name + "/data", name + "/index", name + "/indptr", false, hopt
+        );
+
+        auto rwork = ref->dense_row();
+        auto mwork = mat->dense_row();
+        for (int r = 0; r < rfull; ++r) {
+            auto expected = tatami_test::fetch(*rwork, r, cfull);
+            EXPECT_EQ(expected, tatami_test::fetch(*mwork, r, cfull));
+        }
+    }
+}
+
+/*************************************
+ *************************************/
+
 class SparseMatrixCacheTypeTest : public ::testing::TestWithParam<std::tuple<double, bool, bool> > {
 protected:
     inline static std::shared_ptr<tatami::Matrix<double, int> > ref, mat;
