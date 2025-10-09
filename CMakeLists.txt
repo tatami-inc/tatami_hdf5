@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(tatami_hdf5
-    VERSION 2.0.4
+    VERSION 2.0.5
     DESCRIPTION "tatami bindings for HDF5"
     LANGUAGES CXX)
 
