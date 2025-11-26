@@ -486,3 +486,27 @@ INSTANTIATE_TEST_SUITE_P(
         ::testing::Values(1,3)
     )
 );
+
+TEST(WriteCompressedSparseMatrix, Defaults) {
+    const size_t NR = 200, NC = 100;
+    auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NC, NR, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.data), std::move(triplets.index), std::move(triplets.indptr));
+
+    // Dumping it with default parameters, just to check the overload.
+    auto fpath = temp_file_path("tatami-write-test.h5");
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
+        auto mhandle = fhandle.createGroup("matrix");
+        tatami_hdf5::write_compressed_sparse_matrix(&mat, mhandle);
+    }
+
+    // Roundtripping.
+    auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
+    tatami_test::test_simple_row_access(*reloaded, mat);
+}
