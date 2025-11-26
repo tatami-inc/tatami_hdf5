@@ -266,15 +266,15 @@
       <type>void</type>
       <name>write_compressed_sparse_matrix</name>
       <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>abbb2c7427230171df09b7404f3931e02</anchor>
-      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location, const WriteCompressedSparseMatrixOptions &amp;params)</arglist>
+      <anchor>aa0160511308ae9921f192825072dea34</anchor>
+      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; &amp;mat, H5::Group &amp;location, const WriteCompressedSparseMatrixOptions &amp;params)</arglist>
     </member>
     <member kind="function">
       <type>void</type>
       <name>write_compressed_sparse_matrix</name>
       <anchorfile>namespacetatami__hdf5.html</anchorfile>
-      <anchor>a8534a867ece6f241802d5cabc9b19d13</anchor>
-      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location)</arglist>
+      <anchor>af55184b3ad94fa3547a0e09809b19a82</anchor>
+      <arglist>(const tatami::Matrix&lt; Value_, Index_ &gt; &amp;mat, H5::Group &amp;location)</arglist>
     </member>
   </compound>
   <compound kind="page">

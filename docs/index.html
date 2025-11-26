@@ -137,8 +137,8 @@ $(function(){ initResizable(false); });
 </div><!-- fragment --><p>We can also write a <b>tatami</b> sparse matrix into a HDF5 file:</p>
 <div class="fragment"><div class="line">H5::H5File fhandle(<span class="stringliteral">&quot;some_file2.h5&quot;</span>, H5F_ACC_TRUNC);</div>
 <div class="line"><span class="keyword">auto</span> ghandle = fhandle.createGroup(<span class="stringliteral">&quot;group_name&quot;</span>);</div>
-<div class="line"><a class="code hl_function" href="namespacetatami__hdf5.html#abbb2c7427230171df09b7404f3931e02">tatami_hdf5::write_compressed_sparse_matrix</a>(&amp;sparse_mat_mem, ghandle); </div>
-<div class="ttc" id="anamespacetatami__hdf5_html_abbb2c7427230171df09b7404f3931e02"><div class="ttname"><a href="namespacetatami__hdf5.html#abbb2c7427230171df09b7404f3931e02">tatami_hdf5::write_compressed_sparse_matrix</a></div><div class="ttdeci">void write_compressed_sparse_matrix(const tatami::Matrix&lt; Value_, Index_ &gt; *mat, H5::Group &amp;location, const WriteCompressedSparseMatrixOptions &amp;params)</div><div class="ttdef"><b>Definition</b> write_compressed_sparse_matrix.hpp:334</div></div>
+<div class="line"><a class="code hl_function" href="namespacetatami__hdf5.html#aa0160511308ae9921f192825072dea34">tatami_hdf5::write_compressed_sparse_matrix</a>(&amp;sparse_mat_mem, ghandle); </div>
+<div class="ttc" id="anamespacetatami__hdf5_html_aa0160511308ae9921f192825072dea34"><div class="ttname"><a href="namespacetatami__hdf5.html#aa0160511308ae9921f192825072dea34">tatami_hdf5::write_compressed_sparse_matrix</a></div><div class="ttdeci">void write_compressed_sparse_matrix(const tatami::Matrix&lt; Value_, Index_ &gt; &amp;mat, H5::Group &amp;location, const WriteCompressedSparseMatrixOptions &amp;params)</div><div class="ttdef"><b>Definition</b> write_compressed_sparse_matrix.hpp:334</div></div>
 </div><!-- fragment --><p>Check out the <a href="https://tatami-inc.github.io/tatami_hdf5">reference documentation</a> for more details.</p>
 <h1>Building projects</h1>
 <p>If you're using CMake, you just need to add something like this to your <code>CMakeLists.txt</code>:</p>
