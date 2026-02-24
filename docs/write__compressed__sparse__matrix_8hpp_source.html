@@ -300,7 +300,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00269" name="l00269"></a><span class="lineno">  269</span>                    <span class="keyword">auto</span> extracted = wrk-&gt;fetch(r, xbuffer.data(), ibuffer.data());</div>
 <div class="line"><a id="l00270" name="l00270"></a><span class="lineno">  270</span>                    update_hdf5_stats(extracted, output, infer_value, infer_index);</div>
 <div class="line"><a id="l00271" name="l00271"></a><span class="lineno">  271</span>                }</div>
-<div class="line"><a id="l00272" name="l00272"></a><span class="lineno">  272</span>                get_output(t) = std::move(output); <span class="comment">// move it in the end, to avoid false sharing between threads.</span></div>
+<div class="line"><a id="l00272" name="l00272"></a><span class="lineno">  272</span>                get_output(t) = std::move(output); <span class="comment">// only move to the result buffer at the end, to avoid false sharing between threads.</span></div>
 <div class="line"><a id="l00273" name="l00273"></a><span class="lineno">  273</span>            }, NR, nthreads);</div>
 <div class="line"><a id="l00274" name="l00274"></a><span class="lineno">  274</span> </div>
 <div class="line"><a id="l00275" name="l00275"></a><span class="lineno">  275</span>        } <span class="keywordflow">else</span> {</div>
@@ -313,7 +313,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00282" name="l00282"></a><span class="lineno">  282</span>                    <span class="keyword">auto</span> extracted = wrk-&gt;fetch(c, xbuffer.data(), ibuffer.data());</div>
 <div class="line"><a id="l00283" name="l00283"></a><span class="lineno">  283</span>                    update_hdf5_stats(extracted, output, infer_value, infer_index);</div>
 <div class="line"><a id="l00284" name="l00284"></a><span class="lineno">  284</span>                }</div>
-<div class="line"><a id="l00285" name="l00285"></a><span class="lineno">  285</span>                get_output(t) = std::move(output);</div>
+<div class="line"><a id="l00285" name="l00285"></a><span class="lineno">  285</span>                get_output(t) = std::move(output); <span class="comment">// only move to the result buffer at the end, to avoid false sharing between threads.</span></div>
 <div class="line"><a id="l00286" name="l00286"></a><span class="lineno">  286</span>            }, NC, nthreads);</div>
 <div class="line"><a id="l00287" name="l00287"></a><span class="lineno">  287</span>        }</div>
 <div class="line"><a id="l00288" name="l00288"></a><span class="lineno">  288</span> </div>
@@ -327,7 +327,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00296" name="l00296"></a><span class="lineno">  296</span>                    <span class="keyword">auto</span> extracted = wrk-&gt;fetch(r, xbuffer.data());</div>
 <div class="line"><a id="l00297" name="l00297"></a><span class="lineno">  297</span>                    update_hdf5_stats(extracted, NC, output);</div>
 <div class="line"><a id="l00298" name="l00298"></a><span class="lineno">  298</span>                }</div>
-<div class="line"><a id="l00299" name="l00299"></a><span class="lineno">  299</span>                get_output(t) = std::move(output);</div>
+<div class="line"><a id="l00299" name="l00299"></a><span class="lineno">  299</span>                get_output(t) = std::move(output); <span class="comment">// only move to the result buffer at the end, to avoid false sharing between threads.</span></div>
 <div class="line"><a id="l00300" name="l00300"></a><span class="lineno">  300</span>            }, NR, nthreads);</div>
 <div class="line"><a id="l00301" name="l00301"></a><span class="lineno">  301</span> </div>
 <div class="line"><a id="l00302" name="l00302"></a><span class="lineno">  302</span>        } <span class="keywordflow">else</span> {</div>
@@ -339,7 +339,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00308" name="l00308"></a><span class="lineno">  308</span>                    <span class="keyword">auto</span> extracted = wrk-&gt;fetch(c, xbuffer.data());</div>
 <div class="line"><a id="l00309" name="l00309"></a><span class="lineno">  309</span>                    update_hdf5_stats(extracted, NR, output);</div>
 <div class="line"><a id="l00310" name="l00310"></a><span class="lineno">  310</span>                }</div>
-<div class="line"><a id="l00311" name="l00311"></a><span class="lineno">  311</span>                get_output(t) = std::move(output);</div>
+<div class="line"><a id="l00311" name="l00311"></a><span class="lineno">  311</span>                get_output(t) = std::move(output); <span class="comment">// only move to the result buffer at the end, to avoid false sharing between threads.</span></div>
 <div class="line"><a id="l00312" name="l00312"></a><span class="lineno">  312</span>            }, NC, nthreads);</div>
 <div class="line"><a id="l00313" name="l00313"></a><span class="lineno">  313</span>        }</div>
 <div class="line"><a id="l00314" name="l00314"></a><span class="lineno">  314</span>    }</div>
