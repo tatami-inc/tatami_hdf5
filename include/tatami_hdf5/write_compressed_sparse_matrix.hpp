@@ -247,8 +247,11 @@ void update_hdf5_stats(const Value_* extracted, Index_ n, WriteSparseHdf5Statist
 
 template<typename Value_, typename Index_>
 WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tatami::Matrix<Value_, Index_>& mat, bool infer_value, bool infer_index, int nthreads) {
-    auto NR = mat.nrow(), NC = mat.ncol();
-    std::vector<WriteSparseHdf5Statistics<Value_, Index_> > collected(nthreads);
+    const auto NR = mat.nrow(), NC = mat.ncol();
+
+    WriteSparseHdf5Statistics<Value_, Index_> output;
+    auto collected = sanisizer::create<std::vector<WriteSparseHdf5Statistics<Value_, Index_> > >(nthreads - 1); // nthreads had better be >= 1.
+    int num_used;
 
     if (mat.sparse()) {
         tatami::Options opt;
@@ -256,62 +259,81 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
         opt.sparse_extract_value = infer_value;
 
         if (mat.prefer_rows()) {
-            tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
+            num_used = tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
+                WriteSparseHdf5Statistics<Value_, Index_> current_output;
+
                 auto wrk = tatami::consecutive_extractor<true>(mat, true, start, len, opt);
                 std::vector<Value_> xbuffer(NC);
                 std::vector<Index_> ibuffer(NC);
                 for (Index_ r = start, end = start + len; r < end; ++r) {
                     auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
-                    update_hdf5_stats(extracted, collected[t], infer_value, infer_index);
+                    update_hdf5_stats(extracted, current_output, infer_value, infer_index);
                 }
+
+                // Only move to the result buffer at the end, to avoid false sharing between threads.
+                (t ? collected[t - 1] : output) = std::move(current_output);
             }, NR, nthreads);
 
         } else {
-            tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
+            num_used = tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
+                WriteSparseHdf5Statistics<Value_, Index_> current_output;
+
                 auto wrk = tatami::consecutive_extractor<true>(mat, false, start, len, opt);
                 std::vector<Value_> xbuffer(NR);
                 std::vector<Index_> ibuffer(NR);
                 for (Index_ c = start, end = start + len; c < end; ++c) {
                     auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
-                    update_hdf5_stats(extracted, collected[t], infer_value, infer_index);
+                    update_hdf5_stats(extracted, current_output, infer_value, infer_index);
                 }
+
+                // Only move to the result buffer at the end, to avoid false sharing between threads.
+                (t ? collected[t - 1] : output) = std::move(current_output);
             }, NC, nthreads);
         }
 
     } else {
         if (mat.prefer_rows()) {
-            tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
+            num_used = tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
+                WriteSparseHdf5Statistics<Value_, Index_> current_output;
+
                 auto wrk = tatami::consecutive_extractor<false>(mat, true, start, len);
                 std::vector<Value_> xbuffer(NC);
                 for (Index_ r = start, end = start + len; r < end; ++r) {
                     auto extracted = wrk->fetch(r, xbuffer.data());
-                    update_hdf5_stats(extracted, NC, collected[t]);
+                    update_hdf5_stats(extracted, NC, current_output);
                 }
+
+                // Only move to the result buffer at the end, to avoid false sharing between threads.
+                (t ? collected[t - 1] : output) = std::move(current_output);
             }, NR, nthreads);
 
         } else {
-            tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
+            num_used = tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
+                WriteSparseHdf5Statistics<Value_, Index_> current_output;
+
                 auto wrk = tatami::consecutive_extractor<false>(mat, false, start, len);
                 std::vector<Value_> xbuffer(NR);
                 for (Index_ c = start, end = start + len; c < end; ++c) {
                     auto extracted = wrk->fetch(c, xbuffer.data());
-                    update_hdf5_stats(extracted, NR, collected[t]);
+                    update_hdf5_stats(extracted, NR, current_output);
                 }
+
+                // Only move to the result buffer at the end, to avoid false sharing between threads.
+                (t ? collected[t - 1] : output) = std::move(current_output);
             }, NC, nthreads);
         }
     }
 
-    auto& first = collected.front();
-    for (int i = 1; i < nthreads; ++i) {
-        auto& current = collected[i];
-        first.lower_data = std::min(first.lower_data, current.lower_data);
-        first.upper_data = std::max(first.upper_data, current.upper_data);
-        first.upper_index = std::max(first.upper_index, current.upper_index);
-        first.non_zeros = sanisizer::sum<hsize_t>(first.non_zeros, current.non_zeros);
-        first.non_integer = first.non_integer || current.non_integer;
+    for (int i = 1; i < num_used; ++i) {
+        auto& current = collected[i - 1];
+        output.lower_data = std::min(output.lower_data, current.lower_data);
+        output.upper_data = std::max(output.upper_data, current.upper_data);
+        output.upper_index = std::max(output.upper_index, current.upper_index);
+        output.non_zeros = sanisizer::sum<hsize_t>(output.non_zeros, current.non_zeros);
+        output.non_integer = output.non_integer || current.non_integer;
     }
 
-    return std::move(first); // better be at least one thread.
+    return output;
 }
 /**
  * @endcond
