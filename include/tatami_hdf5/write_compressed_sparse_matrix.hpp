@@ -11,6 +11,7 @@
 #include <vector>
 #include <cmath>
 #include <limits>
+#include <optional>
 
 /**
  * @file write_compressed_sparse_matrix.hpp
@@ -24,46 +25,38 @@ namespace tatami_hdf5 {
  */
 struct WriteCompressedSparseMatrixOptions {
     /**
-     * @cond
-     */
-    WriteCompressedSparseMatrixOptions() : data_name("data"), index_name("indices"), ptr_name("indptr") {}
-    /**
-     * @endcond
-     */
-
-    /**
      * Name of the dataset in which to store the data values for non-zero elements.
-     * Defaults to `"data"`.
+     * If unset, defaults to `"data"`.
      */
-    std::string data_name;
+    std::optional<std::string> data_name;
 
     /**
      * Name of the dataset in which to store the indices for non-zero elements.
-     * Defaults to `"indices"`.
+     * If unset, defaults to `"indices"`.
      */
-    std::string index_name;
+    std::optional<std::string> index_name;
 
     /**
      * Name of the dataset in which to store the column/row pointers.
-     * Defaults to `"indptr"`.
+     * If unset, defaults to `"indptr"`.
      */
-    std::string ptr_name;
+    std::optional<std::string> ptr_name;
 
     /**
      * Whether to save in the compressed sparse column layout.
-     * If `false`, this is determined from the layout of the input matrix.
+     * If unset, this is determined from the layout of the input matrix.
      */
-    WriteStorageLayout columnar = WriteStorageLayout::AUTOMATIC;
+    std::optional<WriteStorageLayout> columnar;
 
     /**
      * Storage type for the data values.
-     * If `AUTOMATIC`, it is automatically determined from the range and integralness of the data in the input matrix.
+     * If unset, it is automatically determined from the range and integralness of the data in the input matrix.
      */
-    WriteStorageType data_type = WriteStorageType::AUTOMATIC;
+    std::optional<WriteStorageType> data_type;
 
     /**
      * Whether to force non-integer floating point values into an integer storage mode.
-     * Only relevant if `data_type` is set to `AUTOMATIC`.
+     * Only relevant if `data_type` is unset. 
      * If `true` and/or all values are integers, the smallest integer storage mode that fits the (truncated) floats is used.
      * If `false` and any non-integer values are detected, the `DOUBLE` storage mode is used instead.
      */
@@ -71,9 +64,9 @@ struct WriteCompressedSparseMatrixOptions {
 
     /**
      * Storage type for the data values.
-     * If `AUTOMATIC`, it is automatically determined from the range of the indices in the input matrix.
+     * If unset, it is automatically determined from the range of the indices in the input matrix.
      */
-    WriteStorageType index_type = WriteStorageType::AUTOMATIC;
+    std::optional<WriteStorageType> index_type;
 
     /**
      * Compression level.
@@ -87,8 +80,7 @@ struct WriteCompressedSparseMatrixOptions {
 
     /**
      * Number of threads to use for the first pass through the input matrix.
-     * This is only used to determine the number of non-zero elements 
-     * (and infer an appropriate storage type, if an `AUTOMATIC` selection is requested).
+     * This is only used to determine the number of non-zero elements and check storage types.
      */
     int num_threads = 1;
 };
@@ -354,14 +346,13 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
  */
 template<typename Value_, typename Index_>
 void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H5::Group& location, const WriteCompressedSparseMatrixOptions& params) {
-    auto data_type = params.data_type;
-    auto index_type = params.index_type;
-    auto use_auto_data_type = (data_type == WriteStorageType::AUTOMATIC);
-    auto use_auto_index_type = (index_type == WriteStorageType::AUTOMATIC);
-    auto stats = write_sparse_hdf5_statistics(mat, use_auto_data_type, use_auto_index_type, params.num_threads);
+    auto stats = write_sparse_hdf5_statistics(mat, !params.data_type.has_value(), !params.index_type.has_value(), params.num_threads);
 
     // Choosing the types.
-    if (use_auto_data_type) {
+    WriteStorageType data_type;
+    if (params.data_type.has_value()) {
+        data_type = *(params.data_type);
+    } else {
         if (stats.non_integer && !params.force_integer) {
             data_type = WriteStorageType::DOUBLE;
         } else {
@@ -387,7 +378,10 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
         }
     }
 
-    if (use_auto_index_type) {
+    WriteStorageType index_type;
+    if (params.index_type.has_value()) {
+        index_type = *(params.index_type);
+    } else {
         auto upper_index = stats.upper_index;
         if (fits_upper_limit<std::uint8_t>(upper_index)) {
             index_type = WriteStorageType::UINT8;
@@ -399,8 +393,10 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
     }
 
     // Choosing the layout.
-    auto layout = params.columnar;
-    if (layout == WriteStorageLayout::AUTOMATIC) {
+    WriteStorageLayout layout;
+    if (params.columnar.has_value()) {
+        layout = *(params.columnar);
+    } else {
         if (mat.prefer_rows()) {
             layout = WriteStorageLayout::ROW;
         } else {
@@ -408,10 +404,32 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
         }
     }
 
+    // Choosing the names.
+    std::string data_name;
+    if (params.data_name.has_value()) {
+        data_name = *(params.data_name);
+    } else {
+        data_name = "data";
+    }
+
+    std::string index_name;
+    if (params.index_name.has_value()) {
+        index_name = *(params.index_name);
+    } else {
+        index_name = "indices";
+    }
+
+    std::string ptr_name;
+    if (params.ptr_name.has_value()) {
+        ptr_name = *(params.ptr_name);
+    } else {
+        ptr_name = "indptr";
+    }
+
     // And then saving it. This time we have no choice but to iterate by the desired dimension.
     auto non_zeros = stats.non_zeros;
-    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, params.data_name, non_zeros, params.deflate_level, params.chunk_size);
-    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, params.index_name, non_zeros, params.deflate_level, params.chunk_size);
+    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, data_name, non_zeros, params.deflate_level, params.chunk_size);
+    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, index_name, non_zeros, params.deflate_level, params.chunk_size);
     hsize_t offset = 0;
     H5::DataSpace inspace(1, &non_zeros);
     H5::DataSpace outspace(1, &non_zeros);
@@ -499,7 +517,7 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
 
     // Saving the pointers.
     auto ptr_len = sanisizer::cast<hsize_t>(ptrs.size());
-    H5::DataSet ptr_ds = create_1d_compressed_hdf5_dataset(location, H5::PredType::NATIVE_HSIZE, params.ptr_name, ptr_len, params.deflate_level, params.chunk_size);
+    H5::DataSet ptr_ds = create_1d_compressed_hdf5_dataset(location, H5::PredType::NATIVE_HSIZE, ptr_name, ptr_len, params.deflate_level, params.chunk_size);
     H5::DataSpace ptr_space(1, &ptr_len);
     ptr_ds.write(ptrs.data(), H5::PredType::NATIVE_HSIZE, ptr_space);
 

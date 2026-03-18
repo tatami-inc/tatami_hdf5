@@ -19,14 +19,14 @@
 namespace tatami_hdf5 {
 
 /**
- * Layout to use when saving the matrix inside the HDF5 group.
+ * Layout of the matrix inside the HDF5 file.
  */
-enum class WriteStorageLayout { AUTOMATIC, COLUMN, ROW };
+enum class WriteStorageLayout { COLUMN, ROW };
 
 /**
- * Numeric type for writing data into a HDF5 dataset.
+ * Numeric type of the HDF5 dataset in which to store matrix contents.
  */
-enum class WriteStorageType { AUTOMATIC, INT8, UINT8, INT16, UINT16, INT32, UINT32, DOUBLE };
+enum class WriteStorageType { INT8, UINT8, INT16, UINT16, INT32, UINT32, DOUBLE };
 
 /**
  * @cond
