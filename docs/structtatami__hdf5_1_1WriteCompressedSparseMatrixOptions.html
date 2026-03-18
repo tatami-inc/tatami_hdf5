@@ -118,6 +118,8 @@ Public Attributes</h2></td></tr>
 <tr class="separator:a3c2805c165a053161952d62c2088fcc0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab9907d156449b4fe9538a35b91a31d88" id="r_ab9907d156449b4fe9538a35b91a31d88"><td class="memItemLeft" align="right" valign="top">std::optional&lt; <a class="el" href="namespacetatami__hdf5.html#a6ae3b5a86584169d643af24097ea6cf5">WriteStorageType</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ab9907d156449b4fe9538a35b91a31d88">index_type</a></td></tr>
 <tr class="separator:ab9907d156449b4fe9538a35b91a31d88"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5bbe9bcf2c21ba3fd63f9717e18cf32d" id="r_a5bbe9bcf2c21ba3fd63f9717e18cf32d"><td class="memItemLeft" align="right" valign="top">std::optional&lt; <a class="el" href="namespacetatami__hdf5.html#a6ae3b5a86584169d643af24097ea6cf5">WriteStorageType</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a5bbe9bcf2c21ba3fd63f9717e18cf32d">ptr_type</a></td></tr>
+<tr class="separator:a5bbe9bcf2c21ba3fd63f9717e18cf32d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3d8c006ce36fbe523e72fb84a1cde8f7" id="r_a3d8c006ce36fbe523e72fb84a1cde8f7"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a3d8c006ce36fbe523e72fb84a1cde8f7">deflate_level</a> = 6</td></tr>
 <tr class="separator:a3d8c006ce36fbe523e72fb84a1cde8f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a633950d7b6a0d463f32169a9de30db17" id="r_a633950d7b6a0d463f32169a9de30db17"><td class="memItemLeft" align="right" valign="top">hsize_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a633950d7b6a0d463f32169a9de30db17">chunk_size</a> = sanisizer::cap&lt;hsize_t&gt;(10000)</td></tr>
@@ -199,7 +201,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Storage type for the data values. If unset, it is automatically determined from the range and integralness of the data in the input matrix. </p>
+<p>Storage type for the matrix data. If unset, it is automatically determined from the range and integralness of the data in the input matrix. </p>
 
 </div>
 </div>
@@ -229,7 +231,22 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Storage type for the data values. If unset, it is automatically determined from the range of the indices in the input matrix. </p>
+<p>Storage type for the row/column indices. If unset, it is automatically determined from the range of the indices in the input matrix. </p>
+
+</div>
+</div>
+<a id="a5bbe9bcf2c21ba3fd63f9717e18cf32d" name="a5bbe9bcf2c21ba3fd63f9717e18cf32d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5bbe9bcf2c21ba3fd63f9717e18cf32d">&#9670;&#160;</a></span>ptr_type</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::optional&lt;<a class="el" href="namespacetatami__hdf5.html#a6ae3b5a86584169d643af24097ea6cf5">WriteStorageType</a>&gt; tatami_hdf5::WriteCompressedSparseMatrixOptions::ptr_type</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Storage type for the index pointers. If unset, it is automatically determined from the number of structural non-zero elements. </p>
 
 </div>
 </div>
