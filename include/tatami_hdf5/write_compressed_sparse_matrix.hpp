@@ -49,7 +49,7 @@ struct WriteCompressedSparseMatrixOptions {
     std::optional<WriteStorageLayout> columnar;
 
     /**
-     * Storage type for the data values.
+     * Storage type for the matrix data.
      * If unset, it is automatically determined from the range and integralness of the data in the input matrix.
      */
     std::optional<WriteStorageType> data_type;
@@ -63,10 +63,16 @@ struct WriteCompressedSparseMatrixOptions {
     bool force_integer = false;
 
     /**
-     * Storage type for the data values.
+     * Storage type for the row/column indices.
      * If unset, it is automatically determined from the range of the indices in the input matrix.
      */
     std::optional<WriteStorageType> index_type;
+
+    /**
+     * Storage type for the index pointers.
+     * If unset, it is automatically determined from the number of structural non-zero elements.
+     */
+    std::optional<WriteStorageType> ptr_type;
 
     /**
      * Compression level of DEFLATE.
@@ -127,6 +133,12 @@ inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteS
         case WriteStorageType::UINT32:
             dtype = &(H5::PredType::NATIVE_UINT32);
             break;
+        case WriteStorageType::INT64:
+            dtype = &(H5::PredType::NATIVE_INT64);
+            break;
+        case WriteStorageType::UINT64:
+            dtype = &(H5::PredType::NATIVE_UINT64);
+            break;
         case WriteStorageType::DOUBLE:
             dtype = &(H5::PredType::NATIVE_DOUBLE);
             break;
@@ -168,13 +180,35 @@ bool fits_lower_limit(Min_ min) {
         return min >= static_cast<double>(native_min);
     }
 }
-/**
- * @endcond
- */
 
-/**
- * @cond
- */
+inline WriteStorageType choose_ptr_type(const std::optional<WriteStorageType>& ptr_type, hsize_t nnzero) {
+    if (!ptr_type.has_value()) {
+        if (fits_upper_limit<std::uint32_t>(nnzero)) {
+            return WriteStorageType::UINT32;
+        } else if (fits_upper_limit<std::uint64_t>(nnzero)) {
+            return WriteStorageType::UINT64;
+        } else {
+            throw std::runtime_error("no integer type is not enough to store the number of non-zero elements");
+        }
+    } else {
+        const auto ptype = *ptr_type;
+        if (
+            (ptype == WriteStorageType::INT8   && !fits_upper_limit<std::int8_t  >(nnzero)) ||
+            (ptype == WriteStorageType::UINT8  && !fits_upper_limit<std::uint8_t >(nnzero)) ||
+            (ptype == WriteStorageType::INT16  && !fits_upper_limit<std::int16_t >(nnzero)) ||
+            (ptype == WriteStorageType::UINT16 && !fits_upper_limit<std::uint16_t>(nnzero)) ||
+            (ptype == WriteStorageType::INT32  && !fits_upper_limit<std::int32_t >(nnzero)) ||
+            (ptype == WriteStorageType::UINT32 && !fits_upper_limit<std::uint32_t>(nnzero)) ||
+            (ptype == WriteStorageType::INT64  && !fits_upper_limit<std::int64_t >(nnzero)) ||
+            (ptype == WriteStorageType::UINT64 && !fits_upper_limit<std::uint64_t>(nnzero))
+        ) {
+            throw std::runtime_error("specified integer type is not enough to store the number of non-zero elements");
+        }
+    }
+
+    return *ptr_type;
+}
+
 template<typename Value_, typename Index_>
 struct WriteSparseHdf5Statistics {
     Value_ lower_data = 0;
@@ -519,7 +553,14 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
 
     // Saving the pointers.
     auto ptr_len = sanisizer::cast<hsize_t>(ptrs.size());
-    H5::DataSet ptr_ds = create_1d_compressed_hdf5_dataset(location, H5::PredType::NATIVE_HSIZE, ptr_name, ptr_len, params.deflate_level, params.chunk_size);
+    H5::DataSet ptr_ds = create_1d_compressed_hdf5_dataset(
+        location,
+        choose_ptr_type(params.ptr_type, ptrs.back()),
+        ptr_name,
+        ptr_len,
+        params.deflate_level,
+        params.chunk_size
+    );
     H5::DataSpace ptr_space(1, &ptr_len);
     ptr_ds.write(ptrs.data(), H5::PredType::NATIVE_HSIZE, ptr_space);
 

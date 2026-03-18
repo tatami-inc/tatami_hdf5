@@ -487,6 +487,103 @@ INSTANTIATE_TEST_SUITE_P(
     )
 );
 
+/*****************************************
+ *****************************************/
+
+class WriteCompressedSparseMatrixPtrTypeTest : public ::testing::TestWithParam<std::tuple<tatami_hdf5::WriteStorageType, int> > {};
+
+TEST_P(WriteCompressedSparseMatrixPtrTypeTest, Check) {
+    auto params = GetParam();
+    auto type = std::get<0>(params);
+    auto nthreads = std::get<1>(params);
+
+    const size_t NC = 10;
+    size_t NR = 200;
+
+    auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NC, NR, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = -100;
+        opt.upper = 100;
+        return opt;
+    }());
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.data), std::move(triplets.index), std::move(triplets.indptr));
+
+    // Dumping it.
+    auto fpath = temp_file_path("tatami-write-test.h5");
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
+        auto mhandle = fhandle.createGroup("matrix");
+        tatami_hdf5::WriteCompressedSparseMatrixOptions params;
+        params.num_threads = nthreads;
+        params.ptr_type = type;
+        tatami_hdf5::write_compressed_sparse_matrix(&mat, mhandle, params);
+    }
+
+    // Checking the dumped contents.
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_RDONLY);
+        auto phandle = fhandle.openDataSet("matrix/indptr");
+        EXPECT_EQ(phandle.getDataType().getClass(), H5T_INTEGER);
+
+        H5::IntType ptype(phandle);
+        EXPECT_EQ(ptype.getSign(), H5T_SGN_NONE);
+        if (type == tatami_hdf5::WriteStorageType::UINT32) {
+            EXPECT_EQ(ptype.getSize(), 4);
+        } else {
+            EXPECT_EQ(ptype.getSize(), 8);
+        }
+    }
+
+    // Roundtripping.
+    auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
+    tatami_test::test_simple_row_access(*reloaded, mat);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    WriteCompressedSparseMatrix,
+    WriteCompressedSparseMatrixPtrTypeTest,
+    ::testing::Combine(
+        ::testing::Values(
+            tatami_hdf5::WriteStorageType::UINT32,
+            tatami_hdf5::WriteStorageType::UINT64
+        ),
+        ::testing::Values(1,3)
+    )
+);
+
+TEST_F(WriteCompressedSparseMatrixPtrTypeTest, Choices) {
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type({}, 5), tatami_hdf5::WriteStorageType::UINT32);
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type({}, 5000000000u), tatami_hdf5::WriteStorageType::UINT64);
+
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::INT8, 5), tatami_hdf5::WriteStorageType::INT8);
+    EXPECT_ANY_THROW(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::INT8, 200));
+
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::UINT8, 5), tatami_hdf5::WriteStorageType::UINT8);
+    EXPECT_ANY_THROW(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::UINT8, 500));
+
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::INT16, 500), tatami_hdf5::WriteStorageType::INT16);
+    EXPECT_ANY_THROW(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::INT16, 50000));
+
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::UINT16, 500), tatami_hdf5::WriteStorageType::UINT16);
+    EXPECT_ANY_THROW(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::UINT16, 100000));
+
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::INT32, 50000), tatami_hdf5::WriteStorageType::INT32);
+    EXPECT_ANY_THROW(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::INT32, 3000000000ul));
+
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::UINT32, 50000), tatami_hdf5::WriteStorageType::UINT32);
+    EXPECT_ANY_THROW(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::UINT32, 5000000000ul));
+
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::INT64, 50000), tatami_hdf5::WriteStorageType::INT64);
+    EXPECT_ANY_THROW(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::INT64, 9223372036854775808ull));
+
+    EXPECT_EQ(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::UINT64, 50000), tatami_hdf5::WriteStorageType::UINT64);
+    // Don't know how to test for boundaries here, there isn't anything guaranteed to be bigger. 
+}
+
+/*****************************************
+ *****************************************/
+
 TEST(WriteCompressedSparseMatrix, Defaults) {
     const size_t NR = 200, NC = 100;
     auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NC, NR, []{
