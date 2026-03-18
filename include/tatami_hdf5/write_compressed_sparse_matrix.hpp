@@ -69,14 +69,16 @@ struct WriteCompressedSparseMatrixOptions {
     std::optional<WriteStorageType> index_type;
 
     /**
-     * Compression level.
+     * Compression level of DEFLATE.
+     * This should be any integer between 0 and 9 inclusive.
+     * At zero, no compression is performed.
      */
     int deflate_level = 6;
 
     /**
      * Size of the chunks used for compression.
      */
-    hsize_t chunk_size = sanisizer::cap<hsize_t>(100000);
+    hsize_t chunk_size = sanisizer::cap<hsize_t>(10000);
 
     /**
      * Number of threads to use for the first pass through the input matrix.
