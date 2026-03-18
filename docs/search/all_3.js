@@ -1,8 +1,8 @@
 var searchData=
 [
   ['data_0',['data',['https://tatami-inc.github.io/tatami/classtatami_1_1ArrayView.html#ad23ad79ab7ed43ebb652aa172e26977a',1,'tatami::ArrayView']]],
-  ['data_5fname_1',['data_name',['../structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html#a3e84cc9efdefa32f94721d93fd7e4556',1,'tatami_hdf5::WriteCompressedSparseMatrixOptions']]],
-  ['data_5ftype_2',['data_type',['../structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html#a54db560e1016dc71f11e5ab2171a54e6',1,'tatami_hdf5::WriteCompressedSparseMatrixOptions']]],
+  ['data_5fname_1',['data_name',['../structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html#a7abeedb86cc6933fb16af0045efe689b',1,'tatami_hdf5::WriteCompressedSparseMatrixOptions']]],
+  ['data_5ftype_2',['data_type',['../structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html#abb38c4af894ba9e5fa1f4a8a8cd0a4b0',1,'tatami_hdf5::WriteCompressedSparseMatrixOptions']]],
   ['deflate_5flevel_3',['deflate_level',['../structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html#a3d8c006ce36fbe523e72fb84a1cde8f7',1,'tatami_hdf5::WriteCompressedSparseMatrixOptions']]],
   ['delayedbinaryisometricaddhelper_4',['DelayedBinaryIsometricAddHelper',['https://tatami-inc.github.io/tatami/namespacetatami.html#a57425b6548448b71576c04f16f4dc38d',1,'tatami']]],
   ['delayedbinaryisometricarithmetichelper_5',['DelayedBinaryIsometricArithmeticHelper',['https://tatami-inc.github.io/tatami/classtatami_1_1DelayedBinaryIsometricArithmeticHelper.html',1,'tatami']]],

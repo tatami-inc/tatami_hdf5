@@ -138,38 +138,38 @@
     <name>tatami_hdf5::WriteCompressedSparseMatrixOptions</name>
     <filename>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</filename>
     <member kind="variable">
-      <type>std::string</type>
+      <type>std::optional&lt; std::string &gt;</type>
       <name>data_name</name>
       <anchorfile>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</anchorfile>
-      <anchor>a3e84cc9efdefa32f94721d93fd7e4556</anchor>
+      <anchor>a7abeedb86cc6933fb16af0045efe689b</anchor>
       <arglist></arglist>
     </member>
     <member kind="variable">
-      <type>std::string</type>
+      <type>std::optional&lt; std::string &gt;</type>
       <name>index_name</name>
       <anchorfile>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</anchorfile>
-      <anchor>a451f12a59f08ee3a3b8b493fad71864c</anchor>
+      <anchor>a97cdf626f380847bb0608242d53dcd24</anchor>
       <arglist></arglist>
     </member>
     <member kind="variable">
-      <type>std::string</type>
+      <type>std::optional&lt; std::string &gt;</type>
       <name>ptr_name</name>
       <anchorfile>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</anchorfile>
-      <anchor>a02bcb589398f16c0b52621bfeae814d3</anchor>
+      <anchor>a8a28d1ad24383a2c1c80046c04c68461</anchor>
       <arglist></arglist>
     </member>
     <member kind="variable">
-      <type>WriteStorageLayout</type>
+      <type>std::optional&lt; WriteStorageLayout &gt;</type>
       <name>columnar</name>
       <anchorfile>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</anchorfile>
-      <anchor>abfaaaa0eb83834b8e6293e86e7268036</anchor>
+      <anchor>a1cfd5dece165db70a4dc24f2bad5a88d</anchor>
       <arglist></arglist>
     </member>
     <member kind="variable">
-      <type>WriteStorageType</type>
+      <type>std::optional&lt; WriteStorageType &gt;</type>
       <name>data_type</name>
       <anchorfile>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</anchorfile>
-      <anchor>a54db560e1016dc71f11e5ab2171a54e6</anchor>
+      <anchor>abb38c4af894ba9e5fa1f4a8a8cd0a4b0</anchor>
       <arglist></arglist>
     </member>
     <member kind="variable">
@@ -180,10 +180,10 @@
       <arglist></arglist>
     </member>
     <member kind="variable">
-      <type>WriteStorageType</type>
+      <type>std::optional&lt; WriteStorageType &gt;</type>
       <name>index_type</name>
       <anchorfile>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</anchorfile>
-      <anchor>a25224e6ff67ab13ccc4ffd24dba7cf54</anchor>
+      <anchor>ab9907d156449b4fe9538a35b91a31d88</anchor>
       <arglist></arglist>
     </member>
     <member kind="variable">
