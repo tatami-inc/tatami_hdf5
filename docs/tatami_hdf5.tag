@@ -222,7 +222,6 @@
       <anchorfile>namespacetatami__hdf5.html</anchorfile>
       <anchor>a6265ac39e6f87118435c505451caa604</anchor>
       <arglist></arglist>
-      <enumvalue file="namespacetatami__hdf5.html" anchor="a6265ac39e6f87118435c505451caa604a008f6cdd0c190839e9885cf9f9e2a652">AUTOMATIC</enumvalue>
       <enumvalue file="namespacetatami__hdf5.html" anchor="a6265ac39e6f87118435c505451caa604a829250befeaeea0b203d31fd09a0ced3">COLUMN</enumvalue>
       <enumvalue file="namespacetatami__hdf5.html" anchor="a6265ac39e6f87118435c505451caa604a54c1ed33c810f895d48c008d89f880b7">ROW</enumvalue>
     </member>
@@ -232,7 +231,6 @@
       <anchorfile>namespacetatami__hdf5.html</anchorfile>
       <anchor>a6ae3b5a86584169d643af24097ea6cf5</anchor>
       <arglist></arglist>
-      <enumvalue file="namespacetatami__hdf5.html" anchor="a6ae3b5a86584169d643af24097ea6cf5a008f6cdd0c190839e9885cf9f9e2a652">AUTOMATIC</enumvalue>
       <enumvalue file="namespacetatami__hdf5.html" anchor="a6ae3b5a86584169d643af24097ea6cf5aee9d73311ff0658494edfff14c3ec1e3">INT8</enumvalue>
       <enumvalue file="namespacetatami__hdf5.html" anchor="a6ae3b5a86584169d643af24097ea6cf5aecfc091ed2a607335524c8389cfa41b5">UINT8</enumvalue>
       <enumvalue file="namespacetatami__hdf5.html" anchor="a6ae3b5a86584169d643af24097ea6cf5a5f90af42814c0a419d715d43ae54fd7a">INT16</enumvalue>
