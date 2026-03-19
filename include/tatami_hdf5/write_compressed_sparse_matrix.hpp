@@ -181,32 +181,131 @@ bool fits_lower_limit(Min_ min) {
     }
 }
 
+template<typename Value_>
+WriteStorageType choose_data_type(const std::optional<WriteStorageType>& data_type, Value_ lower_data, Value_ upper_data, bool non_integer, bool force_integer) {
+    const bool is_lower_negative = [&](){
+        if constexpr(std::is_integral<Value_>::value && std::is_unsigned<Value_>::value) {
+            return false;
+        } else {
+            return lower_data < 0;
+        }
+    }();
+
+    if (!data_type.has_value()) {
+        if (non_integer && !force_integer) {
+            return WriteStorageType::DOUBLE;
+        }
+
+        if (is_lower_negative) {
+            if (fits_lower_limit<std::int8_t>(lower_data) && fits_upper_limit<std::int8_t>(upper_data)) {
+                return WriteStorageType::INT8;
+            } else if (fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t>(upper_data)) {
+                return WriteStorageType::INT16;
+            } else if (fits_lower_limit<std::int32_t>(lower_data) && fits_upper_limit<std::int32_t>(upper_data)) {
+                return WriteStorageType::INT32;
+            } else if (fits_lower_limit<std::int64_t>(lower_data) && fits_upper_limit<std::int64_t>(upper_data)) {
+                return WriteStorageType::INT64;
+            }
+
+        } else {
+            if (fits_upper_limit<std::uint8_t>(upper_data)) {
+                return WriteStorageType::UINT8;
+            } else if (fits_upper_limit<std::uint16_t>(upper_data)) {
+                return WriteStorageType::UINT16;
+            } else if (fits_upper_limit<std::uint32_t>(upper_data)) {
+                return WriteStorageType::UINT32;
+            } else if (fits_upper_limit<std::uint64_t>(upper_data)) {
+                return WriteStorageType::UINT64;
+            }
+        }
+
+        throw std::runtime_error("no storage type can store the matrix values");
+    }
+
+    const auto dtype = *data_type;
+    if (non_integer && !force_integer) {
+        if (dtype != WriteStorageType::DOUBLE) {
+            throw std::runtime_error("cannot store floating-point values as integers without 'force_integer = true'");
+        }
+
+    } else {
+        if (
+            (dtype == WriteStorageType::INT8   && !(fits_lower_limit<std::int8_t >(lower_data) && fits_upper_limit<std::int8_t  >(upper_data))) ||
+            (dtype == WriteStorageType::UINT8  && !(!is_lower_negative                         && fits_upper_limit<std::uint8_t >(upper_data))) ||
+            (dtype == WriteStorageType::INT16  && !(fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t >(upper_data))) ||
+            (dtype == WriteStorageType::UINT16 && !(!is_lower_negative                         && fits_upper_limit<std::uint16_t>(upper_data))) ||
+            (dtype == WriteStorageType::INT32  && !(fits_lower_limit<std::int32_t>(lower_data) && fits_upper_limit<std::int32_t >(upper_data))) ||
+            (dtype == WriteStorageType::UINT32 && !(!is_lower_negative                         && fits_upper_limit<std::uint32_t>(upper_data))) ||
+            (dtype == WriteStorageType::INT64  && !(fits_lower_limit<std::int64_t>(lower_data) && fits_upper_limit<std::int64_t >(upper_data))) ||
+            (dtype == WriteStorageType::UINT64 && !(!is_lower_negative                         && fits_upper_limit<std::uint64_t>(upper_data)))
+        ) {
+            throw std::runtime_error("specified integer type cannot store all matrix values");
+        }
+    }
+
+    return dtype;
+}
+
+template<typename Index_>
+WriteStorageType choose_index_type(const std::optional<WriteStorageType>& index_type, Index_ upper_index) {
+    if (!index_type.has_value()) {
+        if (fits_upper_limit<std::uint8_t>(upper_index)) {
+            return WriteStorageType::UINT8;
+        } else if (fits_upper_limit<std::uint16_t>(upper_index)) {
+            return WriteStorageType::UINT16;
+        } else if (fits_upper_limit<std::uint32_t>(upper_index)) {
+            return WriteStorageType::UINT32;
+        } else if (fits_upper_limit<std::uint64_t>(upper_index)) {
+            return WriteStorageType::UINT64;
+        }
+        throw std::runtime_error("no type can store the largest index");
+    }
+
+    const auto itype = *index_type;
+    if (
+        (itype == WriteStorageType::INT8   && !fits_upper_limit<std::int8_t  >(upper_index)) ||
+        (itype == WriteStorageType::UINT8  && !fits_upper_limit<std::uint8_t >(upper_index)) ||
+        (itype == WriteStorageType::INT16  && !fits_upper_limit<std::int16_t >(upper_index)) ||
+        (itype == WriteStorageType::UINT16 && !fits_upper_limit<std::uint16_t>(upper_index)) ||
+        (itype == WriteStorageType::INT32  && !fits_upper_limit<std::int32_t >(upper_index)) ||
+        (itype == WriteStorageType::UINT32 && !fits_upper_limit<std::uint32_t>(upper_index)) ||
+        (itype == WriteStorageType::INT64  && !fits_upper_limit<std::int64_t >(upper_index)) ||
+        (itype == WriteStorageType::UINT64 && !fits_upper_limit<std::uint64_t>(upper_index)) ||
+        (itype == WriteStorageType::DOUBLE /* must be integer */                           )
+    ) {
+        throw std::runtime_error("specified type cannot store the largest index");
+    }
+
+    return itype;
+}
+
 inline WriteStorageType choose_ptr_type(const std::optional<WriteStorageType>& ptr_type, hsize_t nnzero) {
     if (!ptr_type.has_value()) {
         if (fits_upper_limit<std::uint32_t>(nnzero)) {
             return WriteStorageType::UINT32;
         } else if (fits_upper_limit<std::uint64_t>(nnzero)) {
             return WriteStorageType::UINT64;
-        } else {
-            throw std::runtime_error("no integer type is not enough to store the number of non-zero elements");
         }
-    } else {
-        const auto ptype = *ptr_type;
-        if (
-            (ptype == WriteStorageType::INT8   && !fits_upper_limit<std::int8_t  >(nnzero)) ||
-            (ptype == WriteStorageType::UINT8  && !fits_upper_limit<std::uint8_t >(nnzero)) ||
-            (ptype == WriteStorageType::INT16  && !fits_upper_limit<std::int16_t >(nnzero)) ||
-            (ptype == WriteStorageType::UINT16 && !fits_upper_limit<std::uint16_t>(nnzero)) ||
-            (ptype == WriteStorageType::INT32  && !fits_upper_limit<std::int32_t >(nnzero)) ||
-            (ptype == WriteStorageType::UINT32 && !fits_upper_limit<std::uint32_t>(nnzero)) ||
-            (ptype == WriteStorageType::INT64  && !fits_upper_limit<std::int64_t >(nnzero)) ||
-            (ptype == WriteStorageType::UINT64 && !fits_upper_limit<std::uint64_t>(nnzero))
-        ) {
-            throw std::runtime_error("specified integer type is not enough to store the number of non-zero elements");
-        }
+
+        throw std::runtime_error("no type can store the number of non-zero elements");
     }
 
-    return *ptr_type;
+    const auto ptype = *ptr_type;
+    if (
+        (ptype == WriteStorageType::INT8   && !fits_upper_limit<std::int8_t  >(nnzero)) ||
+        (ptype == WriteStorageType::UINT8  && !fits_upper_limit<std::uint8_t >(nnzero)) ||
+        (ptype == WriteStorageType::INT16  && !fits_upper_limit<std::int16_t >(nnzero)) ||
+        (ptype == WriteStorageType::UINT16 && !fits_upper_limit<std::uint16_t>(nnzero)) ||
+        (ptype == WriteStorageType::INT32  && !fits_upper_limit<std::int32_t >(nnzero)) ||
+        (ptype == WriteStorageType::UINT32 && !fits_upper_limit<std::uint32_t>(nnzero)) ||
+        (ptype == WriteStorageType::INT64  && !fits_upper_limit<std::int64_t >(nnzero)) ||
+        (ptype == WriteStorageType::UINT64 && !fits_upper_limit<std::uint64_t>(nnzero)) ||
+        (ptype == WriteStorageType::DOUBLE /* must be integer */                      )
+    ) {
+        throw std::runtime_error("specified type cannot store the number of non-zero elements");
+    }
+
+    return ptype;
 }
 
 template<typename Value_, typename Index_>
@@ -239,20 +338,16 @@ struct WriteSparseHdf5Statistics {
 };
 
 template<typename Value_, typename Index_>
-void update_hdf5_stats(const tatami::SparseRange<Value_, Index_>& extracted, WriteSparseHdf5Statistics<Value_, Index_>& output, bool infer_value, bool infer_index) {
+void update_hdf5_stats(const tatami::SparseRange<Value_, Index_>& extracted, WriteSparseHdf5Statistics<Value_, Index_>& output) {
     // We need to protect the addition just in case it overflows from having too many non-zero elements.
     output.non_zeros = sanisizer::sum<hsize_t>(output.non_zeros, extracted.number);
 
-    if (infer_value) {
-        for (Index_ i = 0; i < extracted.number; ++i) {
-            output.add_value(extracted.value[i]);
-        }
+    for (Index_ i = 0; i < extracted.number; ++i) {
+        output.add_value(extracted.value[i]);
     }
 
-    if (infer_index) {
-        for (Index_ i = 0; i < extracted.number; ++i) {
-            output.add_index(extracted.index[i]);
-        }
+    for (Index_ i = 0; i < extracted.number; ++i) {
+        output.add_index(extracted.index[i]);
     }
 }
 
@@ -274,7 +369,7 @@ void update_hdf5_stats(const Value_* extracted, Index_ n, WriteSparseHdf5Statist
 }
 
 template<typename Value_, typename Index_>
-WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tatami::Matrix<Value_, Index_>& mat, bool infer_value, bool infer_index, int nthreads) {
+WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tatami::Matrix<Value_, Index_>& mat, int nthreads) {
     const auto NR = mat.nrow(), NC = mat.ncol();
 
     WriteSparseHdf5Statistics<Value_, Index_> output;
@@ -282,20 +377,16 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
     int num_used;
 
     if (mat.sparse()) {
-        tatami::Options opt;
-        opt.sparse_extract_index = infer_index;
-        opt.sparse_extract_value = infer_value;
-
         if (mat.prefer_rows()) {
             num_used = tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
                 WriteSparseHdf5Statistics<Value_, Index_> current_output;
 
-                auto wrk = tatami::consecutive_extractor<true>(mat, true, start, len, opt);
+                auto wrk = tatami::consecutive_extractor<true>(mat, true, start, len);
                 std::vector<Value_> xbuffer(NC);
                 std::vector<Index_> ibuffer(NC);
                 for (Index_ r = start, end = start + len; r < end; ++r) {
                     auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
-                    update_hdf5_stats(extracted, current_output, infer_value, infer_index);
+                    update_hdf5_stats(extracted, current_output);
                 }
 
                 // Only move to the result buffer at the end, to avoid false sharing between threads.
@@ -306,12 +397,12 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
             num_used = tatami::parallelize([&](int t, Index_ start, Index_ len) -> void {
                 WriteSparseHdf5Statistics<Value_, Index_> current_output;
 
-                auto wrk = tatami::consecutive_extractor<true>(mat, false, start, len, opt);
+                auto wrk = tatami::consecutive_extractor<true>(mat, false, start, len);
                 std::vector<Value_> xbuffer(NR);
                 std::vector<Index_> ibuffer(NR);
                 for (Index_ c = start, end = start + len; c < end; ++c) {
                     auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
-                    update_hdf5_stats(extracted, current_output, infer_value, infer_index);
+                    update_hdf5_stats(extracted, current_output);
                 }
 
                 // Only move to the result buffer at the end, to avoid false sharing between threads.
@@ -382,51 +473,9 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
  */
 template<typename Value_, typename Index_>
 void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H5::Group& location, const WriteCompressedSparseMatrixOptions& params) {
-    auto stats = write_sparse_hdf5_statistics(mat, !params.data_type.has_value(), !params.index_type.has_value(), params.num_threads);
-
-    // Choosing the types.
-    WriteStorageType data_type;
-    if (params.data_type.has_value()) {
-        data_type = *(params.data_type);
-    } else {
-        if (stats.non_integer && !params.force_integer) {
-            data_type = WriteStorageType::DOUBLE;
-        } else {
-            auto lower_data = stats.lower_data;
-            auto upper_data = stats.upper_data;
-            if (lower_data < 0) {
-                if (fits_lower_limit<std::int8_t>(lower_data) && fits_upper_limit<std::int8_t>(upper_data)) {
-                    data_type = WriteStorageType::INT8;
-                } else if (fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t>(upper_data)) {
-                    data_type = WriteStorageType::INT16;
-                } else {
-                    data_type = WriteStorageType::INT32;
-                }
-            } else {
-                if (fits_upper_limit<std::uint8_t>(upper_data)) {
-                    data_type = WriteStorageType::UINT8;
-                } else if (fits_upper_limit<std::uint16_t>(upper_data)) {
-                    data_type = WriteStorageType::UINT16;
-                } else {
-                    data_type = WriteStorageType::UINT32;
-                }
-            }
-        }
-    }
-
-    WriteStorageType index_type;
-    if (params.index_type.has_value()) {
-        index_type = *(params.index_type);
-    } else {
-        auto upper_index = stats.upper_index;
-        if (fits_upper_limit<std::uint8_t>(upper_index)) {
-            index_type = WriteStorageType::UINT8;
-        } else if (fits_upper_limit<std::uint16_t>(upper_index)) {
-            index_type = WriteStorageType::UINT16;
-        } else {
-            index_type = WriteStorageType::UINT32;
-        }
-    }
+    auto stats = write_sparse_hdf5_statistics(mat, params.num_threads);
+    const auto data_type = choose_data_type(params.data_type, stats.lower_data, stats.upper_data, stats.non_integer, params.force_integer);
+    const auto index_type = choose_index_type(params.index_type, stats.upper_index);
 
     // Choosing the layout.
     WriteStorageLayout layout;
