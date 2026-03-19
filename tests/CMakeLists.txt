@@ -20,6 +20,7 @@ add_executable(
     src/write_compressed_sparse_matrix.cpp
     src/DenseMatrix.cpp
     src/CompressedSparseMatrix.cpp
+    src/utils.cpp
 )
 
 macro(decorate_test target)
