@@ -246,6 +246,7 @@
       <enumvalue file="namespacetatami__hdf5.html" anchor="a6ae3b5a86584169d643af24097ea6cf5a17266551181f69a1b4a3ad5c9e270afc">UINT32</enumvalue>
       <enumvalue file="namespacetatami__hdf5.html" anchor="a6ae3b5a86584169d643af24097ea6cf5a4e866b275c85fbb439f6484251cfb31c">INT64</enumvalue>
       <enumvalue file="namespacetatami__hdf5.html" anchor="a6ae3b5a86584169d643af24097ea6cf5a6de7acf711860176ba606e9aa2b85d5f">UINT64</enumvalue>
+      <enumvalue file="namespacetatami__hdf5.html" anchor="a6ae3b5a86584169d643af24097ea6cf5ae738c26bf4ce1037fa81b039a915cbf6">FLOAT</enumvalue>
       <enumvalue file="namespacetatami__hdf5.html" anchor="a6ae3b5a86584169d643af24097ea6cf5afd3e4ece78a7d422280d5ed379482229">DOUBLE</enumvalue>
     </member>
     <member kind="function">
