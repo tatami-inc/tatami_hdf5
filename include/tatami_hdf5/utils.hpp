@@ -26,7 +26,7 @@ enum class WriteStorageLayout { COLUMN, ROW };
 /**
  * Numeric type of the HDF5 dataset in which to store matrix contents.
  */
-enum class WriteStorageType { INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64, DOUBLE };
+enum class WriteStorageType { INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64, FLOAT, DOUBLE };
 
 /**
  * @cond

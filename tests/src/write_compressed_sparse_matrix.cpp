@@ -78,7 +78,8 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, SparseColumn) {
     {
         H5::H5File fhandle(fpath, H5F_ACC_RDONLY);
         auto dhandle = fhandle.openDataSet("matrix/data");
-        EXPECT_EQ(dhandle.getDataType().getClass(), H5T_FLOAT);
+        H5::FloatType dtype = dhandle.getFloatType();
+        EXPECT_EQ(dtype.getSize(), 8); // should be double-precision.
 
         auto phandle = fhandle.openDataSet("matrix/indptr");
         auto pspace = phandle.getSpace();
@@ -149,6 +150,11 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, SparseRow) {
     // Checking the dumped contents.
     {
         H5::H5File fhandle(fpath, H5F_ACC_RDONLY);
+        auto dhandle = fhandle.openDataSet("matrix/data");
+        EXPECT_EQ(dhandle.getDataType().getClass(), H5T_FLOAT);
+        H5::FloatType dtype = dhandle.getFloatType();
+        EXPECT_EQ(dtype.getSize(), 8); // should be double-precision.
+
         auto phandle = fhandle.openDataSet("matrix/indptr");
         auto pspace = phandle.getSpace();
         hsize_t dim;
@@ -356,33 +362,71 @@ INSTANTIATE_TEST_SUITE_P(
     )
 );
 
+template<typename Value_>
+static tatami_hdf5::WriteStorageType choose_integer_type(const std::optional<tatami_hdf5::WriteStorageType>& x, Value_ lower, Value_ upper) {
+    return tatami_hdf5::choose_data_type(
+        x,
+        lower,
+        upper,
+        /* has_decimal = */ false,
+        /* force_integer = */ false,
+        /* has_nonfinite = */ false
+    );
+}
+
 TEST_F(WriteCompressedSparseMatrixUnsignedDataTypeTest, Choices) {
-    const bool def_non_integer = false;
-    const bool def_force_integer = false;
+    EXPECT_EQ(choose_integer_type({}, 0, 5), tatami_hdf5::WriteStorageType::UINT8);
+    EXPECT_EQ(choose_integer_type({}, 0, 500), tatami_hdf5::WriteStorageType::UINT16);
+    EXPECT_EQ(choose_integer_type({}, 0, 500000), tatami_hdf5::WriteStorageType::UINT32);
+    EXPECT_EQ(choose_integer_type({}, 0ll, 5000000000ll), tatami_hdf5::WriteStorageType::UINT64);
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, 0, 5, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::UINT8);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, 0, 500, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::UINT16);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, 0, 500000, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::UINT32);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, 0ll, 5000000000ll, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::UINT64);
+    EXPECT_EQ(choose_integer_type(tatami_hdf5::WriteStorageType::UINT8, 0, 5), tatami_hdf5::WriteStorageType::UINT8);
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::UINT8, -1, 0));
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::UINT8, 0, 300));
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT8, 0, 5, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::UINT8);
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT8, -1, 0, def_non_integer, def_force_integer));
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT8, 0, 300, def_non_integer, def_force_integer));
+    EXPECT_EQ(choose_integer_type(tatami_hdf5::WriteStorageType::UINT16, 0, 500), tatami_hdf5::WriteStorageType::UINT16);
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::UINT16, -1, 0));
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::UINT16, 0, 100000));
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT16, 0, 500, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::UINT16);
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT16, -1, 0, def_non_integer, def_force_integer));
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT16, 0, 100000, def_non_integer, def_force_integer));
+    EXPECT_EQ(choose_integer_type(tatami_hdf5::WriteStorageType::UINT32, 0, 100000), tatami_hdf5::WriteStorageType::UINT32);
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::UINT32, -1, 0));
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::UINT32, 0ll, 5000000000ll));
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT32, 0, 100000, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::UINT32);
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT32, -1, 0, def_non_integer, def_force_integer));
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT32, 0ll, 5000000000ll, def_non_integer, def_force_integer));
-
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT64, 0ll, 5000000000ll, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::UINT64);
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT64, -1, 0, def_non_integer, def_force_integer));
+    EXPECT_EQ(choose_integer_type(tatami_hdf5::WriteStorageType::UINT64, 0ll, 5000000000ll), tatami_hdf5::WriteStorageType::UINT64);
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::UINT64, -1, 0));
     // Not sure how to do the test for overflow in positive values.
 
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT8, 0, 0, /* non_integer = */ true, /* force_integer = */ false));
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::UINT8, 0, 0, /* non_integer = */ true, /* force_integer = */ true), tatami_hdf5::WriteStorageType::UINT8);
+    EXPECT_ANY_THROW(
+        tatami_hdf5::choose_data_type(
+            tatami_hdf5::WriteStorageType::UINT8,
+            0,
+            0,
+            /* has_decimal = */ true,
+            /* force_integer = */ false,
+            /* has_nonfinite = */ false 
+        )
+    );
+    EXPECT_ANY_THROW(
+        tatami_hdf5::choose_data_type(
+            tatami_hdf5::WriteStorageType::UINT8,
+            0,
+            0,
+            /* has_decimal = */ false,
+            /* force_integer = */ false,
+            /* has_nonfinite = */ true 
+        )
+    );
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            tatami_hdf5::WriteStorageType::UINT8,
+            0,
+            0,
+            /* has_decimal = */ true,
+            /* force_integer = */ true,
+            /* has_nonfinite = */ false
+        ),
+        tatami_hdf5::WriteStorageType::UINT8
+    );
 }
 
 /*****************************************
@@ -473,40 +517,141 @@ INSTANTIATE_TEST_SUITE_P(
 );
 
 TEST_F(WriteCompressedSparseMatrixSignedDataTypeTest, Choices) {
-    const bool def_non_integer = false;
-    const bool def_force_integer = false;
+    EXPECT_EQ(choose_integer_type({}, -5, 0), tatami_hdf5::WriteStorageType::INT8);
+    EXPECT_EQ(choose_integer_type({}, -500, 0), tatami_hdf5::WriteStorageType::INT16);
+    EXPECT_EQ(choose_integer_type({}, -500000, 0), tatami_hdf5::WriteStorageType::INT32);
+    EXPECT_EQ(choose_integer_type({}, -5000000000ll, 0ll), tatami_hdf5::WriteStorageType::INT64);
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -5, 0, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT8);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -500, 0, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT16);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -500000, 0, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT32);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -5000000000ll, 0ll, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT64);
+    EXPECT_EQ(choose_integer_type({}, -1, 5), tatami_hdf5::WriteStorageType::INT8);
+    EXPECT_EQ(choose_integer_type({}, -1, 500), tatami_hdf5::WriteStorageType::INT16);
+    EXPECT_EQ(choose_integer_type({}, -1, 500000), tatami_hdf5::WriteStorageType::INT32);
+    EXPECT_EQ(choose_integer_type({}, -1ll, 50000000000ll), tatami_hdf5::WriteStorageType::INT64);
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -1, 5, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT8);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -1, 500, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT16);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -1, 500000, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT32);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -1ll, 50000000000ll, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT64);
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            {},
+            -5.0,
+            5.0,
+            /* has_decimal = */ true,
+            /* force_integer = */ false,
+            /* has_nonfinite = */ false
+        ),
+        tatami_hdf5::WriteStorageType::DOUBLE
+    );
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            {},
+            -5.0f,
+            5.0f,
+            /* has_decimal = */ true,
+            /* force_integer = */ false,
+            /* has_nonfinite = */ false
+        ),
+        tatami_hdf5::WriteStorageType::FLOAT
+    );
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            {},
+            -5.0,
+            5.0,
+            /* has_decimal = */ true,
+            /* force_integer = */ true,
+            /* has_nonfinite = */ false
+        ),
+        tatami_hdf5::WriteStorageType::INT8
+    );
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            {},
+            -5.0,
+            5.0,
+            /* has_decimal = */ true,
+            /* force_integer = */ true,
+            /* has_nonfinite = */ true
+        ),
+        tatami_hdf5::WriteStorageType::DOUBLE
+    );
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -5.0, 5.0, /* non_integer = */ true, /* force_integer = */ false), tatami_hdf5::WriteStorageType::DOUBLE);
-    EXPECT_EQ(tatami_hdf5::choose_data_type({}, -5.0, 5.0, /* non_integer = */ true, /* force_integer = */ true), tatami_hdf5::WriteStorageType::INT8);
+    EXPECT_EQ(choose_integer_type(tatami_hdf5::WriteStorageType::INT8, -5, 5), tatami_hdf5::WriteStorageType::INT8);
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::INT8, -300, 0));
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::INT8, 0, 300));
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT8, -5, 5, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT8);
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT8, -300, 0, def_non_integer, def_force_integer));
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT8, 0, 300, def_non_integer, def_force_integer));
+    EXPECT_EQ(choose_integer_type(tatami_hdf5::WriteStorageType::INT16, -500, 500), tatami_hdf5::WriteStorageType::INT16);
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::INT16, -100000, 0));
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::INT16, 0, 100000));
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT16, -500, 500, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT16);
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT16, -100000, 0, def_non_integer, def_force_integer));
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT16, 0, 100000, def_non_integer, def_force_integer));
+    EXPECT_EQ(choose_integer_type(tatami_hdf5::WriteStorageType::INT32, -100000, 100000), tatami_hdf5::WriteStorageType::INT32);
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::INT32, -5000000000ll, 0ll));
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::INT32, 0ll, 5000000000ll));
 
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT32, -100000, 100000, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT32);
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT32, -5000000000ll, 0ll, def_non_integer, def_force_integer));
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT32, 0ll, 5000000000ll, def_non_integer, def_force_integer));
-
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT64, -5000000000ll, 5000000000ll, def_non_integer, def_force_integer), tatami_hdf5::WriteStorageType::INT64);
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT64, 0ull, 9223372036854775809ull, def_non_integer, def_force_integer));
+    EXPECT_EQ(choose_integer_type(tatami_hdf5::WriteStorageType::INT64, -5000000000ll, 5000000000ll), tatami_hdf5::WriteStorageType::INT64);
+    EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::INT64, 0ull, 9223372036854775809ull));
     // Not sure how to do the test for underflow in negative values.
 
-    EXPECT_ANY_THROW(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT8, 0, 0, /* non_integer = */ true, /* force_integer = */ false));
-    EXPECT_EQ(tatami_hdf5::choose_data_type(tatami_hdf5::WriteStorageType::INT8, 0, 0, /* non_integer = */ true, /* force_integer = */ true), tatami_hdf5::WriteStorageType::INT8);
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            tatami_hdf5::WriteStorageType::FLOAT,
+            0,
+            0,
+            /* has_decimal = */ true,
+            /* force_integer = */ false,
+            /* has_nonfinite = */ false
+        ),
+        tatami_hdf5::WriteStorageType::FLOAT
+    );
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            tatami_hdf5::WriteStorageType::FLOAT,
+            0,
+            0,
+            /* has_decimal = */ false,
+            /* force_integer = */ false,
+            /* has_nonfinite = */ true 
+        ),
+        tatami_hdf5::WriteStorageType::FLOAT
+    );
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            tatami_hdf5::WriteStorageType::DOUBLE,
+            0,
+            0,
+            /* has_decimal = */ true,
+            /* force_integer = */ true,
+            /* has_nonfinite = */ true 
+        ),
+        tatami_hdf5::WriteStorageType::DOUBLE
+    );
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            tatami_hdf5::WriteStorageType::INT8,
+            0,
+            0,
+            /* has_decimal = */ true,
+            /* force_integer = */ true,
+            /* has_nonfinite = */ false 
+        ),
+        tatami_hdf5::WriteStorageType::INT8
+    );
+    EXPECT_ANY_THROW(
+        tatami_hdf5::choose_data_type(
+            tatami_hdf5::WriteStorageType::INT8,
+            0,
+            0,
+            /* has_decimal = */ true,
+            /* force_integer = */  false,
+            /* has_nonfinite = */ false 
+        )
+    );
+    EXPECT_ANY_THROW(
+        tatami_hdf5::choose_data_type(
+            tatami_hdf5::WriteStorageType::INT8,
+            0,
+            0,
+            /* has_decimal = */ false,
+            /* force_integer = */ true,
+            /* has_nonfinite = */ true 
+        )
+    );
 }
 
 /*****************************************
@@ -619,6 +764,7 @@ TEST_F(WriteCompressedSparseMatrixIndexTypeTest, Choices) {
     EXPECT_EQ(tatami_hdf5::choose_index_type(tatami_hdf5::WriteStorageType::UINT64, 5000000000ull), tatami_hdf5::WriteStorageType::UINT64);
     // Don't know how to test for boundaries here, there isn't anything guaranteed to be bigger. 
 
+    EXPECT_ANY_THROW(tatami_hdf5::choose_index_type(tatami_hdf5::WriteStorageType::FLOAT, 10));
     EXPECT_ANY_THROW(tatami_hdf5::choose_index_type(tatami_hdf5::WriteStorageType::DOUBLE, 10));
 }
 
@@ -715,6 +861,7 @@ TEST_F(WriteCompressedSparseMatrixPtrTypeTest, Choices) {
     EXPECT_EQ(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::UINT64, 5000000000ull), tatami_hdf5::WriteStorageType::UINT64);
     // Don't know how to test for boundaries here, there isn't anything guaranteed to be bigger. 
 
+    EXPECT_ANY_THROW(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::FLOAT, 10));
     EXPECT_ANY_THROW(tatami_hdf5::choose_ptr_type(tatami_hdf5::WriteStorageType::DOUBLE, 10));
 }
 
@@ -738,6 +885,78 @@ TEST(WriteCompressedSparseMatrix, Defaults) {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
         tatami_hdf5::write_compressed_sparse_matrix(&mat, mhandle);
+    }
+
+    // Roundtripping.
+    auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<double, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
+    tatami_test::test_simple_row_access(*reloaded, mat);
+}
+
+TEST(WriteCompressedSparseMatrix, SinglePrecision) {
+    const size_t NR = 200, NC = 100;
+    auto triplets = tatami_test::simulate_compressed_sparse<float, int>(NC, NR, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
+    tatami::CompressedSparseColumnMatrix<float, int> mat(NR, NC, std::move(triplets.data), std::move(triplets.index), std::move(triplets.indptr));
+
+    // Dumping it with default parameters, just to check the overload.
+    auto fpath = temp_file_path("tatami-write-test.h5");
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
+        auto mhandle = fhandle.createGroup("matrix");
+        tatami_hdf5::write_compressed_sparse_matrix(&mat, mhandle);
+    }
+
+    // Checking the dumped contents.
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_RDONLY);
+        auto phandle = fhandle.openDataSet("matrix/data");
+        EXPECT_EQ(phandle.getDataType().getClass(), H5T_FLOAT);
+        H5::FloatType ptype(phandle);
+        EXPECT_EQ(ptype.getSize(), 4);
+    }
+
+    // Roundtripping.
+    auto reloaded = tatami_hdf5::load_compressed_sparse_matrix<float, int>(NR, NC, fpath, "matrix/data", "matrix/indices", "matrix/indptr", false);
+    tatami_test::test_simple_row_access(*reloaded, mat);
+}
+
+TEST(WriteCompressedSparseMatrix, NonFinite) {
+    const size_t NR = 200, NC = 100;
+    auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NC, NR, []{
+        tatami_test::SimulateCompressedSparseOptions opt;
+        opt.density = 0.05;
+        opt.lower = 0;
+        opt.upper = 100;
+        return opt;
+    }());
+
+    // Rounding so that it would ordinarily be detected as integer, but also adding an Inf.
+    for (auto& x : triplets.data) {
+        x = std::round(x);
+    }
+    ASSERT_FALSE(triplets.data.empty());
+    triplets.data.front() = std::numeric_limits<double>::infinity();
+
+    tatami::CompressedSparseColumnMatrix<double, int> mat(NR, NC, std::move(triplets.data), std::move(triplets.index), std::move(triplets.indptr));
+
+    auto fpath = temp_file_path("tatami-write-test.h5");
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
+        auto mhandle = fhandle.createGroup("matrix");
+        tatami_hdf5::write_compressed_sparse_matrix(&mat, mhandle);
+    }
+
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_RDONLY);
+        auto phandle = fhandle.openDataSet("matrix/data");
+        EXPECT_EQ(phandle.getDataType().getClass(), H5T_FLOAT);
+        H5::FloatType ptype(phandle);
+        EXPECT_EQ(ptype.getSize(), 8);
     }
 
     // Roundtripping.

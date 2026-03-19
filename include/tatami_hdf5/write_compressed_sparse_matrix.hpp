@@ -139,6 +139,9 @@ inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteS
         case WriteStorageType::UINT64:
             dtype = &(H5::PredType::NATIVE_UINT64);
             break;
+        case WriteStorageType::FLOAT:
+            dtype = &(H5::PredType::NATIVE_FLOAT);
+            break;
         case WriteStorageType::DOUBLE:
             dtype = &(H5::PredType::NATIVE_DOUBLE);
             break;
@@ -182,7 +185,14 @@ bool fits_lower_limit(Min_ min) {
 }
 
 template<typename Value_>
-WriteStorageType choose_data_type(const std::optional<WriteStorageType>& data_type, Value_ lower_data, Value_ upper_data, bool non_integer, bool force_integer) {
+WriteStorageType choose_data_type(
+    const std::optional<WriteStorageType>& data_type,
+    Value_ lower_data,
+    Value_ upper_data,
+    bool has_decimal,
+    bool force_integer,
+    bool has_nonfinite
+) {
     const bool is_lower_negative = [&](){
         if constexpr(std::is_integral<Value_>::value && std::is_unsigned<Value_>::value) {
             return false;
@@ -192,8 +202,12 @@ WriteStorageType choose_data_type(const std::optional<WriteStorageType>& data_ty
     }();
 
     if (!data_type.has_value()) {
-        if (non_integer && !force_integer) {
-            return WriteStorageType::DOUBLE;
+        if ((has_decimal && !force_integer) || has_nonfinite) {
+            if constexpr(std::is_same<Value_, float>::value) {
+                return WriteStorageType::FLOAT;
+            } else {
+                return WriteStorageType::DOUBLE;
+            }
         }
 
         if (is_lower_negative) {
@@ -223,9 +237,13 @@ WriteStorageType choose_data_type(const std::optional<WriteStorageType>& data_ty
     }
 
     const auto dtype = *data_type;
-    if (non_integer && !force_integer) {
-        if (dtype != WriteStorageType::DOUBLE) {
-            throw std::runtime_error("cannot store floating-point values as integers without 'force_integer = true'");
+    if ((has_decimal && !force_integer) || has_nonfinite) {
+        if (dtype != WriteStorageType::DOUBLE && dtype != WriteStorageType::FLOAT) {
+            if (has_nonfinite) {
+                throw std::runtime_error("cannot store non-finite floating-point values as integers");
+            } else {
+                throw std::runtime_error("cannot store floating-point values as integers without 'force_integer = true'");
+            }
         }
 
     } else {
@@ -271,7 +289,8 @@ WriteStorageType choose_index_type(const std::optional<WriteStorageType>& index_
         (itype == WriteStorageType::UINT32 && !fits_upper_limit<std::uint32_t>(upper_index)) ||
         (itype == WriteStorageType::INT64  && !fits_upper_limit<std::int64_t >(upper_index)) ||
         (itype == WriteStorageType::UINT64 && !fits_upper_limit<std::uint64_t>(upper_index)) ||
-        (itype == WriteStorageType::DOUBLE /* must be integer */                           )
+        (itype == WriteStorageType::DOUBLE /* must be integer */                           ) ||
+        (itype == WriteStorageType::FLOAT  /* must be integer */                           )
     ) {
         throw std::runtime_error("specified type cannot store the largest index");
     }
@@ -300,7 +319,8 @@ inline WriteStorageType choose_ptr_type(const std::optional<WriteStorageType>& p
         (ptype == WriteStorageType::UINT32 && !fits_upper_limit<std::uint32_t>(nnzero)) ||
         (ptype == WriteStorageType::INT64  && !fits_upper_limit<std::int64_t >(nnzero)) ||
         (ptype == WriteStorageType::UINT64 && !fits_upper_limit<std::uint64_t>(nnzero)) ||
-        (ptype == WriteStorageType::DOUBLE /* must be integer */                      )
+        (ptype == WriteStorageType::DOUBLE /* must be integer */                      ) ||
+        (ptype == WriteStorageType::FLOAT  /* must be integer */                      )
     ) {
         throw std::runtime_error("specified type cannot store the number of non-zero elements");
     }
@@ -314,12 +334,16 @@ struct WriteSparseHdf5Statistics {
     Value_ upper_data = 0;
     Index_ upper_index = 0;
     hsize_t non_zeros = 0;
-    bool non_integer = false;
+    bool has_decimal = false;
+    bool has_nonfinite = false;
 
     void add_value(Value_ val) {
         if constexpr(!std::is_integral<Value_>::value) {
-            if (std::trunc(val) != val || !std::isfinite(val)) {
-                non_integer = true;
+            if (std::trunc(val) != val) {
+                has_decimal = true;
+            }
+            if (!std::isfinite(val)) {
+                has_nonfinite = true;
             }
         }
 
@@ -449,7 +473,8 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
         output.upper_data = std::max(output.upper_data, current.upper_data);
         output.upper_index = std::max(output.upper_index, current.upper_index);
         output.non_zeros = sanisizer::sum<hsize_t>(output.non_zeros, current.non_zeros);
-        output.non_integer = output.non_integer || current.non_integer;
+        output.has_decimal = output.has_decimal || current.has_decimal;
+        output.has_nonfinite = output.has_nonfinite || current.has_nonfinite;
     }
 
     return output;
@@ -474,7 +499,7 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
 template<typename Value_, typename Index_>
 void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H5::Group& location, const WriteCompressedSparseMatrixOptions& params) {
     auto stats = write_sparse_hdf5_statistics(mat, params.num_threads);
-    const auto data_type = choose_data_type(params.data_type, stats.lower_data, stats.upper_data, stats.non_integer, params.force_integer);
+    const auto data_type = choose_data_type(params.data_type, stats.lower_data, stats.upper_data, stats.has_decimal, params.force_integer, stats.has_nonfinite);
     const auto index_type = choose_index_type(params.index_type, stats.upper_index);
 
     // Choosing the layout.
