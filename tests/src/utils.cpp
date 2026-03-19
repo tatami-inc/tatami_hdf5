@@ -24,6 +24,32 @@ TEST(Utils, IsLessThanOrEqual) {
     EXPECT_FALSE(tatami_hdf5::is_less_than_or_equal(static_cast<std::uint8_t>(10), 0));
 }
 
+TEST(Utils, RequiredBitsForFloat) {
+    for (int i = 0; i < 2; ++i) {
+        auto fun = [&](auto x) -> int {
+            if (i == 0) {
+                return tatami_hdf5::required_bits_for_float(x);
+            } else {
+                return tatami_hdf5::required_bits_for_float_safe(x);
+            }
+        };
+
+        EXPECT_EQ(fun(1.), 1);
+        EXPECT_EQ(fun(127.), 7);
+        EXPECT_EQ(fun(128.), 8);
+        EXPECT_EQ(fun(255.), 8);
+        EXPECT_EQ(fun(256.), 9);
+        EXPECT_EQ(fun(32767.), 15);
+        EXPECT_EQ(fun(32768.), 16);
+        EXPECT_EQ(fun(65535.), 16);
+        EXPECT_EQ(fun(65536.), 17);
+        EXPECT_EQ(fun(2147483647.), 31);
+        EXPECT_EQ(fun(2147483648.), 32);
+        EXPECT_EQ(fun(4294967295.), 32);
+        EXPECT_EQ(fun(4294967296.), 33);
+    }
+}
+
 TEST(Utils, FitsLimit) {
     EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::int8_t>(-1000));
     EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-10));
@@ -33,10 +59,33 @@ TEST(Utils, FitsLimit) {
     EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(10));
     EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(-10));
 
+    // Now the floats are where it gets interesting:
     EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-10.0));
     EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(10.0));
-    EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::int8_t>(-1000.0f));
-    EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::int8_t>(1000.0f));
+
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(1000.0)); // ignores values of the other sign.
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(-1000.0));
+
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(0.0)); // protects against zeros.
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(0.5)); // ... even with truncation.
+
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-1.)); // some special behavior at -1 for lower_limit.
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-1.8)); // ... again, with truncation.
+
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-128.1f));
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(127.8f));
+    EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::int8_t>(-129.f));
+    EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::int8_t>(128.f));
+
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::uint32_t>(0.f));
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::uint32_t>(4294967295.6));
+    EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::uint32_t>(-1.f)); // unsigned integers can't handle negative values.
+    EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::uint32_t>(4294967296.6));
+
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int32_t>(-2147483648.44));
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int32_t>(2147483647.88));
+    EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::int32_t>(-2147483649.1));
+    EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::int32_t>(2147483648.0));
 }
 
 template<typename Value_>

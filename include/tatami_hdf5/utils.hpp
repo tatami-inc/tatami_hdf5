@@ -10,6 +10,8 @@
 #include <string>
 #include <type_traits>
 #include <stdexcept>
+#include <cassert>
+#include <cmath>
 
 /**
  * @file utils.hpp
@@ -44,23 +46,70 @@ bool is_less_than_or_equal(Left_ l, Right_ r) {
     }
 }
 
+template<typename Float_>
+int required_bits_for_float_safe(Float_ y) {
+    int exp;
+    std::frexp(y, &exp); 
+    // frexp guarantees that 2^(exp - 1) <= y < 2^exp.
+    // So, we return exp - 1, as we want the lower bound.
+    return exp;
+}
+
+template<typename Float_>
+int required_bits_for_float(Float_ y) {
+    static_assert(std::is_floating_point<Float_>::value);
+    assert(y == std::trunc(y));
+    assert(y > 0);
+
+    if constexpr(std::numeric_limits<Float_>::radix == 2) {
+        // ilogb returns an 'exp' such that 2^exp <= y < 2^(exp + 1).
+        // Note that it doesn't work for zero but we can assume that y > 0 in all calls.
+        return std::ilogb(y) + 1;
+    } else {
+        // Ensure we're covered for weird float types where the radix is not 2.
+        // This is pretty unusual so we need to use a macro to force test coverage.
+        return required_bits_for_float_safe(y);
+    }
+}
+
 template<typename Native_, typename Max_>
 bool fits_upper_limit(Max_ max) {
-    constexpr auto native_max = std::numeric_limits<Native_>::max();
     if constexpr(std::is_integral<Max_>::value) { // Native_ is already integral, so no need to check that.
+        constexpr auto native_max = std::numeric_limits<Native_>::max();
         return is_less_than_or_equal(max, native_max);
     } else {
-        return max <= static_cast<double>(native_max);
+        // We don't compare values directly as the Native_-to-float conversion might not be exact;
+        // if native_max gets rounded up during the conversion, we might end up with a situation where 'native_max < max <= FLOAT(native_max)'. 
+        // This would result in undefined behavior when casting values equal to 'max' to Native_. 
+        //
+        // So instead, we compare the number of bits in Native_ with that required to store our (truncated) 'max'.
+        // We ignore negative or zero values of 'max' as required_bits_for_float() expects positive values.
+        // (Non-positive values would always be less than any 'native_max', so we can always return true in such cases.)
+        constexpr auto digits = std::numeric_limits<Native_>::digits;
+        max = std::trunc(max);
+        return (max <= 0 || required_bits_for_float(max) <= digits);
     }
 }
 
 template<typename Native_, typename Min_>
 bool fits_lower_limit(Min_ min) {
-    constexpr auto native_min = std::numeric_limits<Native_>::min();
     if constexpr(std::is_integral<Min_>::value) {
+        constexpr auto native_min = std::numeric_limits<Native_>::min();
         return is_less_than_or_equal(native_min, min);
     } else {
-        return min >= static_cast<double>(native_min);
+        // This function should never be called for an unsigned Native_ integer,
+        // but we'll just implement some protection for the sake of completeness.
+        if constexpr(std::is_unsigned<Native_>::value) {
+            if (min < 0) {
+                return false; 
+            }
+        }
+
+        // Pretty much the same logic as fits_upper_limit() but we reverse the sign.
+        // We add 1 before reversing to account for the sign bit, i.e., -128 becomes 127 for 7 bits.
+        constexpr auto digits = std::numeric_limits<Native_>::digits;
+        min = std::trunc(min);
+        return (min >= -1 || required_bits_for_float(-(min + 1)) <= digits); 
     }
 }
 
