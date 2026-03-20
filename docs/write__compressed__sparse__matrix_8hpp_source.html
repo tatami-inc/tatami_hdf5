@@ -410,7 +410,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00386" name="l00386"></a><span class="lineno">  386</span>    }</div>
 <div class="line"><a id="l00387" name="l00387"></a><span class="lineno">  387</span> </div>
 <div class="line"><a id="l00388" name="l00388"></a><span class="lineno">  388</span>    <span class="comment">// And then saving it. This time we have no choice but to iterate by the desired dimension.</span></div>
-<div class="line"><a id="l00389" name="l00389"></a><span class="lineno">  389</span>    <span class="keyword">auto</span> non_zeros = stats.non_zeros;</div>
+<div class="line"><a id="l00389" name="l00389"></a><span class="lineno">  389</span>    <span class="keyword">const</span> <span class="keyword">auto</span> non_zeros = stats.non_zeros;</div>
 <div class="line"><a id="l00390" name="l00390"></a><span class="lineno">  390</span>    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, data_name, non_zeros, params.<a class="code hl_variable" href="structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html#a3d8c006ce36fbe523e72fb84a1cde8f7">deflate_level</a>, params.<a class="code hl_variable" href="structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html#a633950d7b6a0d463f32169a9de30db17">chunk_size</a>);</div>
 <div class="line"><a id="l00391" name="l00391"></a><span class="lineno">  391</span>    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, index_name, non_zeros, params.<a class="code hl_variable" href="structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html#a3d8c006ce36fbe523e72fb84a1cde8f7">deflate_level</a>, params.<a class="code hl_variable" href="structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html#a633950d7b6a0d463f32169a9de30db17">chunk_size</a>);</div>
 <div class="line"><a id="l00392" name="l00392"></a><span class="lineno">  392</span>    hsize_t offset = 0;</div>
@@ -442,7 +442,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00418" name="l00418"></a><span class="lineno">  418</span>            <span class="keywordflow">for</span> (Index_ r = 0; r &lt; NR; ++r) {</div>
 <div class="line"><a id="l00419" name="l00419"></a><span class="lineno">  419</span>                <span class="keyword">auto</span> extracted = wrk-&gt;fetch(r, xbuffer.data(), ibuffer.data());</div>
 <div class="line"><a id="l00420" name="l00420"></a><span class="lineno">  420</span>                fill_datasets(extracted.value, extracted.index, extracted.number);</div>
-<div class="line"><a id="l00421" name="l00421"></a><span class="lineno">  421</span>                ptrs[r+1] = ptrs[r] + extracted.number;</div>
+<div class="line"><a id="l00421" name="l00421"></a><span class="lineno">  421</span>                ptrs[r + 1] = ptrs[r] + extracted.number; <span class="comment">// sum is safe as we already know that the number of non_zeros fits in a hsize_t.</span></div>
 <div class="line"><a id="l00422" name="l00422"></a><span class="lineno">  422</span>            }</div>
 <div class="line"><a id="l00423" name="l00423"></a><span class="lineno">  423</span> </div>
 <div class="line"><a id="l00424" name="l00424"></a><span class="lineno">  424</span>        } <span class="keywordflow">else</span> {</div>
@@ -454,7 +454,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00430" name="l00430"></a><span class="lineno">  430</span>            <span class="keywordflow">for</span> (Index_ c = 0; c &lt; NC; ++c) {</div>
 <div class="line"><a id="l00431" name="l00431"></a><span class="lineno">  431</span>                <span class="keyword">auto</span> extracted = wrk-&gt;fetch(c, xbuffer.data(), ibuffer.data());</div>
 <div class="line"><a id="l00432" name="l00432"></a><span class="lineno">  432</span>                fill_datasets(extracted.value, extracted.index, extracted.number);</div>
-<div class="line"><a id="l00433" name="l00433"></a><span class="lineno">  433</span>                ptrs[c+1] = ptrs[c] + extracted.number;</div>
+<div class="line"><a id="l00433" name="l00433"></a><span class="lineno">  433</span>                ptrs[c + 1] = ptrs[c] + extracted.number;</div>
 <div class="line"><a id="l00434" name="l00434"></a><span class="lineno">  434</span>            }</div>
 <div class="line"><a id="l00435" name="l00435"></a><span class="lineno">  435</span>        }</div>
 <div class="line"><a id="l00436" name="l00436"></a><span class="lineno">  436</span> </div>
@@ -483,7 +483,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00459" name="l00459"></a><span class="lineno">  459</span>            <span class="keywordflow">for</span> (Index_ r = 0; r &lt; NR; ++r) {</div>
 <div class="line"><a id="l00460" name="l00460"></a><span class="lineno">  460</span>                <span class="keyword">auto</span> extracted = wrk-&gt;fetch(r, dbuffer.data());</div>
 <div class="line"><a id="l00461" name="l00461"></a><span class="lineno">  461</span>                <span class="keyword">auto</span> count = fill_datasets_from_dense(extracted, NC);</div>
-<div class="line"><a id="l00462" name="l00462"></a><span class="lineno">  462</span>                ptrs[r+1] = ptrs[r] + count;</div>
+<div class="line"><a id="l00462" name="l00462"></a><span class="lineno">  462</span>                ptrs[r + 1] = ptrs[r] + count;</div>
 <div class="line"><a id="l00463" name="l00463"></a><span class="lineno">  463</span>            }</div>
 <div class="line"><a id="l00464" name="l00464"></a><span class="lineno">  464</span> </div>
 <div class="line"><a id="l00465" name="l00465"></a><span class="lineno">  465</span>        } <span class="keywordflow">else</span> {</div>
@@ -493,7 +493,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00469" name="l00469"></a><span class="lineno">  469</span>            <span class="keywordflow">for</span> (Index_ c = 0; c &lt; NC; ++c) {</div>
 <div class="line"><a id="l00470" name="l00470"></a><span class="lineno">  470</span>                <span class="keyword">auto</span> extracted = wrk-&gt;fetch(c, dbuffer.data());</div>
 <div class="line"><a id="l00471" name="l00471"></a><span class="lineno">  471</span>                <span class="keyword">auto</span> count = fill_datasets_from_dense(extracted, NR);</div>
-<div class="line"><a id="l00472" name="l00472"></a><span class="lineno">  472</span>                ptrs[c+1] = ptrs[c] + count;</div>
+<div class="line"><a id="l00472" name="l00472"></a><span class="lineno">  472</span>                ptrs[c + 1] = ptrs[c] + count;</div>
 <div class="line"><a id="l00473" name="l00473"></a><span class="lineno">  473</span>            }</div>
 <div class="line"><a id="l00474" name="l00474"></a><span class="lineno">  474</span>        }</div>
 <div class="line"><a id="l00475" name="l00475"></a><span class="lineno">  475</span>    }</div>
