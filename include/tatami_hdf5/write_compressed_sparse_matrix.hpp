@@ -386,7 +386,7 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
     }
 
     // And then saving it. This time we have no choice but to iterate by the desired dimension.
-    auto non_zeros = stats.non_zeros;
+    const auto non_zeros = stats.non_zeros;
     H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, data_name, non_zeros, params.deflate_level, params.chunk_size);
     H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, index_name, non_zeros, params.deflate_level, params.chunk_size);
     hsize_t offset = 0;
@@ -418,7 +418,7 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
             for (Index_ r = 0; r < NR; ++r) {
                 auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
                 fill_datasets(extracted.value, extracted.index, extracted.number);
-                ptrs[r+1] = ptrs[r] + extracted.number;
+                ptrs[r + 1] = ptrs[r] + extracted.number; // sum is safe as we already know that the number of non_zeros fits in a hsize_t.
             }
 
         } else {
@@ -430,7 +430,7 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
             for (Index_ c = 0; c < NC; ++c) {
                 auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
                 fill_datasets(extracted.value, extracted.index, extracted.number);
-                ptrs[c+1] = ptrs[c] + extracted.number;
+                ptrs[c + 1] = ptrs[c] + extracted.number;
             }
         }
 
@@ -459,7 +459,7 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
             for (Index_ r = 0; r < NR; ++r) {
                 auto extracted = wrk->fetch(r, dbuffer.data());
                 auto count = fill_datasets_from_dense(extracted, NC);
-                ptrs[r+1] = ptrs[r] + count;
+                ptrs[r + 1] = ptrs[r] + count;
             }
 
         } else {
@@ -469,7 +469,7 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
             for (Index_ c = 0; c < NC; ++c) {
                 auto extracted = wrk->fetch(c, dbuffer.data());
                 auto count = fill_datasets_from_dense(extracted, NR);
-                ptrs[c+1] = ptrs[c] + count;
+                ptrs[c + 1] = ptrs[c] + count;
             }
         }
     }
