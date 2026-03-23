@@ -124,6 +124,8 @@ Public Attributes</h2></td></tr>
 <tr class="separator:a3d8c006ce36fbe523e72fb84a1cde8f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a633950d7b6a0d463f32169a9de30db17" id="r_a633950d7b6a0d463f32169a9de30db17"><td class="memItemLeft" align="right" valign="top">hsize_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a633950d7b6a0d463f32169a9de30db17">chunk_size</a> = sanisizer::cap&lt;hsize_t&gt;(10000)</td></tr>
 <tr class="separator:a633950d7b6a0d463f32169a9de30db17"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a378f4a8837a59d8c9f8497d737aabc31" id="r_a378f4a8837a59d8c9f8497d737aabc31"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a378f4a8837a59d8c9f8497d737aabc31">two_pass</a> = false</td></tr>
+<tr class="separator:a378f4a8837a59d8c9f8497d737aabc31"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abf8c63e1057d98410b7cdc741ac4cc08" id="r_abf8c63e1057d98410b7cdc741ac4cc08"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#abf8c63e1057d98410b7cdc741ac4cc08">num_threads</a> = 1</td></tr>
 <tr class="separator:abf8c63e1057d98410b7cdc741ac4cc08"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
@@ -277,6 +279,21 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>Size of the chunks used for compression. </p>
+
+</div>
+</div>
+<a id="a378f4a8837a59d8c9f8497d737aabc31" name="a378f4a8837a59d8c9f8497d737aabc31"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a378f4a8837a59d8c9f8497d737aabc31">&#9670;&#160;</a></span>two_pass</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool tatami_hdf5::WriteCompressedSparseMatrixOptions::two_pass = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Whether to use a two-pass algorithm to first determine the number of non-zero elements before creating the dataset. If <code>false</code>, a one-pass algorithm with extensible HDF5 datasets is used. Ignored if either <code>data_type</code> or <code>index_type</code> is unset, in which case a two-pass algorithm is always used. </p>
 
 </div>
 </div>
