@@ -35,6 +35,9 @@ enum class WriteStorageType { INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, 
  */
 template<typename Left_, typename Right_>
 bool is_less_than_or_equal(Left_ l, Right_ r) {
+    static_assert(std::is_integral<Left_>::value);
+    static_assert(std::is_integral<Right_>::value);
+
     constexpr bool lsigned = std::is_signed<Left_>::value;
     constexpr bool rsigned = std::is_signed<Right_>::value;
     if constexpr(lsigned == rsigned) {
@@ -48,6 +51,10 @@ bool is_less_than_or_equal(Left_ l, Right_ r) {
 
 template<typename Float_>
 int required_bits_for_float_safe(Float_ y) {
+    static_assert(std::is_floating_point<Float_>::value);
+    assert(y == std::trunc(y));
+    assert(y > 0);
+
     int exp;
     std::frexp(y, &exp); 
     // frexp guarantees that 2^(exp - 1) <= y < 2^exp.
@@ -74,6 +81,8 @@ int required_bits_for_float(Float_ y) {
 
 template<typename Native_, typename Max_>
 bool fits_upper_limit(Max_ max) {
+    static_assert(std::is_integral<Native_>::value);
+
     if constexpr(std::is_integral<Max_>::value) { // Native_ is already integral, so no need to check that.
         constexpr auto native_max = std::numeric_limits<Native_>::max();
         return is_less_than_or_equal(max, native_max);
@@ -86,17 +95,21 @@ bool fits_upper_limit(Max_ max) {
         // We ignore negative or zero values of 'max' as required_bits_for_float() expects positive values.
         // (Non-positive values would always be less than any 'native_max', so we can always return true in such cases.)
         constexpr auto digits = std::numeric_limits<Native_>::digits;
-        max = std::trunc(max);
+        assert(max == std::trunc(max));
         return (max <= 0 || required_bits_for_float(max) <= digits);
     }
 }
 
 template<typename Native_, typename Min_>
 bool fits_lower_limit(Min_ min) {
+    static_assert(std::is_integral<Native_>::value);
+
     if constexpr(std::is_integral<Min_>::value) {
         constexpr auto native_min = std::numeric_limits<Native_>::min();
         return is_less_than_or_equal(native_min, min);
     } else {
+        assert(min == std::trunc(min));
+
         // This function should never be called for an unsigned Native_ integer,
         // but we'll just implement some protection for the sake of completeness.
         if constexpr(std::is_unsigned<Native_>::value) {
@@ -108,7 +121,6 @@ bool fits_lower_limit(Min_ min) {
         // Pretty much the same logic as fits_upper_limit() but we reverse the sign.
         // We add 1 before reversing to account for the sign bit, i.e., -128 becomes 127 for 7 bits.
         constexpr auto digits = std::numeric_limits<Native_>::digits;
-        min = std::trunc(min);
         return (min >= -1 || required_bits_for_float(-(min + 1)) <= digits); 
     }
 }
@@ -116,75 +128,67 @@ bool fits_lower_limit(Min_ min) {
 template<typename Value_>
 bool is_negative(Value_ val) {
     // Avoid compiler warnings about < 0 comparisons when Value_ is unsigned.
-    if constexpr(std::is_integral<Value_>::value && std::is_unsigned<Value_>::value) {
-        return false;
+    if constexpr(std::is_integral<Value_>::value) {
+        if constexpr(std::is_unsigned<Value_>::value) {
+            return false;
+        } else {
+            return val < 0;
+        }
     } else {
+        assert(val == std::trunc(val)); // floats should have been truncated at this point.
         return val < 0;
     }
 }
 
 template<typename Value_>
-void check_data_value_range_fit(
-    const WriteStorageType data_type,
-    Value_ lower_data,
-    Value_ upper_data,
-    bool has_nonfinite
-) {
-    if (has_nonfinite) {
-        if (data_type != WriteStorageType::DOUBLE && data_type != WriteStorageType::FLOAT) {
-            throw std::runtime_error("cannot store non-finite floating-point values as integers");
-        }
+void check_integer_range_fit(const WriteStorageType data_type, Value_ lower_data, Value_ upper_data) {
+    bool okay = false;
 
-    } else {
-        bool okay = false;
-        const bool is_lower_negative = is_negative(lower_data);
+    switch (data_type) {
+        case WriteStorageType::INT8:
+            okay = fits_lower_limit<std::int8_t >(lower_data) && fits_upper_limit<std::int8_t  >(upper_data);
+            break;
+        case WriteStorageType::UINT8:
+            okay = !is_negative(lower_data) && fits_upper_limit<std::uint8_t >(upper_data);
+            break;
+        case WriteStorageType::INT16:
+            okay = fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t >(upper_data);
+            break;
+        case WriteStorageType::UINT16:
+            okay = !is_negative(lower_data) && fits_upper_limit<std::uint16_t>(upper_data);
+            break;
+        case WriteStorageType::INT32:
+            okay = fits_lower_limit<std::int32_t>(lower_data) && fits_upper_limit<std::int32_t >(upper_data);
+            break;
+        case WriteStorageType::UINT32:
+            okay = !is_negative(lower_data) && fits_upper_limit<std::uint32_t>(upper_data);
+            break;
+        case WriteStorageType::INT64:
+            okay = fits_lower_limit<std::int64_t>(lower_data) && fits_upper_limit<std::int64_t >(upper_data);
+            break;
+        case WriteStorageType::UINT64:
+            okay = !is_negative(lower_data) && fits_upper_limit<std::uint64_t>(upper_data);
+            break;
+        default:
+            ;  // we should never get to this point as everything should already be truncated.
+    }
 
-        switch (data_type) {
-            case WriteStorageType::INT8:
-                okay = fits_lower_limit<std::int8_t >(lower_data) && fits_upper_limit<std::int8_t  >(upper_data);
-                break;
-            case WriteStorageType::UINT8:
-                okay = !is_lower_negative && fits_upper_limit<std::uint8_t >(upper_data);
-                break;
-            case WriteStorageType::INT16:
-                okay = fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t >(upper_data);
-                break;
-            case WriteStorageType::UINT16:
-                okay = !is_lower_negative && fits_upper_limit<std::uint16_t>(upper_data);
-                break;
-            case WriteStorageType::INT32:
-                okay = fits_lower_limit<std::int32_t>(lower_data) && fits_upper_limit<std::int32_t >(upper_data);
-                break;
-            case WriteStorageType::UINT32:
-                okay = !is_lower_negative && fits_upper_limit<std::uint32_t>(upper_data);
-                break;
-            case WriteStorageType::INT64:
-                okay = fits_lower_limit<std::int64_t>(lower_data) && fits_upper_limit<std::int64_t >(upper_data);
-                break;
-            case WriteStorageType::UINT64:
-                okay = !is_lower_negative && fits_upper_limit<std::uint64_t>(upper_data);
-                break;
-            case WriteStorageType::DOUBLE: // IEEE floats can store any number or NaN, so no need to check.
-            case WriteStorageType::FLOAT: 
-                okay = true;
-                break;
-        }
-
-        if (!okay) {
-            throw std::runtime_error("no integer type can store the matrix values");
-        }
+    if (!okay) {
+        throw std::runtime_error("no integer type can store the matrix values");
     }
 }
 
 template<typename Value_>
 void check_data_value_fit(const WriteStorageType data_type, Value_ val) {
-    bool has_nonfinite = false;
-    if constexpr(!std::is_integral<Value_>::value) {
-        if (!std::isfinite(val)) {
-            has_nonfinite = true;
+    if (data_type != WriteStorageType::DOUBLE && data_type != WriteStorageType::FLOAT) {
+        if constexpr(std::is_floating_point<Value_>::value) {
+            val = std::trunc(val);
+            if (!std::isfinite(val)) {
+                throw std::runtime_error("cannot store non-finite floating-point values as integers");
+            }
         }
+        check_integer_range_fit(data_type, val, val);
     }
-    check_data_value_range_fit(data_type, val, val, has_nonfinite);
 }
 
 template<typename Value_>
@@ -203,6 +207,11 @@ WriteStorageType choose_data_type(
             } else {
                 return WriteStorageType::DOUBLE;
             }
+        }
+
+        if constexpr(std::is_floating_point<Value_>::value) {
+            lower_data = std::trunc(lower_data);
+            upper_data = std::trunc(upper_data);
         }
 
         if (is_negative(lower_data)) {
@@ -232,7 +241,17 @@ WriteStorageType choose_data_type(
     }
 
     const auto dtype = *data_type;
-    check_data_value_range_fit(dtype, lower_data, upper_data, has_nonfinite);
+    if (data_type != WriteStorageType::DOUBLE && data_type != WriteStorageType::FLOAT) {
+        if constexpr(std::is_floating_point<Value_>::value) {
+            lower_data = std::trunc(lower_data);
+            upper_data = std::trunc(upper_data);
+            if (has_nonfinite) {
+                throw std::runtime_error("cannot store non-finite floating-point values as integers");
+            }
+        }
+        check_integer_range_fit(dtype, lower_data, upper_data);
+    }
+
     return dtype;
 }
 

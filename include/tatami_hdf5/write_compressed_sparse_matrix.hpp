@@ -122,6 +122,8 @@ inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteS
 
 template<typename Type_>
 bool does_non_negative_integer_fit(const WriteStorageType type, const Type_ x) {
+    static_assert(std::is_integral<Type_>::value);
+
     bool okay = false;
     switch (type) {
         case WriteStorageType::INT8:
@@ -157,6 +159,8 @@ bool does_non_negative_integer_fit(const WriteStorageType type, const Type_ x) {
 
 template<typename Index_>
 WriteStorageType choose_index_type(const std::optional<WriteStorageType>& index_type, Index_ upper_index) {
+    static_assert(std::is_integral<Index_>::value);
+
     if (!index_type.has_value()) {
         if (fits_upper_limit<std::uint8_t>(upper_index)) {
             return WriteStorageType::UINT8;
