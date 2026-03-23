@@ -87,6 +87,13 @@ struct WriteCompressedSparseMatrixOptions {
     hsize_t chunk_size = sanisizer::cap<hsize_t>(10000);
 
     /**
+     * Whether to use a two-pass algorithm to first determine the number of non-zero elements before creating the dataset.
+     * If `false`, a one-pass algorithm with extensible HDF5 datasets is used.
+     * Ignored if either `data_type` or `index_type` is unset, in which case a two-pass algorithm is always used.
+     */
+    bool two_pass = false;
+
+    /**
      * Number of threads to use for the first pass through the input matrix.
      * This is only used to determine the number of non-zero elements and check storage types.
      */
@@ -113,6 +120,41 @@ inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteS
     return location.createDataSet(name, *dtype, dspace, plist);
 }
 
+template<typename Type_>
+bool does_non_negative_integer_fit(const WriteStorageType type, const Type_ x) {
+    bool okay = false;
+    switch (type) {
+        case WriteStorageType::INT8:
+            okay = fits_upper_limit<std::int8_t>(x);
+            break;
+        case WriteStorageType::UINT8:
+            okay = fits_upper_limit<std::uint8_t>(x);
+            break;
+        case WriteStorageType::INT16:
+            okay = fits_upper_limit<std::int16_t >(x);
+            break;
+        case WriteStorageType::UINT16:
+            okay = fits_upper_limit<std::uint16_t>(x);
+            break;
+        case WriteStorageType::INT32:
+            okay = fits_upper_limit<std::int32_t >(x);
+            break;
+        case WriteStorageType::UINT32:
+            okay = fits_upper_limit<std::uint32_t>(x);
+            break;
+        case WriteStorageType::INT64:
+            okay = fits_upper_limit<std::int64_t >(x);
+            break;
+        case WriteStorageType::UINT64:
+            okay = fits_upper_limit<std::uint64_t>(x);
+            break;
+        default:
+            // okay remains false, as the x must be integer.
+            break;
+    }
+    return okay;
+}
+
 template<typename Index_>
 WriteStorageType choose_index_type(const std::optional<WriteStorageType>& index_type, Index_ upper_index) {
     if (!index_type.has_value()) {
@@ -129,18 +171,7 @@ WriteStorageType choose_index_type(const std::optional<WriteStorageType>& index_
     }
 
     const auto itype = *index_type;
-    if (
-        (itype == WriteStorageType::INT8   && !fits_upper_limit<std::int8_t  >(upper_index)) ||
-        (itype == WriteStorageType::UINT8  && !fits_upper_limit<std::uint8_t >(upper_index)) ||
-        (itype == WriteStorageType::INT16  && !fits_upper_limit<std::int16_t >(upper_index)) ||
-        (itype == WriteStorageType::UINT16 && !fits_upper_limit<std::uint16_t>(upper_index)) ||
-        (itype == WriteStorageType::INT32  && !fits_upper_limit<std::int32_t >(upper_index)) ||
-        (itype == WriteStorageType::UINT32 && !fits_upper_limit<std::uint32_t>(upper_index)) ||
-        (itype == WriteStorageType::INT64  && !fits_upper_limit<std::int64_t >(upper_index)) ||
-        (itype == WriteStorageType::UINT64 && !fits_upper_limit<std::uint64_t>(upper_index)) ||
-        (itype == WriteStorageType::DOUBLE /* must be integer */                           ) ||
-        (itype == WriteStorageType::FLOAT  /* must be integer */                           )
-    ) {
+    if (!does_non_negative_integer_fit(itype, upper_index)) {
         throw std::runtime_error("specified type cannot store the largest index");
     }
 
@@ -159,18 +190,7 @@ inline WriteStorageType choose_ptr_type(const std::optional<WriteStorageType>& p
     }
 
     const auto ptype = *ptr_type;
-    if (
-        (ptype == WriteStorageType::INT8   && !fits_upper_limit<std::int8_t  >(nnzero)) ||
-        (ptype == WriteStorageType::UINT8  && !fits_upper_limit<std::uint8_t >(nnzero)) ||
-        (ptype == WriteStorageType::INT16  && !fits_upper_limit<std::int16_t >(nnzero)) ||
-        (ptype == WriteStorageType::UINT16 && !fits_upper_limit<std::uint16_t>(nnzero)) ||
-        (ptype == WriteStorageType::INT32  && !fits_upper_limit<std::int32_t >(nnzero)) ||
-        (ptype == WriteStorageType::UINT32 && !fits_upper_limit<std::uint32_t>(nnzero)) ||
-        (ptype == WriteStorageType::INT64  && !fits_upper_limit<std::int64_t >(nnzero)) ||
-        (ptype == WriteStorageType::UINT64 && !fits_upper_limit<std::uint64_t>(nnzero)) ||
-        (ptype == WriteStorageType::DOUBLE /* must be integer */                      ) ||
-        (ptype == WriteStorageType::FLOAT  /* must be integer */                      )
-    ) {
+    if (!does_non_negative_integer_fit(ptype, nnzero)) {
         throw std::runtime_error("specified type cannot store the number of non-zero elements");
     }
 
@@ -328,6 +348,277 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
 
     return output;
 }
+
+template<typename Value_, typename Index_>
+void write_compressed_sparse_matrix_two_pass(
+    const tatami::Matrix<Value_, Index_>& mat,
+    H5::Group& location,
+    const WriteStorageLayout layout,
+    const std::string& data_name,
+    const std::string& index_name,
+    const std::string& ptr_name,
+    const WriteCompressedSparseMatrixOptions& params
+) {
+    auto stats = write_sparse_hdf5_statistics(mat, params.num_threads);
+    const auto data_type = choose_data_type(params.data_type, stats.lower_data, stats.upper_data, stats.has_decimal, params.force_integer, stats.has_nonfinite);
+    const auto index_type = choose_index_type(params.index_type, stats.upper_index);
+
+    // And then saving it. This time we have no choice but to iterate by the desired dimension.
+    const auto non_zeros = stats.non_zeros;
+    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, data_name, non_zeros, params.deflate_level, params.chunk_size);
+    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, index_name, non_zeros, params.deflate_level, params.chunk_size);
+    hsize_t offset = 0;
+    H5::DataSpace inspace(1, &non_zeros);
+    H5::DataSpace outspace(1, &non_zeros);
+    const auto& dstype = define_mem_type<Value_>();
+    const auto& ixtype = define_mem_type<Index_>();
+
+    const Index_ NR = mat.nrow(), NC = mat.ncol();
+    std::vector<hsize_t> ptrs;
+
+    auto fill_datasets = [&](const Value_* vptr, const Index_* iptr, hsize_t count) -> void {
+        if (count) {
+            inspace.setExtentSimple(1, &count);
+            outspace.selectHyperslab(H5S_SELECT_SET, &count, &offset);
+            data_ds.write(vptr, dstype, inspace, outspace);
+            index_ds.write(iptr, ixtype, inspace, outspace);
+            offset += count; // sum is safe as we already know that the number of non-zeros fits in a hsize_t.
+        }
+    };
+
+    if (mat.sparse()) {
+        if (layout == WriteStorageLayout::ROW) {
+            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NR, 1));
+            auto xbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NC);
+            auto ibuffer = tatami::create_container_of_Index_size<std::vector<Index_> >(NC);
+
+            auto wrk = tatami::consecutive_extractor<true>(mat, true, static_cast<Index_>(0), NR);
+            for (Index_ r = 0; r < NR; ++r) {
+                auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
+                fill_datasets(extracted.value, extracted.index, extracted.number);
+                ptrs[r + 1] = offset;
+            }
+
+        } else {
+            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NC, 1));
+            auto xbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NR);
+            auto ibuffer = tatami::create_container_of_Index_size<std::vector<Index_> >(NR);
+
+            auto wrk = tatami::consecutive_extractor<true>(mat, false, static_cast<Index_>(0), NC);
+            for (Index_ c = 0; c < NC; ++c) {
+                auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
+                fill_datasets(extracted.value, extracted.index, extracted.number);
+                ptrs[c + 1] = offset;
+            }
+        }
+
+    } else {
+        std::vector<Value_> sparse_xbuffer;
+        std::vector<Index_> sparse_ibuffer;
+        auto fill_datasets_from_dense = [&](const Value_* extracted, Index_ n) -> void {
+            sparse_xbuffer.clear();
+            sparse_ibuffer.clear();
+            for (Index_ i = 0; i < n; ++i) {
+                if (extracted[i]) {
+                    sparse_xbuffer.push_back(extracted[i]);
+                    sparse_ibuffer.push_back(i);
+                }
+            }
+
+            hsize_t count = sparse_xbuffer.size();
+            fill_datasets(sparse_xbuffer.data(), sparse_ibuffer.data(), count);
+        };
+
+        if (layout == WriteStorageLayout::ROW) {
+            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NR, 1));
+            auto dbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NC);
+            auto wrk = tatami::consecutive_extractor<false>(mat, true, static_cast<Index_>(0), NR);
+            for (Index_ r = 0; r < NR; ++r) {
+                auto extracted = wrk->fetch(r, dbuffer.data());
+                fill_datasets_from_dense(extracted, NC);
+                ptrs[r + 1] = offset;
+            }
+
+        } else {
+            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NC, 1));
+            auto dbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NR);
+            auto wrk = tatami::consecutive_extractor<false>(mat, false, static_cast<Index_>(0), NC);
+            for (Index_ c = 0; c < NC; ++c) {
+                auto extracted = wrk->fetch(c, dbuffer.data());
+                fill_datasets_from_dense(extracted, NR);
+                ptrs[c + 1] = offset;
+            }
+        }
+    }
+
+    // Saving the pointers.
+    auto ptr_len = sanisizer::cast<hsize_t>(ptrs.size());
+    H5::DataSet ptr_ds = create_1d_compressed_hdf5_dataset(
+        location,
+        choose_ptr_type(params.ptr_type, ptrs.back()),
+        ptr_name,
+        ptr_len,
+        params.deflate_level,
+        params.chunk_size
+    );
+    H5::DataSpace ptr_space(1, &ptr_len);
+    ptr_ds.write(ptrs.data(), H5::PredType::NATIVE_HSIZE, ptr_space);
+
+    return;
+}
+
+inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteStorageType type, const std::string& name, int deflate_level, hsize_t chunk) {
+    const hsize_t length = 0;
+    constexpr auto copy = H5S_UNLIMITED; // can't directly take an address to this, guess it's a macro.
+    H5::DataSpace dspace(1, &length, &copy);
+ 	H5::DSetCreatPropList plist;
+    plist.setDeflate(deflate_level); // extensible datasets must be chunked.
+    plist.setChunk(1, &chunk);
+    const auto dtype = choose_pred_type(type);
+    return location.createDataSet(name, *dtype, dspace, plist);
+}
+
+template<typename Value_, typename Index_>
+void write_compressed_sparse_matrix_one_pass(
+    const tatami::Matrix<Value_, Index_>& mat,
+    H5::Group& location,
+    const WriteStorageLayout layout,
+    const std::string& data_name,
+    const std::string& index_name,
+    const std::string& ptr_name,
+    const WriteCompressedSparseMatrixOptions& params
+){
+    const auto requested_dtype = *(params.data_type);
+    const auto requested_itype = *(params.index_type);
+    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, requested_dtype, data_name, params.deflate_level, params.chunk_size);
+    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, requested_itype, index_name, params.deflate_level, params.chunk_size);
+
+    hsize_t offset = 0;
+    H5::DataSpace outspace;
+    const auto& dstype = define_mem_type<Value_>();
+    const auto& ixtype = define_mem_type<Index_>();
+
+    const Index_ NR = mat.nrow(), NC = mat.ncol();
+    std::vector<hsize_t> ptrs;
+
+    auto fill_datasets = [&](const Value_* vptr, const Index_* iptr, hsize_t count, H5::DataSpace& inspace) -> void {
+        if (count) {
+            // We need to check this because we don't know that the number of non-zeros fits in a hsize_t.
+            const hsize_t new_size = sanisizer::sum<hsize_t>(offset, count);
+            data_ds.extend(&new_size);
+            index_ds.extend(&new_size);
+
+            constexpr hsize_t zero = 0;
+            inspace.selectHyperslab(H5S_SELECT_SET, &count, &zero);
+            outspace.setExtentSimple(1, &new_size);
+            outspace.selectHyperslab(H5S_SELECT_SET, &count, &offset);
+
+            data_ds.write(vptr, dstype, inspace, outspace);
+            index_ds.write(iptr, ixtype, inspace, outspace);
+            offset = new_size;
+        }
+    };
+
+    if (mat.sparse()) {
+        auto fill_datasets_from_sparse = [&](const Value_* vptr, const Index_* iptr, Index_ n, H5::DataSpace& inspace) -> void {
+            for (Index_ i = 0; i < n; ++i) {
+                check_data_value_fit(requested_dtype, vptr[i]);
+                does_non_negative_integer_fit(requested_itype, iptr[i]);
+            }
+            // We need to check this because we don't even know that the dimension extent fits in a hsize_t.
+            const auto count = sanisizer::cast<hsize_t>(n);
+            fill_datasets(vptr, iptr, count, inspace);
+        };
+
+        if (layout == WriteStorageLayout::ROW) {
+            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NR, 1));
+            auto xbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NC);
+            auto ibuffer = tatami::create_container_of_Index_size<std::vector<Index_> >(NC);
+            const hsize_t extent = NC;
+            H5::DataSpace inspace(1, &extent);
+
+            auto wrk = tatami::consecutive_extractor<true>(mat, true, static_cast<Index_>(0), NR);
+            for (Index_ r = 0; r < NR; ++r) {
+                auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
+                fill_datasets_from_sparse(extracted.value, extracted.index, extracted.number, inspace);
+                ptrs[r + 1] = offset;
+            }
+
+        } else {
+            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NC, 1));
+            auto xbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NR);
+            auto ibuffer = tatami::create_container_of_Index_size<std::vector<Index_> >(NR);
+            const hsize_t extent = NR;
+            H5::DataSpace inspace(1, &extent);
+
+            auto wrk = tatami::consecutive_extractor<true>(mat, false, static_cast<Index_>(0), NC);
+            for (Index_ c = 0; c < NC; ++c) {
+                auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
+                fill_datasets_from_sparse(extracted.value, extracted.index, extracted.number, inspace);
+                ptrs[c + 1] = offset;
+            }
+        }
+
+    } else {
+        std::vector<Value_> sparse_xbuffer;
+        std::vector<Index_> sparse_ibuffer;
+        auto fill_datasets_from_dense = [&](const Value_* extracted, Index_ n, H5::DataSpace& inspace) -> void {
+            sparse_xbuffer.clear();
+            sparse_ibuffer.clear();
+            for (Index_ i = 0; i < n; ++i) {
+                if (extracted[i]) {
+                    check_data_value_fit(requested_dtype, extracted[i]);
+                    sparse_xbuffer.push_back(extracted[i]);
+                    does_non_negative_integer_fit(requested_itype, i);
+                    sparse_ibuffer.push_back(i);
+                }
+            }
+
+            const auto count = sanisizer::cast<hsize_t>(sparse_xbuffer.size());
+            fill_datasets(sparse_xbuffer.data(), sparse_ibuffer.data(), count, inspace);
+        };
+
+        if (layout == WriteStorageLayout::ROW) {
+            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NR, 1));
+            auto dbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NC);
+            const hsize_t extent = NC;
+            H5::DataSpace inspace(1, &extent);
+
+            auto wrk = tatami::consecutive_extractor<false>(mat, true, static_cast<Index_>(0), NR);
+            for (Index_ r = 0; r < NR; ++r) {
+                auto extracted = wrk->fetch(r, dbuffer.data());
+                fill_datasets_from_dense(extracted, NC, inspace);
+                ptrs[r + 1] = offset;
+            }
+
+        } else {
+            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NC, 1));
+            auto dbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NR);
+            const hsize_t extent = NR;
+            H5::DataSpace inspace(1, &extent);
+
+            auto wrk = tatami::consecutive_extractor<false>(mat, false, static_cast<Index_>(0), NC);
+            for (Index_ c = 0; c < NC; ++c) {
+                auto extracted = wrk->fetch(c, dbuffer.data());
+                fill_datasets_from_dense(extracted, NR, inspace);
+                ptrs[c + 1] = offset;
+            }
+        }
+    }
+
+    // Saving the pointers.
+    auto ptr_len = sanisizer::cast<hsize_t>(ptrs.size());
+    H5::DataSet ptr_ds = create_1d_compressed_hdf5_dataset(
+        location,
+        choose_ptr_type(params.ptr_type, ptrs.back()),
+        ptr_name,
+        ptr_len,
+        params.deflate_level,
+        params.chunk_size
+    );
+    H5::DataSpace ptr_space(1, &ptr_len);
+    ptr_ds.write(ptrs.data(), H5::PredType::NATIVE_HSIZE, ptr_space);
+}
 /**
  * @endcond
  */
@@ -347,10 +638,6 @@ WriteSparseHdf5Statistics<Value_, Index_> write_sparse_hdf5_statistics(const tat
  */
 template<typename Value_, typename Index_>
 void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H5::Group& location, const WriteCompressedSparseMatrixOptions& params) {
-    auto stats = write_sparse_hdf5_statistics(mat, params.num_threads);
-    const auto data_type = choose_data_type(params.data_type, stats.lower_data, stats.upper_data, stats.has_decimal, params.force_integer, stats.has_nonfinite);
-    const auto index_type = choose_index_type(params.index_type, stats.upper_index);
-
     // Choosing the layout.
     WriteStorageLayout layout;
     if (params.columnar.has_value()) {
@@ -385,109 +672,12 @@ void write_compressed_sparse_matrix(const tatami::Matrix<Value_, Index_>& mat, H
         ptr_name = "indptr";
     }
 
-    // And then saving it. This time we have no choice but to iterate by the desired dimension.
-    const auto non_zeros = stats.non_zeros;
-    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, data_name, non_zeros, params.deflate_level, params.chunk_size);
-    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, index_name, non_zeros, params.deflate_level, params.chunk_size);
-    hsize_t offset = 0;
-    H5::DataSpace inspace(1, &non_zeros);
-    H5::DataSpace outspace(1, &non_zeros);
-    const auto& dstype = define_mem_type<Value_>();
-    const auto& ixtype = define_mem_type<Index_>();
-
-    Index_ NR = mat.nrow(), NC = mat.ncol();
-    std::vector<hsize_t> ptrs;
-
-    auto fill_datasets = [&](const Value_* vptr, const Index_* iptr, hsize_t count) -> void {
-        if (count) {
-            inspace.setExtentSimple(1, &count);
-            outspace.selectHyperslab(H5S_SELECT_SET, &count, &offset);
-            data_ds.write(vptr, dstype, inspace, outspace);
-            index_ds.write(iptr, ixtype, inspace, outspace);
-            offset += count;
-        }
-    };
-
-    if (mat.sparse()) {
-        if (layout == WriteStorageLayout::ROW) {
-            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NR, 1));
-            auto xbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NC);
-            auto ibuffer = tatami::create_container_of_Index_size<std::vector<Index_> >(NC);
-
-            auto wrk = tatami::consecutive_extractor<true>(mat, true, static_cast<Index_>(0), NR);
-            for (Index_ r = 0; r < NR; ++r) {
-                auto extracted = wrk->fetch(r, xbuffer.data(), ibuffer.data());
-                fill_datasets(extracted.value, extracted.index, extracted.number);
-                ptrs[r + 1] = ptrs[r] + extracted.number; // sum is safe as we already know that the number of non_zeros fits in a hsize_t.
-            }
-
-        } else {
-            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NC, 1));
-            auto xbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NR);
-            auto ibuffer = tatami::create_container_of_Index_size<std::vector<Index_> >(NR);
-
-            auto wrk = tatami::consecutive_extractor<true>(mat, false, static_cast<Index_>(0), NC);
-            for (Index_ c = 0; c < NC; ++c) {
-                auto extracted = wrk->fetch(c, xbuffer.data(), ibuffer.data());
-                fill_datasets(extracted.value, extracted.index, extracted.number);
-                ptrs[c + 1] = ptrs[c] + extracted.number;
-            }
-        }
-
+    // Only executing a one-pass strategy if the types are already known.
+    if (params.two_pass || !params.data_type.has_value() || !params.index_type.has_value()) {
+        write_compressed_sparse_matrix_two_pass(mat, location, layout, data_name, index_name, ptr_name, params);
     } else {
-        std::vector<Value_> sparse_xbuffer;
-        std::vector<Index_> sparse_ibuffer;
-        auto fill_datasets_from_dense = [&](const Value_* extracted, Index_ n) -> hsize_t {
-            sparse_xbuffer.clear();
-            sparse_ibuffer.clear();
-            for (Index_ i = 0; i < n; ++i) {
-                if (extracted[i]) {
-                    sparse_xbuffer.push_back(extracted[i]);
-                    sparse_ibuffer.push_back(i);
-                }
-            }
-
-            hsize_t count = sparse_xbuffer.size();
-            fill_datasets(sparse_xbuffer.data(), sparse_ibuffer.data(), count);
-            return count;
-        };
-
-        if (layout == WriteStorageLayout::ROW) {
-            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NR, 1));
-            auto dbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NC);
-            auto wrk = tatami::consecutive_extractor<false>(mat, true, static_cast<Index_>(0), NR);
-            for (Index_ r = 0; r < NR; ++r) {
-                auto extracted = wrk->fetch(r, dbuffer.data());
-                auto count = fill_datasets_from_dense(extracted, NC);
-                ptrs[r + 1] = ptrs[r] + count;
-            }
-
-        } else {
-            ptrs.resize(sanisizer::sum<decltype(ptrs.size())>(NC, 1));
-            auto dbuffer = tatami::create_container_of_Index_size<std::vector<Value_> >(NR);
-            auto wrk = tatami::consecutive_extractor<false>(mat, false, static_cast<Index_>(0), NC);
-            for (Index_ c = 0; c < NC; ++c) {
-                auto extracted = wrk->fetch(c, dbuffer.data());
-                auto count = fill_datasets_from_dense(extracted, NR);
-                ptrs[c + 1] = ptrs[c] + count;
-            }
-        }
+        write_compressed_sparse_matrix_one_pass(mat, location, layout, data_name, index_name, ptr_name, params);
     }
-
-    // Saving the pointers.
-    auto ptr_len = sanisizer::cast<hsize_t>(ptrs.size());
-    H5::DataSet ptr_ds = create_1d_compressed_hdf5_dataset(
-        location,
-        choose_ptr_type(params.ptr_type, ptrs.back()),
-        ptr_name,
-        ptr_len,
-        params.deflate_level,
-        params.chunk_size
-    );
-    H5::DataSpace ptr_space(1, &ptr_len);
-    ptr_ds.write(ptrs.data(), H5::PredType::NATIVE_HSIZE, ptr_space);
-
-    return;
 }
 
 /**

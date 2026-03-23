@@ -114,6 +114,80 @@ bool fits_lower_limit(Min_ min) {
 }
 
 template<typename Value_>
+bool is_negative(Value_ val) {
+    // Avoid compiler warnings about < 0 comparisons when Value_ is unsigned.
+    if constexpr(std::is_integral<Value_>::value && std::is_unsigned<Value_>::value) {
+        return false;
+    } else {
+        return val < 0;
+    }
+}
+
+template<typename Value_>
+void check_data_value_range_fit(
+    const WriteStorageType data_type,
+    Value_ lower_data,
+    Value_ upper_data,
+    bool has_nonfinite
+) {
+    if (has_nonfinite) {
+        if (data_type != WriteStorageType::DOUBLE && data_type != WriteStorageType::FLOAT) {
+            throw std::runtime_error("cannot store non-finite floating-point values as integers");
+        }
+
+    } else {
+        bool okay = false;
+        const bool is_lower_negative = is_negative(lower_data);
+
+        switch (data_type) {
+            case WriteStorageType::INT8:
+                okay = fits_lower_limit<std::int8_t >(lower_data) && fits_upper_limit<std::int8_t  >(upper_data);
+                break;
+            case WriteStorageType::UINT8:
+                okay = !is_lower_negative && fits_upper_limit<std::uint8_t >(upper_data);
+                break;
+            case WriteStorageType::INT16:
+                okay = fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t >(upper_data);
+                break;
+            case WriteStorageType::UINT16:
+                okay = !is_lower_negative && fits_upper_limit<std::uint16_t>(upper_data);
+                break;
+            case WriteStorageType::INT32:
+                okay = fits_lower_limit<std::int32_t>(lower_data) && fits_upper_limit<std::int32_t >(upper_data);
+                break;
+            case WriteStorageType::UINT32:
+                okay = !is_lower_negative && fits_upper_limit<std::uint32_t>(upper_data);
+                break;
+            case WriteStorageType::INT64:
+                okay = fits_lower_limit<std::int64_t>(lower_data) && fits_upper_limit<std::int64_t >(upper_data);
+                break;
+            case WriteStorageType::UINT64:
+                okay = !is_lower_negative && fits_upper_limit<std::uint64_t>(upper_data);
+                break;
+            case WriteStorageType::DOUBLE: // IEEE floats can store any number or NaN, so no need to check.
+            case WriteStorageType::FLOAT: 
+                okay = true;
+                break;
+        }
+
+        if (!okay) {
+            throw std::runtime_error("no integer type can store the matrix values");
+        }
+    }
+}
+
+template<typename Value_>
+void check_data_value_fit(const WriteStorageType data_type, Value_ val) {
+    bool has_nonfinite = false;
+    if constexpr(!std::is_integral<Value_>::value) {
+        if (!std::isfinite(val)) {
+            has_nonfinite = true;
+        }
+    }
+    check_data_value_range_fit(data_type, val, val, has_nonfinite);
+}
+
+template<typename Value_>
 WriteStorageType choose_data_type(
     const std::optional<WriteStorageType>& data_type,
     Value_ lower_data,
@@ -122,14 +196,6 @@ WriteStorageType choose_data_type(
     bool force_integer,
     bool has_nonfinite
 ) {
-    const bool is_lower_negative = [&](){
-        if constexpr(std::is_integral<Value_>::value && std::is_unsigned<Value_>::value) {
-            return false;
-        } else {
-            return lower_data < 0;
-        }
-    }();
-
     if (!data_type.has_value()) {
         if ((has_decimal && !force_integer) || has_nonfinite) {
             if constexpr(std::is_same<Value_, float>::value) {
@@ -139,7 +205,7 @@ WriteStorageType choose_data_type(
             }
         }
 
-        if (is_lower_negative) {
+        if (is_negative(lower_data)) {
             if (fits_lower_limit<std::int8_t>(lower_data) && fits_upper_limit<std::int8_t>(upper_data)) {
                 return WriteStorageType::INT8;
             } else if (fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t>(upper_data)) {
@@ -162,34 +228,11 @@ WriteStorageType choose_data_type(
             }
         }
 
-        throw std::runtime_error("no storage type can store the matrix values");
+        throw std::runtime_error("no type can store the matrix values");
     }
 
     const auto dtype = *data_type;
-    if ((has_decimal && !force_integer) || has_nonfinite) {
-        if (dtype != WriteStorageType::DOUBLE && dtype != WriteStorageType::FLOAT) {
-            if (has_nonfinite) {
-                throw std::runtime_error("cannot store non-finite floating-point values as integers");
-            } else {
-                throw std::runtime_error("cannot store floating-point values as integers without 'force_integer = true'");
-            }
-        }
-
-    } else {
-        if (
-            (dtype == WriteStorageType::INT8   && !(fits_lower_limit<std::int8_t >(lower_data) && fits_upper_limit<std::int8_t  >(upper_data))) ||
-            (dtype == WriteStorageType::UINT8  && !(!is_lower_negative                         && fits_upper_limit<std::uint8_t >(upper_data))) ||
-            (dtype == WriteStorageType::INT16  && !(fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t >(upper_data))) ||
-            (dtype == WriteStorageType::UINT16 && !(!is_lower_negative                         && fits_upper_limit<std::uint16_t>(upper_data))) ||
-            (dtype == WriteStorageType::INT32  && !(fits_lower_limit<std::int32_t>(lower_data) && fits_upper_limit<std::int32_t >(upper_data))) ||
-            (dtype == WriteStorageType::UINT32 && !(!is_lower_negative                         && fits_upper_limit<std::uint32_t>(upper_data))) ||
-            (dtype == WriteStorageType::INT64  && !(fits_lower_limit<std::int64_t>(lower_data) && fits_upper_limit<std::int64_t >(upper_data))) ||
-            (dtype == WriteStorageType::UINT64 && !(!is_lower_negative                         && fits_upper_limit<std::uint64_t>(upper_data)))
-        ) {
-            throw std::runtime_error("specified integer type cannot store all matrix values");
-        }
-    }
-
+    check_data_value_range_fit(dtype, lower_data, upper_data, has_nonfinite);
     return dtype;
 }
 

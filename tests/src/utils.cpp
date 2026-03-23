@@ -88,6 +88,15 @@ TEST(Utils, FitsLimit) {
     EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::int32_t>(2147483648.0));
 }
 
+TEST(Utils, IsNegative) {
+    EXPECT_FALSE(tatami_hdf5::is_negative(0));
+    EXPECT_TRUE(tatami_hdf5::is_negative(-1));
+    EXPECT_FALSE(tatami_hdf5::is_negative(0.));
+    EXPECT_TRUE(tatami_hdf5::is_negative(-1.));
+    EXPECT_FALSE(tatami_hdf5::is_negative(0u));
+    EXPECT_FALSE(tatami_hdf5::is_negative(1u));
+}
+
 template<typename Value_>
 static tatami_hdf5::WriteStorageType choose_integer_type(const std::optional<tatami_hdf5::WriteStorageType>& x, Value_ lower, Value_ upper) {
     return tatami_hdf5::choose_data_type(
@@ -100,7 +109,7 @@ static tatami_hdf5::WriteStorageType choose_integer_type(const std::optional<tat
     );
 }
 
-TEST(Utils, ChooseDataType) {
+TEST(ChooseDataType, Integer) {
     // Seeing if auto-inference works correctly.
     EXPECT_EQ(choose_integer_type({}, 0, 5), tatami_hdf5::WriteStorageType::UINT8);
     EXPECT_EQ(choose_integer_type({}, 0, 500), tatami_hdf5::WriteStorageType::UINT16);
@@ -195,8 +204,33 @@ TEST(Utils, ChooseDataType) {
     EXPECT_EQ(choose_integer_type(tatami_hdf5::WriteStorageType::UINT64, 0ll, 5000000000ll), tatami_hdf5::WriteStorageType::UINT64);
     EXPECT_ANY_THROW(choose_integer_type(tatami_hdf5::WriteStorageType::UINT64, -1, 0));
     // Not sure how to do the test for overflow in positive values.
+}
 
-    // Checking for correct handling of floating-point inputs.
+TEST(ChooseDataType, Float) {
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            {},
+            -std::numeric_limits<double>::infinity(),
+            std::numeric_limits<double>::infinity(),
+            /* has_decimal = */ false,
+            /* force_integer = */ false,
+            /* has_nonfinite = */ true 
+        ),
+        tatami_hdf5::WriteStorageType::DOUBLE
+    );
+
+    EXPECT_EQ(
+        tatami_hdf5::choose_data_type(
+            {},
+            -0.5f,
+            0.5f,
+            /* has_decimal = */ true,
+            /* force_integer = */ false,
+            /* has_nonfinite = */false 
+        ),
+        tatami_hdf5::WriteStorageType::FLOAT
+    );
+
     EXPECT_EQ(
         tatami_hdf5::choose_data_type(
             tatami_hdf5::WriteStorageType::FLOAT,
@@ -208,6 +242,7 @@ TEST(Utils, ChooseDataType) {
         ),
         tatami_hdf5::WriteStorageType::FLOAT
     );
+
     EXPECT_EQ(
         tatami_hdf5::choose_data_type(
             tatami_hdf5::WriteStorageType::FLOAT,
@@ -219,6 +254,7 @@ TEST(Utils, ChooseDataType) {
         ),
         tatami_hdf5::WriteStorageType::FLOAT
     );
+
     EXPECT_EQ(
         tatami_hdf5::choose_data_type(
             tatami_hdf5::WriteStorageType::DOUBLE,
@@ -230,16 +266,7 @@ TEST(Utils, ChooseDataType) {
         ),
         tatami_hdf5::WriteStorageType::DOUBLE
     );
-    EXPECT_ANY_THROW(
-        tatami_hdf5::choose_data_type(
-            tatami_hdf5::WriteStorageType::UINT8,
-            0,
-            0,
-            /* has_decimal = */ true,
-            /* force_integer = */ false,
-            /* has_nonfinite = */ false 
-        )
-    );
+
     EXPECT_ANY_THROW(
         tatami_hdf5::choose_data_type(
             tatami_hdf5::WriteStorageType::UINT8,
@@ -250,6 +277,7 @@ TEST(Utils, ChooseDataType) {
             /* has_nonfinite = */ true 
         )
     );
+
     EXPECT_EQ(
         tatami_hdf5::choose_data_type(
             tatami_hdf5::WriteStorageType::UINT8,
@@ -261,4 +289,14 @@ TEST(Utils, ChooseDataType) {
         ),
         tatami_hdf5::WriteStorageType::UINT8
     );
+}
+
+TEST(Utils, CheckDataValueFit) {
+    check_data_value_fit(tatami_hdf5::WriteStorageType::INT8, 10);
+    EXPECT_ANY_THROW(check_data_value_fit(tatami_hdf5::WriteStorageType::INT8, 1000));
+    check_data_value_fit(tatami_hdf5::WriteStorageType::INT32, 1000);
+
+    EXPECT_ANY_THROW(check_data_value_fit(tatami_hdf5::WriteStorageType::INT8, std::numeric_limits<double>::infinity()));
+    check_data_value_fit(tatami_hdf5::WriteStorageType::INT8, 1.5);
+    check_data_value_fit(tatami_hdf5::WriteStorageType::INT8, 127.999);
 }
