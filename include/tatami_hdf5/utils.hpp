@@ -109,34 +109,14 @@ bool fits_lower_limit(Min_ min) {
         return is_less_than_or_equal(native_min, min);
     } else {
         assert(min == std::trunc(min));
-
-        // This function should never be called for an unsigned Native_ integer,
-        // but we'll just implement some protection for the sake of completeness.
         if constexpr(std::is_unsigned<Native_>::value) {
-            if (min < 0) {
-                return false; 
-            }
-        }
-
-        // Pretty much the same logic as fits_upper_limit() but we reverse the sign.
-        // We add 1 before reversing to account for the sign bit, i.e., -128 becomes 127 for 7 bits.
-        constexpr auto digits = std::numeric_limits<Native_>::digits;
-        return (min >= -1 || required_bits_for_float(-(min + 1)) <= digits); 
-    }
-}
-
-template<typename Value_>
-bool is_negative(Value_ val) {
-    // Avoid compiler warnings about < 0 comparisons when Value_ is unsigned.
-    if constexpr(std::is_integral<Value_>::value) {
-        if constexpr(std::is_unsigned<Value_>::value) {
-            return false;
+            return min >= 0;
         } else {
-            return val < 0;
+            // Pretty much the same logic as fits_upper_limit() but we reverse the sign.
+            // We add 1 before reversing to account for the sign bit, i.e., -128 becomes 127 for 7 bits.
+            constexpr auto digits = std::numeric_limits<Native_>::digits;
+            return (min >= -1 || required_bits_for_float(-(min + 1)) <= digits); 
         }
-    } else {
-        assert(val == std::trunc(val)); // floats should have been truncated at this point.
-        return val < 0;
     }
 }
 
@@ -146,28 +126,28 @@ void check_integer_range_fit(const WriteStorageType data_type, Value_ lower_data
 
     switch (data_type) {
         case WriteStorageType::INT8:
-            okay = fits_lower_limit<std::int8_t >(lower_data) && fits_upper_limit<std::int8_t  >(upper_data);
+            okay = fits_lower_limit<std::int8_t  >(lower_data) && fits_upper_limit<std::int8_t  >(upper_data);
             break;
         case WriteStorageType::UINT8:
-            okay = !is_negative(lower_data) && fits_upper_limit<std::uint8_t >(upper_data);
+            okay = fits_lower_limit<std::uint8_t >(lower_data) && fits_upper_limit<std::uint8_t >(upper_data);
             break;
         case WriteStorageType::INT16:
-            okay = fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t >(upper_data);
+            okay = fits_lower_limit<std::int16_t >(lower_data) && fits_upper_limit<std::int16_t >(upper_data);
             break;
         case WriteStorageType::UINT16:
-            okay = !is_negative(lower_data) && fits_upper_limit<std::uint16_t>(upper_data);
+            okay = fits_lower_limit<std::uint16_t>(lower_data) && fits_upper_limit<std::uint16_t>(upper_data);
             break;
         case WriteStorageType::INT32:
-            okay = fits_lower_limit<std::int32_t>(lower_data) && fits_upper_limit<std::int32_t >(upper_data);
+            okay = fits_lower_limit<std::int32_t >(lower_data) && fits_upper_limit<std::int32_t >(upper_data);
             break;
         case WriteStorageType::UINT32:
-            okay = !is_negative(lower_data) && fits_upper_limit<std::uint32_t>(upper_data);
+            okay = fits_lower_limit<std::uint32_t>(lower_data) && fits_upper_limit<std::uint32_t>(upper_data);
             break;
         case WriteStorageType::INT64:
-            okay = fits_lower_limit<std::int64_t>(lower_data) && fits_upper_limit<std::int64_t >(upper_data);
+            okay = fits_lower_limit<std::int64_t >(lower_data) && fits_upper_limit<std::int64_t >(upper_data);
             break;
         case WriteStorageType::UINT64:
-            okay = !is_negative(lower_data) && fits_upper_limit<std::uint64_t>(upper_data);
+            okay = fits_lower_limit<std::uint64_t>(lower_data) && fits_upper_limit<std::uint64_t>(upper_data);
             break;
         default:
             ;  // we should never get to this point as everything should already be truncated.
@@ -214,7 +194,7 @@ WriteStorageType choose_data_type(
             upper_data = std::trunc(upper_data);
         }
 
-        if (is_negative(lower_data)) {
+        if (lower_data < 0) {
             if (fits_lower_limit<std::int8_t>(lower_data) && fits_upper_limit<std::int8_t>(upper_data)) {
                 return WriteStorageType::INT8;
             } else if (fits_lower_limit<std::int16_t>(lower_data) && fits_upper_limit<std::int16_t>(upper_data)) {

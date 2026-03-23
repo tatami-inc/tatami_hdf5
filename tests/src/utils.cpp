@@ -59,19 +59,30 @@ TEST(Utils, FitsLimit) {
     EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(10));
     EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(-10));
 
+    EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::uint8_t>(-10));
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::uint8_t>(100));
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::uint8_t>(0));
+
+    EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::uint8_t>(1000));
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::uint8_t>(10));
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::uint8_t>(-10));
+
     // Now the floats are where it gets interesting.
     // Note that these functions assume that all inputs are already truncated.
     EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-10.0));
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-1.)); // some special behavior at -1 for lower_limit.
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(0.));
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(1000.0)); // ignores values of the other sign.
+
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(-1000.0)); // ignores values of the other sign.
+    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(0.0)); // protects against zeros.
     EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(10.0));
 
-    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(1000.0)); // ignores values of the other sign.
-    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(-1000.0));
+    EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::uint8_t>(-1.)); // handles unsigned types.
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::uint8_t>(0.));
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::uint8_t>(1.));
 
-    EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(0.0)); // protects against zeros.
-
-    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-1.)); // some special behavior at -1 for lower_limit.
-
-    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-128.f));
+    EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-128.f)); // more tests at the boundary, using floats for some variety.
     EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int8_t>(127.f));
     EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::int8_t>(-129.f));
     EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::int8_t>(128.f));
@@ -85,15 +96,6 @@ TEST(Utils, FitsLimit) {
     EXPECT_TRUE(tatami_hdf5::fits_upper_limit<std::int32_t>(2147483647.));
     EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::int32_t>(-2147483649.));
     EXPECT_FALSE(tatami_hdf5::fits_upper_limit<std::int32_t>(2147483648.));
-}
-
-TEST(Utils, IsNegative) {
-    EXPECT_FALSE(tatami_hdf5::is_negative(0));
-    EXPECT_TRUE(tatami_hdf5::is_negative(-1));
-    EXPECT_FALSE(tatami_hdf5::is_negative(0.));
-    EXPECT_TRUE(tatami_hdf5::is_negative(-1.));
-    EXPECT_FALSE(tatami_hdf5::is_negative(0u));
-    EXPECT_FALSE(tatami_hdf5::is_negative(1u));
 }
 
 template<typename Value_>
@@ -114,6 +116,11 @@ TEST(ChooseDataType, IntegerToInteger) {
     EXPECT_EQ(choose_integer_type({}, 0, 500), tatami_hdf5::WriteStorageType::UINT16);
     EXPECT_EQ(choose_integer_type({}, 0, 500000), tatami_hdf5::WriteStorageType::UINT32);
     EXPECT_EQ(choose_integer_type({}, 0ll, 5000000000ll), tatami_hdf5::WriteStorageType::UINT64);
+
+    EXPECT_EQ(choose_integer_type({}, 0u, 100u), tatami_hdf5::WriteStorageType::UINT8);
+    EXPECT_EQ(choose_integer_type({}, 0u, 1000u), tatami_hdf5::WriteStorageType::UINT16);
+    EXPECT_EQ(choose_integer_type({}, 0u, 100000u), tatami_hdf5::WriteStorageType::UINT32);
+    EXPECT_EQ(choose_integer_type({}, 0ull, 100000000000ull), tatami_hdf5::WriteStorageType::UINT64);
 
     EXPECT_EQ(choose_integer_type({}, -5, 0), tatami_hdf5::WriteStorageType::INT8);
     EXPECT_EQ(choose_integer_type({}, -500, 0), tatami_hdf5::WriteStorageType::INT16);
