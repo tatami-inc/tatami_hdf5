@@ -24,32 +24,6 @@ TEST(Utils, IsLessThanOrEqual) {
     EXPECT_FALSE(tatami_hdf5::is_less_than_or_equal(static_cast<std::uint8_t>(10), 0));
 }
 
-TEST(Utils, RequiredBitsForFloat) {
-    for (int i = 0; i < 2; ++i) {
-        auto fun = [&](auto x) -> int {
-            if (i == 0) {
-                return tatami_hdf5::required_bits_for_float(x);
-            } else {
-                return tatami_hdf5::required_bits_for_float_safe(x);
-            }
-        };
-
-        EXPECT_EQ(fun(1.), 1);
-        EXPECT_EQ(fun(127.), 7);
-        EXPECT_EQ(fun(128.), 8);
-        EXPECT_EQ(fun(255.), 8);
-        EXPECT_EQ(fun(256.), 9);
-        EXPECT_EQ(fun(32767.), 15);
-        EXPECT_EQ(fun(32768.), 16);
-        EXPECT_EQ(fun(65535.), 16);
-        EXPECT_EQ(fun(65536.), 17);
-        EXPECT_EQ(fun(2147483647.), 31);
-        EXPECT_EQ(fun(2147483648.), 32);
-        EXPECT_EQ(fun(4294967295.), 32);
-        EXPECT_EQ(fun(4294967296.), 33);
-    }
-}
-
 TEST(Utils, FitsLimit) {
     EXPECT_FALSE(tatami_hdf5::fits_lower_limit<std::int8_t>(-1000));
     EXPECT_TRUE(tatami_hdf5::fits_lower_limit<std::int8_t>(-10));

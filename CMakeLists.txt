@@ -16,7 +16,7 @@ if(TATAMI_HDF5_FETCH_EXTERN)
 else()
     find_package(tatami_tatami_chunked 2.1.0 CONFIG REQUIRED)
     find_package(ltla_subpar 0.5.0 CONFIG REQUIRED)
-    find_package(ltla_sanisizer 0.2.0 CONFIG REQUIRED)
+    find_package(ltla_sanisizer 0.2.2 CONFIG REQUIRED)
 endif()
 
 target_link_libraries(tatami_hdf5 INTERFACE tatami::tatami_chunked ltla::subpar ltla::sanisizer)

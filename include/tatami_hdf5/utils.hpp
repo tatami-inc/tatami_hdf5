@@ -49,36 +49,6 @@ bool is_less_than_or_equal(Left_ l, Right_ r) {
     }
 }
 
-template<typename Float_>
-int required_bits_for_float_safe(Float_ y) {
-    static_assert(std::is_floating_point<Float_>::value);
-    assert(y == std::trunc(y));
-    assert(y > 0);
-
-    int exp;
-    std::frexp(y, &exp); 
-    // frexp guarantees that 2^(exp - 1) <= y < 2^exp.
-    // So, we return exp - 1, as we want the lower bound.
-    return exp;
-}
-
-template<typename Float_>
-int required_bits_for_float(Float_ y) {
-    static_assert(std::is_floating_point<Float_>::value);
-    assert(y == std::trunc(y));
-    assert(y > 0);
-
-    if constexpr(std::numeric_limits<Float_>::radix == 2) {
-        // ilogb returns an 'exp' such that 2^exp <= y < 2^(exp + 1).
-        // Note that it doesn't work for zero but we can assume that y > 0 in all calls.
-        return std::ilogb(y) + 1;
-    } else {
-        // Ensure we're covered for weird float types where the radix is not 2.
-        // This is pretty unusual so we need to use a macro to force test coverage.
-        return required_bits_for_float_safe(y);
-    }
-}
-
 template<typename Native_, typename Max_>
 bool fits_upper_limit(Max_ max) {
     static_assert(std::is_integral<Native_>::value);
@@ -96,7 +66,7 @@ bool fits_upper_limit(Max_ max) {
         // (Non-positive values would always be less than any 'native_max', so we can always return true in such cases.)
         constexpr auto digits = std::numeric_limits<Native_>::digits;
         assert(max == std::trunc(max));
-        return (max <= 0 || required_bits_for_float(max) <= digits);
+        return (max <= 0 || sanisizer::required_bits_for_float(max) <= digits);
     }
 }
 
@@ -115,7 +85,7 @@ bool fits_lower_limit(Min_ min) {
             // Pretty much the same logic as fits_upper_limit() but we reverse the sign.
             // We add 1 before reversing to account for the sign bit, i.e., -128 becomes 127 for 7 bits.
             constexpr auto digits = std::numeric_limits<Native_>::digits;
-            return (min >= -1 || required_bits_for_float(-(min + 1)) <= digits); 
+            return (min >= -1 || sanisizer::required_bits_for_float(-(min + 1)) <= digits); 
         }
     }
 }
