@@ -1125,11 +1125,12 @@ TEST(WriteCompressedSparseMatrix, TooLargeIndexOnePass) {
     auto triplets = tatami_test::simulate_compressed_sparse<double, int>(NC, NR, []{
         tatami_test::SimulateCompressedSparseOptions opt;
         opt.density = 0.05;
-        opt.lower = 0;
+        opt.lower = 1;
         opt.upper = 100;
         return opt;
     }());
 
+    // Injecting a very large index that exceeds a unsigned 8-bit integer.
     ASSERT_FALSE(triplets.index.empty());
     triplets.index.back() = NR - 1;
 
@@ -1158,14 +1159,18 @@ TEST(WriteCompressedSparseMatrix, TooLargeIndexOnePass) {
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::write_compressed_sparse_matrix(mat, mhandle, opt);
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::write_compressed_sparse_matrix(mat, mhandle, opt);
+        }, "cannot store the largest index");
     }
 
     // Dense fails.
-    auto dmat = tatami::convert_to_dense<double, int>(mat, true, {});
+    auto dmat = tatami::convert_to_dense<double, int>(mat, false, {});
     {
         H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
         auto mhandle = fhandle.createGroup("matrix");
-        tatami_hdf5::write_compressed_sparse_matrix(*dmat, mhandle, opt);
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::write_compressed_sparse_matrix(*dmat, mhandle, opt);
+        }, "cannot store the largest index");
     }
 }

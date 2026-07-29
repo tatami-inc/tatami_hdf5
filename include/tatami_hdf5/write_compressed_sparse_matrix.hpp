@@ -549,7 +549,9 @@ void write_compressed_sparse_matrix_one_pass(
         auto fill_datasets_from_sparse = [&](const Value_* vptr, const Index_* iptr, Index_ n, H5::DataSpace& inspace) -> void {
             for (Index_ i = 0; i < n; ++i) {
                 check_data_value_fit(requested_dtype, vptr[i]);
-                does_non_negative_integer_fit(requested_itype, iptr[i]);
+                if (!does_non_negative_integer_fit(requested_itype, iptr[i])) {
+                    throw std::runtime_error("specified type cannot store the largest index");
+                }
             }
             // We need to check this because we don't even know that the dimension extent fits in a hsize_t.
             const auto count = sanisizer::cast<hsize_t>(n);
@@ -595,7 +597,9 @@ void write_compressed_sparse_matrix_one_pass(
                 if (extracted[i]) {
                     check_data_value_fit(requested_dtype, extracted[i]);
                     sparse_xbuffer.push_back(extracted[i]);
-                    does_non_negative_integer_fit(requested_itype, i);
+                    if (!does_non_negative_integer_fit(requested_itype, i)) {
+                        throw std::runtime_error("specified type cannot store the largest index");
+                    }
                     sparse_ibuffer.push_back(i);
                 }
             }
