@@ -96,11 +96,18 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, TwoPass) {
 
     // Standard write/read roundtrip test.
     auto fpath = temp_file_path("tatami-write-test.h5");
-    {
+    for (int scenario = 0; scenario < 3; ++scenario) {
+        auto curparam = param_core;
+        if (scenario == 1) {
+            curparam.deflate_level = 0;
+        } else if (scenario == 2) {
+            curparam.shuffle = false;
+        }
+
         {
             H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
             auto mhandle = fhandle.createGroup("matrix");
-            tatami_hdf5::write_compressed_sparse_matrix(*mat, mhandle, param_core);
+            tatami_hdf5::write_compressed_sparse_matrix(*mat, mhandle, curparam);
 
             auto dhandle = fhandle.openDataSet("matrix/data");
             EXPECT_EQ(dhandle.getDataType().getClass(), H5T_FLOAT);
@@ -182,12 +189,18 @@ TEST_P(WriteCompressedSparseMatrixBasicTest, OnePass) {
     const bool is_row = is_row_output(layout, *mat, param_core.columnar);
 
     // Standard write/read roundtrip test.
+    // Can't test with compression disabled, as extensible datasets require compression.
     auto fpath = temp_file_path("tatami-write-test.h5");
-    {
+    for (int scenario = 0; scenario < 2; ++scenario) {
+        auto curparam = param_core;
+        if (scenario == 1) {
+            curparam.shuffle = false;
+        }
+
         {
             H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
             auto mhandle = fhandle.createGroup("matrix");
-            tatami_hdf5::write_compressed_sparse_matrix(*mat, mhandle, param_core);
+            tatami_hdf5::write_compressed_sparse_matrix(*mat, mhandle, curparam);
 
             auto dhandle = fhandle.openDataSet("matrix/data");
             EXPECT_EQ(dhandle.getDataType().getClass(), H5T_FLOAT);
@@ -1000,6 +1013,24 @@ TEST(WriteCompressedSparseMatrix, SinglePrecision) {
 
 /*****************************************
  *****************************************/
+
+TEST(WriteCompressedSparseMatrix, UncompressedOnePass) {
+    tatami::CompressedSparseColumnMatrix<double, int> mat(0, 0, std::vector<double>(), std::vector<int>(), std::vector<std::size_t>(1));
+
+    tatami_hdf5::WriteCompressedSparseMatrixOptions opt;
+    opt.data_type = tatami_hdf5::WriteStorageType::INT32;
+    opt.index_type = tatami_hdf5::WriteStorageType::UINT8;
+    opt.deflate_level = 0;
+
+    auto fpath = temp_file_path("tatami-write-test.h5");
+    {
+        H5::H5File fhandle(fpath, H5F_ACC_TRUNC);
+        auto mhandle = fhandle.createGroup("matrix");
+        tatami_test::throws_error([&]() -> void {
+            tatami_hdf5::write_compressed_sparse_matrix(mat, mhandle, opt);
+        }, "must be positive");
+    }
+}
 
 TEST(WriteCompressedSparseMatrix, NonFiniteTwoPass) {
     const size_t NR = 200, NC = 100;

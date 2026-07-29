@@ -83,8 +83,16 @@ struct WriteCompressedSparseMatrixOptions {
 
     /**
      * Size of the chunks used for compression.
+     * Only used if `deflate_level > 0`.
      */
     hsize_t chunk_size = sanisizer::cap<hsize_t>(10000);
+
+    /**
+     * Whether to enable HDF5's shuffle filter, which reorders the bytes for better compression.
+     * Check out HDF5's documentation for `H5Pset_shuffle()` for more details.
+     * Only used if `deflate_level > 0`.
+     */
+    bool shuffle = true;
 
     /**
      * Whether to use a two-pass algorithm to first determine the number of non-zero elements before creating the dataset.
@@ -103,7 +111,7 @@ struct WriteCompressedSparseMatrixOptions {
 /**
  * @cond
  */
-inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteStorageType type, const std::string& name, hsize_t length, int deflate_level, hsize_t chunk) {
+inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteStorageType type, const std::string& name, hsize_t length, int deflate_level, hsize_t chunk, bool shuffle) {
     H5::DataSpace dspace(1, &length);
  	H5::DSetCreatPropList plist;
 
@@ -113,6 +121,9 @@ inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteS
             plist.setChunk(1, &length);
         } else {
             plist.setChunk(1, &chunk);
+        }
+        if (shuffle) {
+            plist.setShuffle();
         }
     }
 
@@ -369,8 +380,8 @@ void write_compressed_sparse_matrix_two_pass(
 
     // And then saving it. This time we have no choice but to iterate by the desired dimension.
     const auto non_zeros = stats.non_zeros;
-    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, data_name, non_zeros, params.deflate_level, params.chunk_size);
-    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, index_name, non_zeros, params.deflate_level, params.chunk_size);
+    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, data_type, data_name, non_zeros, params.deflate_level, params.chunk_size, params.shuffle);
+    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, index_type, index_name, non_zeros, params.deflate_level, params.chunk_size, params.shuffle);
     hsize_t offset = 0;
     H5::DataSpace inspace(1, &non_zeros);
     H5::DataSpace outspace(1, &non_zeros);
@@ -463,7 +474,8 @@ void write_compressed_sparse_matrix_two_pass(
         ptr_name,
         ptr_len,
         params.deflate_level,
-        params.chunk_size
+        params.chunk_size,
+        params.shuffle
     );
     H5::DataSpace ptr_space(1, &ptr_len);
     ptr_ds.write(ptrs.data(), H5::PredType::NATIVE_HSIZE, ptr_space);
@@ -471,13 +483,23 @@ void write_compressed_sparse_matrix_two_pass(
     return;
 }
 
-inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteStorageType type, const std::string& name, int deflate_level, hsize_t chunk) {
+inline H5::DataSet create_1d_compressed_hdf5_dataset(H5::Group& location, WriteStorageType type, const std::string& name, int deflate_level, hsize_t chunk, bool shuffle) {
     const hsize_t length = 0;
     constexpr auto copy = H5S_UNLIMITED; // can't directly take an address to this, guess it's a macro.
     H5::DataSpace dspace(1, &length, &copy);
  	H5::DSetCreatPropList plist;
-    plist.setDeflate(deflate_level); // extensible datasets must be chunked.
+
+    // Extensible datasets must be chunked.
+    if (deflate_level == 0) {
+        throw std::runtime_error("'deflate_level' must be positive if 'two_pass = false'");
+    }
+
+    plist.setDeflate(deflate_level); 
     plist.setChunk(1, &chunk);
+    if (shuffle) {
+        plist.setShuffle();
+    }
+
     const auto dtype = choose_pred_type(type);
     return location.createDataSet(name, *dtype, dspace, plist);
 }
@@ -494,8 +516,8 @@ void write_compressed_sparse_matrix_one_pass(
 ){
     const auto requested_dtype = *(params.data_type);
     const auto requested_itype = *(params.index_type);
-    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, requested_dtype, data_name, params.deflate_level, params.chunk_size);
-    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, requested_itype, index_name, params.deflate_level, params.chunk_size);
+    H5::DataSet data_ds = create_1d_compressed_hdf5_dataset(location, requested_dtype, data_name, params.deflate_level, params.chunk_size, params.shuffle);
+    H5::DataSet index_ds = create_1d_compressed_hdf5_dataset(location, requested_itype, index_name, params.deflate_level, params.chunk_size, params.shuffle);
 
     hsize_t offset = 0;
     H5::DataSpace outspace;
@@ -618,7 +640,8 @@ void write_compressed_sparse_matrix_one_pass(
         ptr_name,
         ptr_len,
         params.deflate_level,
-        params.chunk_size
+        params.chunk_size,
+        params.shuffle
     );
     H5::DataSpace ptr_space(1, &ptr_len);
     ptr_ds.write(ptrs.data(), H5::PredType::NATIVE_HSIZE, ptr_space);
