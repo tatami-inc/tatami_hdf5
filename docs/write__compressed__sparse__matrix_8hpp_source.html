@@ -578,7 +578,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00549" name="l00549"></a><span class="lineno">  549</span>        <span class="keyword">auto</span> fill_datasets_from_sparse = [&amp;](<span class="keyword">const</span> Value_* vptr, <span class="keyword">const</span> Index_* iptr, Index_ n, H5::DataSpace&amp; inspace) -&gt; <span class="keywordtype">void</span> {</div>
 <div class="line"><a id="l00550" name="l00550"></a><span class="lineno">  550</span>            <span class="keywordflow">for</span> (Index_ i = 0; i &lt; n; ++i) {</div>
 <div class="line"><a id="l00551" name="l00551"></a><span class="lineno">  551</span>                check_data_value_fit(requested_dtype, vptr[i]);</div>
-<div class="line"><a id="l00552" name="l00552"></a><span class="lineno">  552</span>                <span class="keywordflow">if</span> (does_non_negative_integer_fit(requested_itype, iptr[i])) {</div>
+<div class="line"><a id="l00552" name="l00552"></a><span class="lineno">  552</span>                <span class="keywordflow">if</span> (!does_non_negative_integer_fit(requested_itype, iptr[i])) {</div>
 <div class="line"><a id="l00553" name="l00553"></a><span class="lineno">  553</span>                    <span class="keywordflow">throw</span> std::runtime_error(<span class="stringliteral">&quot;specified type cannot store the largest index&quot;</span>);</div>
 <div class="line"><a id="l00554" name="l00554"></a><span class="lineno">  554</span>                }</div>
 <div class="line"><a id="l00555" name="l00555"></a><span class="lineno">  555</span>            }</div>
@@ -626,7 +626,7 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00597" name="l00597"></a><span class="lineno">  597</span>                <span class="keywordflow">if</span> (extracted[i]) {</div>
 <div class="line"><a id="l00598" name="l00598"></a><span class="lineno">  598</span>                    check_data_value_fit(requested_dtype, extracted[i]);</div>
 <div class="line"><a id="l00599" name="l00599"></a><span class="lineno">  599</span>                    sparse_xbuffer.push_back(extracted[i]);</div>
-<div class="line"><a id="l00600" name="l00600"></a><span class="lineno">  600</span>                    <span class="keywordflow">if</span> (does_non_negative_integer_fit(requested_itype, i)) {</div>
+<div class="line"><a id="l00600" name="l00600"></a><span class="lineno">  600</span>                    <span class="keywordflow">if</span> (!does_non_negative_integer_fit(requested_itype, i)) {</div>
 <div class="line"><a id="l00601" name="l00601"></a><span class="lineno">  601</span>                        <span class="keywordflow">throw</span> std::runtime_error(<span class="stringliteral">&quot;specified type cannot store the largest index&quot;</span>);</div>
 <div class="line"><a id="l00602" name="l00602"></a><span class="lineno">  602</span>                    }</div>
 <div class="line"><a id="l00603" name="l00603"></a><span class="lineno">  603</span>                    sparse_ibuffer.push_back(i);</div>
