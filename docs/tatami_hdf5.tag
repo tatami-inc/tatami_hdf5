@@ -209,6 +209,13 @@
     </member>
     <member kind="variable">
       <type>bool</type>
+      <name>shuffle</name>
+      <anchorfile>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</anchorfile>
+      <anchor>af769fbd1fd72b7939d5cd5dd167f728a</anchor>
+      <arglist></arglist>
+    </member>
+    <member kind="variable">
+      <type>bool</type>
       <name>two_pass</name>
       <anchorfile>structtatami__hdf5_1_1WriteCompressedSparseMatrixOptions.html</anchorfile>
       <anchor>a378f4a8837a59d8c9f8497d737aabc31</anchor>
