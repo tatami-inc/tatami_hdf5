@@ -11,17 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Get latest CMake
       uses: lukka/get-cmake@latest
-
-    - name: Install tatami_chunked
-      run: |
-        git clone https://github.com/tatami-inc/tatami_chunked dep-tatami_chunked --depth=1
-        cd dep-tatami_chunked
-        cmake -S . -B build -DTATAMI_CHUNKED_TESTS=OFF
-        sudo cmake --install build
 
     - name: Install HDF5
       run: |
@@ -29,7 +22,7 @@ jobs:
         sudo apt-get install libhdf5-dev
 
     - name: Configure the build
-      run: cmake -S . -B build -DTATAMI_HDF5_FETCH_EXTERN=OFF -DTATAMI_HDF5_TESTS=OFF
+      run: cmake -S . -B build -DTATAMI_HDF5_TESTS=OFF
 
     - name: Install the library
       run: sudo cmake --install build
